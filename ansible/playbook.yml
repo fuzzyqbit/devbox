@@ -1,0 +1,77 @@
+---
+- name: Build development sandbox image
+  hosts: all
+  become: true
+  vars:
+    dev_user: ec2-user
+    dev_home: /home/ec2-user
+
+  pre_tasks:
+    - name: Wait for cloud-init to finish
+      command: cloud-init status --wait
+      changed_when: false
+
+  roles:
+    - role: base
+      when: layers.base | default(true)
+
+    - role: certs
+      when: layers.certs | default(true)
+
+    - role: git
+      when: layers.git | default(false)
+
+    - role: python
+      when: layers.python | default(false)
+
+    - role: golang
+      when: layers.golang | default(false)
+
+    - role: rust
+      when: layers.rust | default(false)
+
+    - role: java
+      when: layers.java | default(false)
+
+    - role: containers
+      when: layers.containers | default(false)
+
+    - role: terraform
+      when: layers.terraform | default(false)
+
+    - role: devops
+      when: layers.devops | default(false)
+
+    - role: devtools
+      when: layers.devtools | default(false)
+
+    - role: vscode
+      when: layers.vscode | default(false)
+
+    - role: desktop
+      when: layers.desktop | default(false)
+
+    - role: hardening
+      when: layers.hardening | default(false)
+
+  post_tasks:
+    - name: Clean dnf cache
+      command: dnf clean all
+      changed_when: false
+
+    - name: Remove temporary files
+      file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /tmp/*.tar.gz
+        - /tmp/*.zip
+        - /var/tmp/*
+
+    - name: Write build manifest
+      copy:
+        content: |
+          build_date: {{ ansible_date_time.iso8601 }}
+          layers: {{ layers | to_nice_yaml }}
+        dest: /etc/devimage-manifest.yml
+        mode: "0644"

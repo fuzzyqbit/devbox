@@ -1,0 +1,24 @@
+[Unit]
+Description=TigerVNC server for {{ dev_user }} on display {{ desktop_vnc_display }}
+After=network.target dbus.service
+
+[Service]
+Type=simple
+User={{ dev_user }}
+Group={{ dev_user }}
+Environment=HOME={{ dev_home }}
+
+ExecStartPre=/bin/sh -c '/usr/bin/vncserver -kill {{ desktop_vnc_display }} 2>/dev/null || true'
+ExecStart=/usr/bin/vncserver {{ desktop_vnc_display }} \
+  -geometry {{ desktop_vnc_resolution }} \
+  -depth {{ desktop_vnc_depth }} \
+  -fg \
+  -localhost yes \
+  -xstartup {{ dev_home }}/.vnc/xstartup
+ExecStop=/usr/bin/vncserver -kill {{ desktop_vnc_display }}
+
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

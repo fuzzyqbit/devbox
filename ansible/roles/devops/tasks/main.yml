@@ -1,0 +1,124 @@
+---
+# --- kubectl ---
+- name: Download kubectl {{ kubectl_version }}
+  get_url:
+    url: "https://dl.k8s.io/release/v{{ kubectl_version }}/bin/linux/amd64/kubectl"
+    dest: /usr/local/bin/kubectl
+    mode: "0755"
+
+- name: Enable kubectl tab completion
+  lineinfile:
+    path: "{{ dev_home }}/.bashrc"
+    line: 'source <(kubectl completion bash)'
+    regexp: 'kubectl completion'
+    owner: "{{ dev_user }}"
+    group: "{{ dev_user }}"
+
+# --- helm ---
+- name: Download helm {{ helm_version }}
+  get_url:
+    url: "https://get.helm.sh/helm-v{{ helm_version }}-linux-amd64.tar.gz"
+    dest: /tmp/helm.tar.gz
+    mode: "0644"
+
+- name: Install helm binary
+  unarchive:
+    src: /tmp/helm.tar.gz
+    dest: /usr/local/bin
+    remote_src: true
+    extra_opts:
+      - --strip-components=1
+      - linux-amd64/helm
+    mode: "0755"
+
+- name: Clean up helm archive
+  file:
+    path: /tmp/helm.tar.gz
+    state: absent
+
+- name: Enable helm tab completion
+  lineinfile:
+    path: "{{ dev_home }}/.bashrc"
+    line: 'source <(helm completion bash)'
+    regexp: 'helm completion'
+    owner: "{{ dev_user }}"
+    group: "{{ dev_user }}"
+
+# --- k9s ---
+- name: Download k9s {{ k9s_version }}
+  get_url:
+    url: "https://github.com/derailed/k9s/releases/download/v{{ k9s_version }}/k9s_Linux_amd64.tar.gz"
+    dest: /tmp/k9s.tar.gz
+    mode: "0644"
+
+- name: Install k9s binary
+  unarchive:
+    src: /tmp/k9s.tar.gz
+    dest: /usr/local/bin
+    remote_src: true
+    extra_opts:
+      - k9s
+    mode: "0755"
+
+- name: Clean up k9s archive
+  file:
+    path: /tmp/k9s.tar.gz
+    state: absent
+
+# --- eksctl ---
+- name: Download eksctl {{ eksctl_version }}
+  get_url:
+    url: "https://github.com/eksctl-io/eksctl/releases/download/v{{ eksctl_version }}/eksctl_Linux_amd64.tar.gz"
+    dest: /tmp/eksctl.tar.gz
+    mode: "0644"
+
+- name: Install eksctl binary
+  unarchive:
+    src: /tmp/eksctl.tar.gz
+    dest: /usr/local/bin
+    remote_src: true
+    extra_opts:
+      - eksctl
+    mode: "0755"
+
+- name: Clean up eksctl archive
+  file:
+    path: /tmp/eksctl.tar.gz
+    state: absent
+
+- name: Enable eksctl tab completion
+  lineinfile:
+    path: "{{ dev_home }}/.bashrc"
+    line: 'source <(eksctl completion bash)'
+    regexp: 'eksctl completion'
+    owner: "{{ dev_user }}"
+    group: "{{ dev_user }}"
+
+# --- istioctl ---
+- name: Download istioctl {{ istioctl_version }}
+  get_url:
+    url: "https://github.com/istio/istio/releases/download/{{ istioctl_version }}/istioctl-{{ istioctl_version }}-linux-amd64.tar.gz"
+    dest: /tmp/istioctl.tar.gz
+    mode: "0644"
+
+- name: Install istioctl binary
+  unarchive:
+    src: /tmp/istioctl.tar.gz
+    dest: /usr/local/bin
+    remote_src: true
+    extra_opts:
+      - istioctl
+    mode: "0755"
+
+- name: Clean up istioctl archive
+  file:
+    path: /tmp/istioctl.tar.gz
+    state: absent
+
+- name: Enable istioctl tab completion
+  lineinfile:
+    path: "{{ dev_home }}/.bashrc"
+    line: 'source <(istioctl completion bash)'
+    regexp: 'istioctl completion'
+    owner: "{{ dev_user }}"
+    group: "{{ dev_user }}"

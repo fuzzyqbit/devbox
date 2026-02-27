@@ -1,0 +1,51 @@
+---
+- name: Download Go {{ go_version }}
+  get_url:
+    url: "https://go.dev/dl/go{{ go_version }}.linux-amd64.tar.gz"
+    dest: /tmp/go.tar.gz
+    mode: "0644"
+
+- name: Remove existing Go installation
+  file:
+    path: "{{ go_install_dir }}/go"
+    state: absent
+
+- name: Extract Go to {{ go_install_dir }}
+  unarchive:
+    src: /tmp/go.tar.gz
+    dest: "{{ go_install_dir }}"
+    remote_src: true
+
+- name: Add Go to system PATH
+  copy:
+    content: |
+      export PATH={{ go_bin }}:$PATH
+    dest: /etc/profile.d/golang.sh
+    mode: "0644"
+
+- name: Set up GOPATH for dev user
+  blockinfile:
+    path: "{{ dev_home }}/.bashrc"
+    marker: "# {mark} GOLANG"
+    block: |
+      export GOPATH={{ dev_home }}/go
+      export PATH={{ go_bin }}:$GOPATH/bin:$PATH
+    owner: "{{ dev_user }}"
+    group: "{{ dev_user }}"
+
+- name: Create GOPATH directories
+  file:
+    path: "{{ dev_home }}/go/{{ item }}"
+    state: directory
+    owner: "{{ dev_user }}"
+    group: "{{ dev_user }}"
+    mode: "0755"
+  loop:
+    - src
+    - bin
+    - pkg
+
+- name: Clean up Go tarball
+  file:
+    path: /tmp/go.tar.gz
+    state: absent

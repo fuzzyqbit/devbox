@@ -1,0 +1,86 @@
+---
+- name: Install Python packages
+  dnf:
+    name: "{{ python_packages }}"
+    state: present
+
+- name: Install pipx
+  pip:
+    name: pipx
+    executable: pip3
+    state: present
+
+- name: Ensure pipx path
+  become: true
+  become_user: "{{ dev_user }}"
+  command: python3 -m pipx ensurepath
+  changed_when: false
+
+- name: Install Python CLI tools via pipx
+  become: true
+  become_user: "{{ dev_user }}"
+  command: "python3 -m pipx install {{ item }}"
+  args:
+    creates: "{{ dev_home }}/.local/bin/{{ item }}"
+  loop: "{{ pipx_tools }}"
+
+# --- uv + uvx (standalone binary, faster than pipx-based install) ---
+- name: Download uv {{ uv_version }}
+  get_url:
+    url: "https://github.com/astral-sh/uv/releases/download/{{ uv_version }}/uv-x86_64-unknown-linux-musl.tar.gz"
+    dest: /tmp/uv.tar.gz
+    mode: "0644"
+
+- name: Create uv extract directory
+  file:
+    path: /tmp/uv-extract
+    state: directory
+    mode: "0755"
+
+- name: Extract uv archive
+  unarchive:
+    src: /tmp/uv.tar.gz
+    dest: /tmp/uv-extract
+    remote_src: true
+    extra_opts:
+      - --strip-components=1
+
+- name: Install uv binary
+  copy:
+    src: /tmp/uv-extract/uv
+    dest: /usr/local/bin/uv
+    remote_src: true
+    mode: "0755"
+
+- name: Install uvx binary
+  copy:
+    src: /tmp/uv-extract/uvx
+    dest: /usr/local/bin/uvx
+    remote_src: true
+    mode: "0755"
+
+- name: Clean up uv archive
+  file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - /tmp/uv.tar.gz
+    - /tmp/uv-extract
+
+# --- virtualenvwrapper ---
+- name: Install virtualenvwrapper
+  pip:
+    name: virtualenvwrapper
+    executable: pip3
+    state: present
+
+- name: Configure virtualenvwrapper in bashrc
+  blockinfile:
+    path: "{{ dev_home }}/.bashrc"
+    block: |
+      export WORKON_HOME=$HOME/.virtualenvs
+      export VIRTUALENVWRAPPER_PYTHON=$(which python3)
+      source $(which virtualenvwrapper.sh)
+    marker: "# {mark} ANSIBLE MANAGED BLOCK - virtualenvwrapper"
+    owner: "{{ dev_user }}"
+    group: "{{ dev_user }}"

@@ -1,0 +1,155 @@
+---
+- name: Install Amazon Corretto JDK
+  dnf:
+    name: "{{ java_packages }}"
+    state: present
+
+- name: Set JAVA_HOME in profile
+  copy:
+    content: |
+      export JAVA_HOME=$(dirname $(dirname $(readlink -f $(which java))))
+      export PATH=$JAVA_HOME/bin:$PATH
+    dest: /etc/profile.d/java.sh
+    mode: "0644"
+
+- name: Download Apache Maven {{ maven_version }}
+  get_url:
+    url: "https://archive.apache.org/dist/maven/maven-3/{{ maven_version }}/binaries/apache-maven-{{ maven_version }}-bin.tar.gz"
+    dest: /tmp/maven.tar.gz
+    mode: "0644"
+
+- name: Extract Maven to /opt
+  unarchive:
+    src: /tmp/maven.tar.gz
+    dest: /opt
+    remote_src: true
+
+- name: Symlink Maven
+  file:
+    src: "/opt/apache-maven-{{ maven_version }}"
+    dest: /opt/maven
+    state: link
+
+- name: Add Maven to PATH
+  copy:
+    content: |
+      export M2_HOME=/opt/maven
+      export PATH=/opt/maven/bin:$PATH
+    dest: /etc/profile.d/maven.sh
+    mode: "0644"
+
+- name: Download Gradle {{ gradle_version }}
+  get_url:
+    url: "https://services.gradle.org/distributions/gradle-{{ gradle_version }}-bin.zip"
+    dest: /tmp/gradle.zip
+    mode: "0644"
+
+- name: Extract Gradle to /opt
+  unarchive:
+    src: /tmp/gradle.zip
+    dest: /opt
+    remote_src: true
+
+- name: Symlink Gradle
+  file:
+    src: "/opt/gradle-{{ gradle_version }}"
+    dest: /opt/gradle
+    state: link
+
+- name: Add Gradle to PATH
+  copy:
+    content: |
+      export GRADLE_HOME=/opt/gradle
+      export PATH=/opt/gradle/bin:$PATH
+    dest: /etc/profile.d/gradle.sh
+    mode: "0644"
+
+- name: Download IntelliJ IDEA Community Edition {{ intellij_version }}
+  get_url:
+    url: "https://download.jetbrains.com/idea/ideaIC-{{ intellij_version }}.tar.gz"
+    dest: /tmp/intellij.tar.gz
+    mode: "0644"
+
+- name: Extract IntelliJ to /opt
+  unarchive:
+    src: /tmp/intellij.tar.gz
+    dest: /opt
+    remote_src: true
+
+- name: Find IntelliJ extracted directory
+  find:
+    paths: /opt
+    patterns: "idea-*"
+    file_type: directory
+  register: intellij_find
+
+- name: Symlink IntelliJ
+  file:
+    src: "{{ intellij_find.files[0].path }}"
+    dest: /opt/idea
+    state: link
+
+- name: Add IntelliJ launcher to PATH
+  file:
+    src: /opt/idea/bin/idea
+    dest: /usr/local/bin/idea
+    state: link
+
+- name: Create IntelliJ desktop entry
+  copy:
+    content: |
+      [Desktop Entry]
+      Name=IntelliJ IDEA CE
+      Comment=IntelliJ IDEA Community Edition
+      Exec=/opt/idea/bin/idea %f
+      Icon=/opt/idea/bin/idea.svg
+      Terminal=false
+      Type=Application
+      Categories=Development;IDE;Java;
+      StartupWMClass=jetbrains-idea-ce
+    dest: /usr/share/applications/intellij-idea-ce.desktop
+    mode: "0644"
+
+# --- Eclipse IDE for Java Developers ---
+- name: Download Eclipse IDE {{ eclipse_version }}-{{ eclipse_build }}
+  get_url:
+    url: "https://download.eclipse.org/technology/epp/downloads/release/{{ eclipse_version }}/{{ eclipse_build }}/eclipse-java-{{ eclipse_version }}-{{ eclipse_build }}-linux-gtk-x86_64.tar.gz"
+    dest: /tmp/eclipse.tar.gz
+    mode: "0644"
+
+- name: Extract Eclipse to /opt
+  unarchive:
+    src: /tmp/eclipse.tar.gz
+    dest: /opt
+    remote_src: true
+
+- name: Symlink Eclipse launcher to PATH
+  file:
+    src: /opt/eclipse/eclipse
+    dest: /usr/local/bin/eclipse
+    state: link
+
+- name: Create Eclipse desktop entry
+  copy:
+    dest: /usr/share/applications/eclipse.desktop
+    mode: "0644"
+    content: |
+      [Desktop Entry]
+      Name=Eclipse IDE
+      Comment=Eclipse IDE for Java Developers
+      Exec=/opt/eclipse/eclipse %f
+      Icon=/opt/eclipse/icon.xpm
+      Terminal=false
+      Type=Application
+      Categories=Development;IDE;Java;
+      StartupWMClass=Eclipse
+
+- name: Clean up installers
+  file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - /tmp/maven.tar.gz
+    - /tmp/gradle.zip
+    - /tmp/intellij.tar.gz
+    - /tmp/eclipse.tar.gz

@@ -1,0 +1,244 @@
+---
+# --- GNOME Desktop ---
+
+- name: Install GNOME desktop group
+  dnf:
+    name: "@Desktop"
+    state: present
+
+- name: Install additional desktop packages
+  dnf:
+    name:
+      - tigervnc-server
+      - dejavu-sans-fonts
+      - dejavu-sans-mono-fonts
+      - mesa-dri-drivers
+    state: present
+
+# --- TigerVNC ---
+
+- name: Create VNC config directory
+  file:
+    path: "{{ dev_home }}/.vnc"
+    state: directory
+    owner: "{{ dev_user }}"
+    group: "{{ dev_user }}"
+    mode: "0755"
+
+- name: Set VNC password
+  shell: |
+    echo "{{ desktop_vnc_password }}" | vncpasswd -f > {{ dev_home }}/.vnc/passwd
+  args:
+    creates: "{{ dev_home }}/.vnc/passwd"
+
+- name: Fix VNC password file permissions
+  file:
+    path: "{{ dev_home }}/.vnc/passwd"
+    owner: "{{ dev_user }}"
+    group: "{{ dev_user }}"
+    mode: "0600"
+
+- name: Install VNC xstartup script
+  template:
+    src: xstartup.j2
+    dest: "{{ dev_home }}/.vnc/xstartup"
+    owner: "{{ dev_user }}"
+    group: "{{ dev_user }}"
+    mode: "0755"
+
+- name: Install VNC server systemd service
+  template:
+    src: vncserver.service.j2
+    dest: /etc/systemd/system/vncserver.service
+    mode: "0644"
+  notify: reload systemd
+
+- name: Enable VNC server service
+  systemd:
+    name: vncserver
+    enabled: true
+    daemon_reload: true
+
+# --- GNOME screensaver: disable lock screen (VNC keyboard input unreliable with lock) ---
+
+- name: Create dconf local profile directory
+  file:
+    path: /etc/dconf/db/local.d/locks
+    state: directory
+    mode: "0755"
+
+- name: Disable GNOME screen lock via dconf system defaults
+  copy:
+    dest: /etc/dconf/db/local.d/01-screensaver
+    content: |
+      [org/gnome/desktop/screensaver]
+      lock-enabled=false
+
+      [org/gnome/desktop/session]
+      idle-delay=uint32 0
+    mode: "0644"
+
+- name: Lock screensaver settings so users cannot re-enable lock
+  copy:
+    dest: /etc/dconf/db/local.d/locks/screensaver
+    content: |
+      /org/gnome/desktop/screensaver/lock-enabled
+      /org/gnome/desktop/session/idle-delay
+    mode: "0644"
+
+- name: Apply dconf system defaults
+  command: dconf update
+
+# --- noVNC ---
+
+- name: Ensure python3-pip is installed
+  dnf:
+    name: python3-pip
+    state: present
+
+- name: Install websockify via pip
+  pip:
+    name: websockify
+    executable: pip3
+    state: present
+
+- name: Download noVNC {{ desktop_novnc_version }}
+  get_url:
+    url: "https://github.com/novnc/noVNC/archive/refs/tags/v{{ desktop_novnc_version }}.tar.gz"
+    dest: /tmp/novnc.tar.gz
+    mode: "0644"
+
+- name: Create noVNC install directory
+  file:
+    path: /usr/local/share/noVNC
+    state: directory
+    mode: "0755"
+
+- name: Extract noVNC
+  unarchive:
+    src: /tmp/novnc.tar.gz
+    dest: /usr/local/share/noVNC
+    remote_src: true
+    extra_opts:
+      - "--strip-components=1"
+
+- name: Clean up noVNC tarball
+  file:
+    path: /tmp/novnc.tar.gz
+    state: absent
+
+- name: Symlink vnc.html to index.html for convenience
+  file:
+    src: /usr/local/share/noVNC/vnc.html
+    dest: /usr/local/share/noVNC/index.html
+    state: link
+
+- name: Create noVNC TLS cert directory
+  file:
+    path: /etc/novnc
+    state: directory
+    mode: "0755"
+
+- name: Generate self-signed TLS cert for noVNC
+  command: >
+    openssl req -x509 -nodes -newkey rsa:2048
+    -keyout /etc/novnc/novnc-key.pem
+    -out /etc/novnc/novnc-cert.pem
+    -days 3650 -subj '/CN=devbox'
+  args:
+    creates: /etc/novnc/novnc-cert.pem
+
+- name: Set noVNC cert/key permissions
+  file:
+    path: "{{ item.path }}"
+    owner: root
+    group: "{{ dev_user }}"
+    mode: "{{ item.mode }}"
+  loop:
+    - { path: /etc/novnc/novnc-cert.pem, mode: "0644" }
+    - { path: /etc/novnc/novnc-key.pem,  mode: "0640" }
+
+- name: Install noVNC systemd service
+  template:
+    src: novnc.service.j2
+    dest: /etc/systemd/system/novnc.service
+    mode: "0644"
+  notify: reload systemd
+
+- name: Enable noVNC service
+  systemd:
+    name: novnc
+    enabled: true
+    daemon_reload: true
+
+# --- ffmpeg (static build — not in AL2023 base repos) ---
+- name: Download ffmpeg static build
+  get_url:
+    url: https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz
+    dest: /tmp/ffmpeg-static.tar.xz
+    mode: "0644"
+
+- name: Create ffmpeg extract directory
+  file:
+    path: /tmp/ffmpeg-extract
+    state: directory
+    mode: "0755"
+
+- name: Extract ffmpeg archive
+  unarchive:
+    src: /tmp/ffmpeg-static.tar.xz
+    dest: /tmp/ffmpeg-extract
+    remote_src: true
+
+- name: Find ffmpeg binary
+  find:
+    paths: /tmp/ffmpeg-extract
+    patterns: "ffmpeg"
+    recurse: true
+    file_type: file
+  register: ffmpeg_bin
+
+- name: Find ffprobe binary
+  find:
+    paths: /tmp/ffmpeg-extract
+    patterns: "ffprobe"
+    recurse: true
+    file_type: file
+  register: ffprobe_bin
+
+- name: Install ffmpeg binary
+  copy:
+    src: "{{ ffmpeg_bin.files[0].path }}"
+    dest: /usr/local/bin/ffmpeg
+    remote_src: true
+    mode: "0755"
+
+- name: Install ffprobe binary
+  copy:
+    src: "{{ ffprobe_bin.files[0].path }}"
+    dest: /usr/local/bin/ffprobe
+    remote_src: true
+    mode: "0755"
+
+- name: Clean up ffmpeg archive
+  file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - /tmp/ffmpeg-static.tar.xz
+    - /tmp/ffmpeg-extract
+
+# --- VLC (flatpak — not in AL2023 base repos) ---
+- name: Install flatpak
+  dnf:
+    name: flatpak
+    state: present
+
+- name: Add Flathub remote
+  command: flatpak remote-add --if-not-exists --system flathub https://dl.flathub.org/repo/flathub.flatpakrepo
+  changed_when: false
+
+- name: Install VLC via flatpak
+  command: flatpak install --system -y flathub org.videolan.VLC
+  args:
+    creates: /var/lib/flatpak/app/org.videolan.VLC

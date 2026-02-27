@@ -1,0 +1,14 @@
+---
+java_packages:
+  - java-21-amazon-corretto-devel
+  - java-21-amazon-corretto
+
+maven_version: "3.9.12"
+gradle_version: "8.10.2"
+intellij_version: "2024.3.1.1"
+
+eclipse_version: "2024-12"
+eclipse_build: "R"
+
+dev_user: ec2-user
+dev_home: /home/ec2-user

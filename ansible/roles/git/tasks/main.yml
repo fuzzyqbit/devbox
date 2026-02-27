@@ -1,0 +1,87 @@
+---
+- name: Install git packages
+  dnf:
+    name: "{{ git_packages }}"
+    state: present
+
+- name: Install GitHub CLI
+  when: gh_cli_install
+  block:
+    - name: Add GitHub CLI yum repository
+      yum_repository:
+        name: gh-cli
+        description: GitHub CLI
+        baseurl: https://cli.github.com/packages/rpm
+        gpgcheck: true
+        gpgkey: https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x23F3D4EA75716059
+        enabled: true
+
+    - name: Install gh
+      dnf:
+        name: gh
+        state: present
+
+- name: Download lazygit
+  get_url:
+    url: "https://github.com/jesseduffield/lazygit/releases/download/v{{ lazygit_version }}/lazygit_{{ lazygit_version }}_Linux_x86_64.tar.gz"
+    dest: /tmp/lazygit.tar.gz
+    mode: "0644"
+
+- name: Install lazygit
+  unarchive:
+    src: /tmp/lazygit.tar.gz
+    dest: /usr/local/bin
+    remote_src: true
+    extra_opts:
+      - lazygit
+    mode: "0755"
+
+- name: Clean up lazygit archive
+  file:
+    path: /tmp/lazygit.tar.gz
+    state: absent
+
+- name: Download git-delta
+  get_url:
+    url: "https://github.com/dandavison/delta/releases/download/{{ delta_version }}/delta-{{ delta_version }}-x86_64-unknown-linux-musl.tar.gz"
+    dest: /tmp/delta.tar.gz
+    mode: "0644"
+
+- name: Create temp dir for delta extraction
+  file:
+    path: /tmp/delta-extract
+    state: directory
+    mode: "0755"
+
+- name: Extract delta
+  unarchive:
+    src: /tmp/delta.tar.gz
+    dest: /tmp/delta-extract
+    remote_src: true
+
+- name: Install delta binary
+  copy:
+    src: "/tmp/delta-extract/delta-{{ delta_version }}-x86_64-unknown-linux-musl/delta"
+    dest: /usr/local/bin/delta
+    remote_src: true
+    mode: "0755"
+
+- name: Clean up delta files
+  file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - /tmp/delta.tar.gz
+    - /tmp/delta-extract
+
+- name: Configure git to use delta
+  become: true
+  become_user: "{{ dev_user }}"
+  command: "git config --global {{ item.key }} {{ item.value }}"
+  loop:
+    - { key: "core.pager", value: "delta" }
+    - { key: "interactive.diffFilter", value: "delta --color-only" }
+    - { key: "delta.navigate", value: "true" }
+    - { key: "delta.side-by-side", value: "true" }
+    - { key: "merge.conflictstyle", value: "diff3" }
+  changed_when: false

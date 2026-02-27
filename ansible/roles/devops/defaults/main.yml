@@ -1,0 +1,9 @@
+---
+kubectl_version: "1.31.3"
+helm_version: "3.16.3"
+k9s_version: "0.32.7"
+eksctl_version: "0.194.0"
+istioctl_version: "1.24.2"
+
+dev_user: ec2-user
+dev_home: /home/ec2-user

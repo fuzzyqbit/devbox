@@ -1,0 +1,5 @@
+---
+# When true, writes /etc/profile.d/ca-trust.sh to point SSL_CERT_FILE,
+# REQUESTS_CA_BUNDLE, and NODE_EXTRA_CA_CERTS at the system bundle.
+# This ensures tools use the updated trust store even without explicit config.
+ca_cert_env_vars: true

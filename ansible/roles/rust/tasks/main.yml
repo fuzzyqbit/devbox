@@ -1,0 +1,35 @@
+---
+- name: Download rustup installer
+  get_url:
+    url: https://sh.rustup.rs
+    dest: /tmp/rustup-init.sh
+    mode: "0755"
+
+- name: Install Rust via rustup
+  become: true
+  become_user: "{{ dev_user }}"
+  command: /tmp/rustup-init.sh -y --default-toolchain {{ rust_toolchain }}
+  args:
+    creates: "{{ dev_home }}/.cargo/bin/rustc"
+
+- name: Add Rust components
+  become: true
+  become_user: "{{ dev_user }}"
+  command: "{{ dev_home }}/.cargo/bin/rustup component add {{ item }}"
+  environment:
+    PATH: "{{ dev_home }}/.cargo/bin:{{ ansible_env.PATH }}"
+  loop: "{{ rust_components }}"
+  changed_when: false
+
+- name: Add cargo env to bashrc
+  lineinfile:
+    path: "{{ dev_home }}/.bashrc"
+    line: '. "$HOME/.cargo/env"'
+    regexp: '\.cargo/env'
+    owner: "{{ dev_user }}"
+    group: "{{ dev_user }}"
+
+- name: Clean up rustup installer
+  file:
+    path: /tmp/rustup-init.sh
+    state: absent

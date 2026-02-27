@@ -1,0 +1,43 @@
+---
+- name: Install CIS hardening prerequisites
+  dnf:
+    name:
+      - authselect
+      - crypto-policies-scripts
+      - aide
+    state: present
+  tags: hardening
+
+- name: Select authselect sssd profile
+  command: authselect select sssd with-sudo --force
+  tags: hardening
+
+- name: Verify authselect profile integrity
+  command: authselect check
+  tags: hardening
+
+- name: Set random root password (required by CIS rule 4.6.6)
+  user:
+    name: root
+    password: "{{ lookup('password', '/dev/null length=32') | password_hash('sha512') }}"
+  tags: hardening
+
+- name: Set SELinux to enforcing
+  selinux:
+    policy: targeted
+    state: enforcing
+  tags: hardening
+
+- name: Apply CIS hardening
+  include_role:
+    name: AMAZON2023-CIS
+  tags: hardening
+
+- name: Enable FIPS mode
+  command: fips-mode-setup --enable
+  tags: hardening
+
+- name: Reboot to apply hardening (SELinux enforcing, FIPS mode, GRUB changes)
+  ansible.builtin.reboot:
+    reboot_timeout: 300
+  tags: hardening

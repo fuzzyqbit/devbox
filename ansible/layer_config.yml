@@ -1,0 +1,19 @@
+# Layer Configuration
+# Toggle layers on/off to customize the image build.
+# To add a new layer: create ansible/roles/<name>/, then add it here.
+
+layers:
+  base: true
+  certs: true
+  python: true
+  golang: true
+  rust: true
+  java: true
+  containers: true
+  terraform: true
+  devops: true
+  vscode: true
+  git: true
+  devtools: true
+  desktop: true
+  hardening: true

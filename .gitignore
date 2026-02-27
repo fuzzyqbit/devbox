@@ -1,0 +1,27 @@
+# Packer
+packer/packer_cache/
+*.pkr.hcl.lock
+
+# Terraform
+terraform/.terraform/
+terraform/.terraform.lock.hcl
+terraform/terraform.tfstate
+terraform/terraform.tfstate.backup
+terraform/terraform.tfstate.d/
+terraform/terraform.tfvars
+terraform/backend.tf
+
+# Terragrunt
+.terragrunt-cache/
+
+# Ansible
+*.retry
+
+# OS
+.DS_Store
+
+# Claude Code (local settings, not project files)
+.claude/
+
+# Root-level Terraform lock (terragrunt generates this at project root)
+.terraform.lock.hcl

@@ -1,0 +1,34 @@
+---
+# Drop .crt or .pem files into ansible/roles/certs/files/ca-certs/ before
+# running a build. They are copied into the system trust anchors and
+# update-ca-trust is run to rebuild the system bundle.
+
+- name: Copy custom CA certificates into trust anchors
+  copy:
+    src: "{{ item }}"
+    dest: /etc/pki/ca-trust/source/anchors/
+    mode: "0644"
+  with_fileglob:
+    - "ca-certs/*.crt"
+    - "ca-certs/*.pem"
+  register: ca_certs_copied
+
+- name: Rebuild system CA trust bundle
+  command: update-ca-trust extract
+  when: ca_certs_copied.changed
+
+# Set env vars so tools that bypass OpenSSL defaults also use the bundle.
+# Java (Amazon Corretto on AL2023) links cacerts -> /etc/pki/java/cacerts
+# which update-ca-trust manages, so no keytool step is needed.
+- name: Write /etc/profile.d/ca-trust.sh
+  when: ca_cert_env_vars
+  copy:
+    dest: /etc/profile.d/ca-trust.sh
+    mode: "0644"
+    content: |
+      # Point SSL tools at the system CA bundle
+      export SSL_CERT_FILE=/etc/pki/tls/certs/ca-bundle.crt
+      export SSL_CERT_DIR=/etc/pki/tls/certs
+      export REQUESTS_CA_BUNDLE=/etc/pki/tls/certs/ca-bundle.crt
+      export NODE_EXTRA_CA_CERTS=/etc/pki/tls/certs/ca-bundle.crt
+      export CURL_CA_BUNDLE=/etc/pki/tls/certs/ca-bundle.crt

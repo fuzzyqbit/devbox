@@ -1,0 +1,11 @@
+---
+git_packages:
+  - git
+  - git-lfs
+
+gh_cli_install: true
+lazygit_version: "0.44.1"
+delta_version: "0.18.2"
+
+dev_user: ec2-user
+dev_home: /home/ec2-user

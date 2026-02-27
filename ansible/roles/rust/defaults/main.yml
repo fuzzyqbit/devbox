@@ -1,0 +1,11 @@
+---
+rust_toolchain: stable
+
+rust_components:
+  - clippy
+  - rustfmt
+  - rust-src
+  - rust-analyzer
+
+dev_user: ec2-user
+dev_home: /home/ec2-user
