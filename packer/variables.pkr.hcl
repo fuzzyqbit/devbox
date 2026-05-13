@@ -39,3 +39,13 @@ variable "extra_tags" {
   default     = {}
   description = "Additional tags to apply to the AMI"
 }
+
+variable "devbox_user" {
+  type        = string
+  default     = ""
+  description = "Operator username; keys SSM parameter paths /devbox/<user>/*. Required."
+  validation {
+    condition     = can(regex("^[a-z_][a-z0-9_-]*$", var.devbox_user))
+    error_message = "The devbox_user value must match the regex ^[a-z_][a-z0-9_-]*$ (lowercase letter or underscore followed by lowercase alphanumerics/dashes/underscores)."
+  }
+}

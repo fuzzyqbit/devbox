@@ -3,3 +3,5 @@ collections:
   - name: community.general
   - name: community.crypto
   - name: ansible.posix
+  - name: community.aws
+    version: "9.0.0"   # bump in Phase 3 (REP-02) along with the other collections

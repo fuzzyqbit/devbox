@@ -45,10 +45,10 @@ source "amazon-ebs" "al2023" {
 
   tags = merge(
     {
-      Name       = local.ami_name
-      Builder    = "packer"
-      BaseOS     = "al2023"
-      BuildTime  = local.timestamp
+      Name      = local.ami_name
+      Builder   = "packer"
+      BaseOS    = "al2023"
+      BuildTime = local.timestamp
     },
     var.extra_tags
   )
@@ -61,7 +61,9 @@ build {
     playbook_file = "${path.root}/../ansible/playbook.yml"
     galaxy_file   = "${path.root}/../ansible/requirements.yml"
     extra_arguments = [
-      "--extra-vars", "@${path.root}/../ansible/layer_config.yml"
+      "--extra-vars", "@${path.root}/../ansible/layer_config.yml",
+      "--extra-vars", "devbox_user=${var.devbox_user}",
+      "--extra-vars", "aws_region=${var.aws_region}",
     ]
     ansible_env_vars = [
       "ANSIBLE_HOST_KEY_CHECKING=False",
