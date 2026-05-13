@@ -45,6 +45,9 @@
     - role: devtools
       when: layers.devtools | default(false)
 
+    - role: secrets
+      when: (layers.vscode | default(false)) or (layers.desktop | default(false))
+
     - role: vscode
       when: layers.vscode | default(false)
 
