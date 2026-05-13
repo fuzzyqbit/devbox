@@ -1,0 +1,19 @@
+# gitleaks configuration — extends the default ruleset with project-specific allowances.
+# See: https://github.com/gitleaks/gitleaks#configuration
+
+# Extend the upstream default rules; this file ADDS allowances, does not replace.
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Permit canonical example keys in documentation and planning artifacts"
+paths = [
+  '''\.planning/.*''',
+  '''.*\.md''',
+]
+regexes = [
+  # The canonical AWS docs example. RESEARCH.md and SUMMARY.md need to reference it.
+  '''AKIAIOSFODNN7EXAMPLE''',
+  # The canonical AWS docs example secret key.
+  '''wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY''',
+]

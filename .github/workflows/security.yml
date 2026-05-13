@@ -1,0 +1,28 @@
+---
+name: security
+
+# Phase 1 (SEC-05): gitleaks gates every push and PR.
+# Phase 4 (CI-01..CI-06) extends this file with terraform fmt, terragrunt hclfmt,
+# packer validate, ansible-lint, shellcheck, tfsec/checkov.
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  gitleaks:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
+        with:
+          fetch-depth: 0   # full history; gitleaks scans every commit, not just HEAD
+
+      - name: Run gitleaks
+        uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7  # v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # GITLEAKS_LICENSE not required for public/personal repos.
