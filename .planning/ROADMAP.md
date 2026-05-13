@@ -37,7 +37,10 @@ Close every CRITICAL and HIGH finding in `.planning/codebase/CONCERNS.md`, and i
   - Decision needed in 1.2: Secrets Manager vs SSM Parameter Store. Bias to SSM Parameter Store (cheaper for personal use, simpler IAM). Record in PROJECT.md.
   - 1.3 introduces the `.pre-commit-config.yaml` file that Phase 4 will extend; coordinate the file layout up front to avoid rewrites.
 **Parallelizable**: 1.2 (Terraform IAM) and 1.3 (gitleaks) can run in parallel with 1.1 (Ansible templates) since they touch disjoint files. 1.1 ↔ 1.2 share an integration point (where the secret value flows from Ansible into AWS) — coordinate the contract before parallelizing.
-**Plans**: TBD
+**Plans**: 3 plans
+- [ ] 01-01-PLAN.md — code-server + VNC per-build random passwords; new `secrets` Ansible role; fix the broken VNC `creates:` guard (SEC-01, SEC-02). Wave 1.
+- [ ] 01-02-PLAN.md — Publish SSM SecureStrings + IAM instance profile + IMDSv2 boot-time oneshot + per-operator SSH key + `make secrets-show` (SEC-03, SEC-04). Wave 2; depends on 01-01.
+- [ ] 01-03-PLAN.md — gitleaks pre-commit + GitHub Actions workflow + `.gitleaks.toml` allowlist; planted-secret smoke test checkpoint (SEC-05). Wave 1; parallel with 01-01 and 01-02.
 
 ### Phase 2: Network exposure remediation
 **Goal**: Replace the `0.0.0.0/0` ingress on SSH/code-server/noVNC with an operator-supplied CIDR allowlist or AWS SSM Session Manager, closing the third CRITICAL finding and removing the trivially-exploitable surface from every devbox.
