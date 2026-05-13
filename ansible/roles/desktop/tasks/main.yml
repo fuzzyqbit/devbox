@@ -9,6 +9,7 @@
 - name: Install additional desktop packages
   dnf:
     name:
+      - gnome-shell
       - tigervnc-server
       - dejavu-sans-fonts
       - dejavu-sans-mono-fonts

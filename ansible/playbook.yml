@@ -75,3 +75,8 @@
           layers: {{ layers | to_nice_yaml }}
         dest: /etc/devimage-manifest.yml
         mode: "0644"
+
+# FIXME: see firewalld-docker-fix.yml header — temporary workaround,
+# not the long-term firewall design. Remove once firewalld policy is
+# managed properly (or once firewalld is removed entirely).
+- import_playbook: firewalld-docker-fix.yml

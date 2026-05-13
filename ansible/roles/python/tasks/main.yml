@@ -68,10 +68,19 @@
     - /tmp/uv-extract
 
 # --- virtualenvwrapper ---
-- name: Install virtualenvwrapper
+# Installed per-user (not system-wide). Reasons:
+#   1. virtualenvwrapper is a shell helper for one user's venv workflow,
+#      not a system tool — install scope should match usage scope.
+#   2. The CIS hardening role sets system umask to 027, so a root-run
+#      `pip install` lands files mode 0640/0750 under /usr/local, making
+#      them unreadable to ec2-user. Per-user install sidesteps this.
+- name: Install virtualenvwrapper for dev user
+  become: true
+  become_user: "{{ dev_user }}"
   pip:
     name: virtualenvwrapper
     executable: pip3
+    extra_args: --user
     state: present
 
 - name: Configure virtualenvwrapper in bashrc
