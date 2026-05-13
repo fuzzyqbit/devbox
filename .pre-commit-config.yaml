@@ -1,0 +1,27 @@
+---
+# Phase 1 (SEC-05): secret-leak gates. Phase 4 will extend this file with
+# terraform_fmt, terragrunt_hclfmt, packer_validate, ansible-lint, shellcheck,
+# tfsec/checkov, end-of-file-fixer, trailing-whitespace.
+#
+# Operator one-time setup:
+#   brew install gitleaks pre-commit   # (or dnf/apt + pip install pre-commit)
+#   pre-commit install                 # wires into .git/hooks/pre-commit
+
+default_stages: [pre-commit]
+
+repos:
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.30.1
+    hooks:
+      - id: gitleaks
+
+  # Belt-and-braces guard against literal weak defaults. gitleaks does NOT
+  # detect the bare word "changeme" by default, so this local hook closes the
+  # specific regression we just removed in 01-PLAN.
+  - repo: local
+    hooks:
+      - id: no-changeme
+        name: Block literal "changeme" in any tracked code file
+        entry: bash -c 'if git grep -nIE "changeme" -- ":!*.md" ":!.planning/**" ":!.pre-commit-config.yaml"; then echo "Found literal changeme — generate per-build secrets via Ansible password lookup (see ansible/roles/secrets/)"; exit 1; fi'
+        language: system
+        pass_filenames: false
