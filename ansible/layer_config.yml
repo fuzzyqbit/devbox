@@ -6,6 +6,8 @@ layers:
   base: true
   certs: true
   python: true
+  # secrets role is auto-gated by vscode/desktop; this flag is informational.
+  secrets: true
   golang: true
   rust: true
   java: true
