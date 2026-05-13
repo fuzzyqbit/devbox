@@ -48,12 +48,6 @@ variable "devbox_user" {
   description = "Username that owns this devbox (used for resource naming and tags)"
 }
 
-variable "iam_instance_profile" {
-  type        = string
-  default     = null
-  description = "Name of an existing IAM instance profile to attach to the instance (optional)"
-}
-
 variable "associate_public_ip" {
   type        = bool
   default     = true

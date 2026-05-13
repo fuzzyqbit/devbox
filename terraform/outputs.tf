@@ -35,7 +35,17 @@ output "security_group_id" {
 
 output "iam_instance_profile" {
   description = "IAM instance profile attached to the instance"
-  value       = var.iam_instance_profile
+  value       = aws_iam_instance_profile.devbox.name
+}
+
+output "ssm_code_server_password_param" {
+  description = "SSM Parameter Store name for the code-server password"
+  value       = "/devbox/${var.devbox_user}/code-server-password"
+}
+
+output "ssm_vnc_password_param" {
+  description = "SSM Parameter Store name for the VNC password"
+  value       = "/devbox/${var.devbox_user}/vnc-password"
 }
 
 output "aws_region" {
