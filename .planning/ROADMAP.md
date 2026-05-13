@@ -12,7 +12,7 @@ Close every CRITICAL and HIGH finding in `.planning/codebase/CONCERNS.md`, and i
 
 ## Phases
 
-- [ ] **Phase 1: Secrets remediation** — Eliminate hardcoded `changeme` passwords, generate per-build secrets, deliver via Secrets Manager/SSM with an instance-profile IAM, and gate against future secret leaks with `gitleaks`.
+- [x] **Phase 1: Secrets remediation** — ✓ Complete 2026-05-13. SEC-01..SEC-05 all closed. Verification: `.planning/phases/01-secrets-remediation/01-VERIFICATION.md`.
 - [ ] **Phase 2: Network exposure remediation** — Decide between AWS SSM Session Manager and a CIDR allowlist, implement the chosen posture, and remove the `0.0.0.0/0` ingress on `:22`, `:8080`, and `:6080`.
 - [ ] **Phase 3: Reproducibility & version pinning** — Commit `.terraform.lock.hcl`, pin every Galaxy collection + role, pin the Packer source AMI, and replace the hand-copied AMI ID with an automated lookup.
 - [ ] **Phase 4: CI, pre-commit, and documentation** — Add GitHub Actions + `.pre-commit-config.yaml` covering fmt/validate/lint/security/secret-scan, populate `CLAUDE.md`, and document the firewalld-docker workaround with its retirement criteria.

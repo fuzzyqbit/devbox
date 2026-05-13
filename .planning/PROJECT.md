@@ -21,19 +21,22 @@ A single operator can spin up, hibernate, and tear down a reproducible, hardened
 - ✓ Lifecycle scripts drive `aws ec2 start/stop/wait` and surface connection info — `scripts/devbox-{start,stop,status}.sh`
 - ✓ Makefile is the single operator entry surface and threads `DEVBOX_USER` through every stage — `Makefile`
 - ✓ CIS-style hardening baseline applied during AMI bake (real root password dropped, sshd config tightened) — `ansible/roles/amazon2023-cis/`
+- ✓ Per-build randomized code-server and VNC passwords via Ansible `secrets` role; cleartext never lands in git — Phase 1 (SEC-01, SEC-02) — `ansible/roles/secrets/`
+- ✓ Secrets published to AWS SSM Parameter Store SecureString and fetched at boot by a systemd oneshot via IAM instance profile (scoped to `/devbox/${devbox_user}/*`); IMDSv2 enforced on the EC2 — Phase 1 (SEC-03) — `terraform/main.tf`, `ansible/roles/secrets/`
+- ✓ Per-operator SSH keypair `${devbox_user}-devbox`; hardcoded `key_name = "me"` removed — Phase 1 (SEC-04) — `terragrunt.hcl`
+- ✓ `gitleaks` v8.30.1 + `no-changeme` guard in `.pre-commit-config.yaml` and `.github/workflows/security.yml` — Phase 1 (SEC-05) — `.pre-commit-config.yaml`, `.github/workflows/security.yml`, `.gitleaks.toml`
 
 ### Active
 
 <!-- Milestone 1: Security hardening + CI baseline. All hypotheses until shipped. -->
 
-- [ ] Eliminate `changeme` default passwords for code-server (:8080) and VNC (:6080) — generate per-build random secrets, store via AWS Secrets Manager or SSM Parameter Store
-- [ ] Restrict security group ingress: replace `0.0.0.0/0` on SSH/8080/6080 with operator-supplied CIDR list (or migrate to AWS SSM Session Manager for SSH)
-- [ ] Pin all third-party versions: commit `.terraform.lock.hcl`, pin `ansible/requirements.yml` collection versions, pin galaxy roles, pin code-server/dnf package versions where feasible
-- [ ] Replace hand-copied AMI ID with Terraform `data "aws_ami"` lookup or Terragrunt input wired to Packer output
-- [ ] Add CI pipeline (GitHub Actions): `terraform fmt -check`, `tofu validate`, `packer validate`, `ansible-lint`, `shellcheck`, `tfsec`/`checkov`, `gitleaks`
-- [ ] Add pre-commit hooks mirroring the CI checks
-- [ ] Document the firewalld-docker workaround and audit whether it can be replaced with a CIS-compliant equivalent — `ansible/firewalld-docker-fix.yml`
-- [ ] Replace Packer base AMI `most_recent = true` with a pinned source AMI for reproducibility
+- [ ] Restrict security group ingress: replace `0.0.0.0/0` on SSH/8080/6080 with operator-supplied CIDR list (or migrate to AWS SSM Session Manager for SSH) — Phase 2
+- [ ] Pin all third-party versions: commit `.terraform.lock.hcl`, pin `ansible/requirements.yml` collection versions, pin galaxy roles, pin code-server/dnf package versions where feasible — Phase 3
+- [ ] Replace hand-copied AMI ID with Terraform `data "aws_ami"` lookup or Terragrunt input wired to Packer output — Phase 3
+- [ ] Add full CI pipeline (`terraform fmt -check`, `tofu validate`, `packer validate`, `ansible-lint`, `shellcheck`, `tfsec`/`checkov`) — Phase 4 (gitleaks gate already in via Phase 1)
+- [ ] Extend pre-commit to mirror full CI checks — Phase 4 (gitleaks + no-changeme already in)
+- [ ] Document the firewalld-docker workaround and audit whether it can be replaced with a CIS-compliant equivalent — Phase 4 — `ansible/firewalld-docker-fix.yml`
+- [ ] Replace Packer base AMI `most_recent = true` with a pinned source AMI for reproducibility — Phase 3
 
 ### Out of Scope
 
@@ -91,4 +94,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-05-13 after initialization*
+*Last updated: 2026-05-13 after Phase 1 (Secrets remediation) complete*

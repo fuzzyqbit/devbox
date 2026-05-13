@@ -81,35 +81,36 @@ Deferred to future milestone(s). Tracked but not in current roadmap.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| SEC-01 | TBD | Pending |
-| SEC-02 | TBD | Pending |
-| SEC-03 | TBD | Pending |
-| SEC-04 | TBD | Pending |
-| SEC-05 | TBD | Pending |
-| NET-01 | TBD | Pending |
-| NET-02 | TBD | Pending |
-| NET-03 | TBD | Pending |
-| NET-04 | TBD | Pending |
-| REP-01 | TBD | Pending |
-| REP-02 | TBD | Pending |
-| REP-03 | TBD | Pending |
-| REP-04 | TBD | Pending |
-| REP-05 | TBD | Pending |
-| CI-01 | TBD | Pending |
-| CI-02 | TBD | Pending |
-| CI-03 | TBD | Pending |
-| CI-04 | TBD | Pending |
-| CI-05 | TBD | Pending |
-| CI-06 | TBD | Pending |
-| CI-07 | TBD | Pending |
-| DOC-01 | TBD | Pending |
-| DOC-02 | TBD | Pending |
+| SEC-01 | Phase 1 | Complete |
+| SEC-02 | Phase 1 | Complete |
+| SEC-03 | Phase 1 | Complete |
+| SEC-04 | Phase 1 | Complete |
+| SEC-05 | Phase 1 | Complete |
+| NET-01 | Phase 2 | Pending |
+| NET-02 | Phase 2 | Pending |
+| NET-03 | Phase 2 | Pending |
+| NET-04 | Phase 2 | Pending |
+| REP-01 | Phase 3 | Pending |
+| REP-02 | Phase 3 | Pending |
+| REP-03 | Phase 3 | Pending |
+| REP-04 | Phase 3 | Pending |
+| REP-05 | Phase 3 | Pending |
+| CI-01 | Phase 4 | Pending |
+| CI-02 | Phase 4 | Pending |
+| CI-03 | Phase 4 | Pending |
+| CI-04 | Phase 4 | Pending |
+| CI-05 | Phase 4 | Pending |
+| CI-06 | Phase 4 | Pending |
+| CI-07 | Phase 4 | Pending |
+| DOC-01 | Phase 4 | Pending |
+| DOC-02 | Phase 4 | Pending |
 
 **Coverage:**
 - v1 requirements: 23 total
-- Mapped to phases: 0 (awaiting ROADMAP.md)
-- Unmapped: 23 ⚠️ — roadmapper will fill in phase numbers
+- Mapped to phases: 23
+- Complete: 5 (Phase 1 — SEC-01..SEC-05)
+- Pending: 18 (Phases 2-4)
 
 ---
 *Requirements defined: 2026-05-13*
-*Last updated: 2026-05-13 after initial definition*
+*Last updated: 2026-05-13 after Phase 1 complete*
