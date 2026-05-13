@@ -1,4 +1,4 @@
-.PHONY: help validate build fmt clean init start stop status tf-init tf-plan tf-apply tf-destroy tg-init tg-reinit tg-plan tg-apply tg-auto-apply tg-destroy tg-auto-destroy
+.PHONY: help validate build fmt clean init start stop status secrets-show tf-init tf-plan tf-apply tf-destroy tg-init tg-reinit tg-plan tg-apply tg-auto-apply tg-destroy tg-auto-destroy
 
 # User detection: override with  make <target> DEVBOX_USER=jsmith
 DEVBOX_USER ?= $(shell whoami)
@@ -25,6 +25,9 @@ help:
 	@echo "  start        Start the devbox EC2 instance"
 	@echo "  stop         Stop the devbox EC2 instance"
 	@echo "  status       Show instance status and connection info"
+	@echo ""
+	@echo "Secrets"
+	@echo "  secrets-show   Print the operator's code-server and VNC passwords from SSM"
 	@echo ""
 	@echo "Cleanup"
 	@echo "  clean        Remove Packer cache and Terraform local state"
@@ -99,6 +102,27 @@ stop:
 
 status:
 	DEVBOX_USER=$(DEVBOX_USER) ./scripts/devbox-status.sh
+
+# --- Secrets (per-user, SSM Parameter Store) ---
+
+secrets-show:
+	@set -euo pipefail; \
+	echo "Resolving secrets for DEVBOX_USER=$(DEVBOX_USER)..."; \
+	cs_pwd=$$(aws ssm get-parameter \
+	    --name "/devbox/$(DEVBOX_USER)/code-server-password" \
+	    --with-decryption --query 'Parameter.Value' --output text 2>/dev/null) \
+	  || { echo "ERROR: code-server password not found at /devbox/$(DEVBOX_USER)/code-server-password" >&2; \
+	       echo "       Run 'make build' first to publish secrets to SSM, or check your DEVBOX_USER." >&2; \
+	       exit 1; }; \
+	vnc_pwd=$$(aws ssm get-parameter \
+	    --name "/devbox/$(DEVBOX_USER)/vnc-password" \
+	    --with-decryption --query 'Parameter.Value' --output text 2>/dev/null) \
+	  || { echo "ERROR: VNC password not found at /devbox/$(DEVBOX_USER)/vnc-password" >&2; exit 1; }; \
+	echo ""; \
+	echo "code-server (https://<host>:8080) password:  $$cs_pwd"; \
+	echo "VNC / noVNC  (https://<host>:6080) password:  $$vnc_pwd"; \
+	echo ""; \
+	echo "(Secrets are stored as SSM SecureStrings; rotated on every \`make build\`.)"
 
 # --- Cleanup ---
 

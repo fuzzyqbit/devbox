@@ -68,7 +68,8 @@ A single operator can spin up, hibernate, and tear down a reproducible, hardened
 | OpenTofu (`tofu`) over Terraform binary | License clarity, free, drop-in compatible | ✓ Good |
 | Terragrunt for backend generation + per-user state | Avoids hand-maintained backend.tf per user; single source of `DEVBOX_USER` threading | ✓ Good |
 | 14-layer toggleable Ansible role structure with `layer_config.yml` | Operators can opt out of layers (e.g., skip Java) without forking; manifest written to `/etc/devimage-manifest.yml` | ✓ Good |
-| Per-build randomized secrets for code-server / VNC | Eliminates `changeme` default; aligns with secret-management constraint | — Pending (Milestone 1) |
+| Per-build randomized secrets for code-server / VNC, delivered via AWS SSM Parameter Store SecureString | Eliminates `changeme` default; SSM SecureString chosen over Secrets Manager — $0/month at this scale vs $0.40/secret/month, identical KMS encryption, sufficient IAM granularity via path-prefix scoping. Per-build rotation happens at AMI bake; no rotation Lambda needed. | ✓ Phase 1 |
+| Per-operator SSH key name `${devbox_user}-devbox` (replaces hardcoded `key_name = "me"`) | Per-operator isolation: no shared keypair authorized across all devboxes. Keys live outside the repo (`aws ec2 import-key-pair`), keeping public-key material out of tfstate. Rotation = `delete-key-pair` + `import-key-pair` + `terraform destroy/apply` to push the new public key. | ✓ Phase 1 |
 | AWS SSM Session Manager vs SSH ingress CIDR list | Decide during Milestone 1 planning; SSM removes need for port 22 ingress entirely but adds IAM complexity | — Pending |
 | CI on GitHub Actions vs alternative | Default to GH Actions (free for personal use, matches repo host) | — Pending (Milestone 1) |
 

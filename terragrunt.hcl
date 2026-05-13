@@ -25,9 +25,11 @@ remote_state {
 }
 
 inputs = {
-  devbox_user      = local.user
-  ami_id           = "ami-0b7cfe2135f319a55"
-  key_name         = "me"
+  devbox_user = local.user
+  ami_id      = "ami-0b7cfe2135f319a55"
+  # Per-operator SSH key. Operator must `aws ec2 import-key-pair` once before tg-apply.
+  # See `make secrets-show` and Phase 1 docs for the rotation procedure.
+  key_name         = "${local.user}-devbox"
   subnet_id        = "subnet-07513680b824b3dbe"
   vpc_id           = "vpc-0dafcc61f21dac9cd"
   instance_type    = "t3.medium"
