@@ -1,4 +1,16 @@
 ---
+- name: Assert VNC password was set by the secrets role
+  ansible.builtin.assert:
+    that:
+      - desktop_vnc_password is defined
+      - desktop_vnc_password | length > 0
+      - desktop_vnc_password != "changeme"
+    fail_msg: >-
+      desktop_vnc_password is not set. Did the `secrets` role run before `desktop`?
+      Check ansible/playbook.yml role ordering and the layers.vscode/layers.desktop flags.
+    quiet: true
+  no_log: true
+
 # --- GNOME Desktop ---
 
 - name: Install GNOME desktop group
@@ -25,11 +37,14 @@
     group: "{{ dev_user }}"
     mode: "0755"
 
-- name: Set VNC password
-  shell: |
-    echo "{{ desktop_vnc_password }}" | vncpasswd -f > {{ dev_home }}/.vnc/passwd
-  args:
-    creates: "{{ dev_home }}/.vnc/passwd"
+- name: Set VNC password (rotates per build, no cleartext in process tree)
+  ansible.builtin.shell:
+    # vncpasswd -f reads cleartext from stdin and writes the obfuscated form to stdout.
+    # Use stdin: rather than a shell heredoc so the cleartext never appears in `ps`.
+    cmd: "vncpasswd -f > {{ dev_home }}/.vnc/passwd"
+    stdin: "{{ desktop_vnc_password }}"
+  changed_when: true   # rotation is the intent; declare the change explicitly
+  no_log: true
 
 - name: Fix VNC password file permissions
   file:

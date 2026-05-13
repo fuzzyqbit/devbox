@@ -4,7 +4,6 @@ desktop_vnc_port: 5901
 desktop_novnc_port: 6080
 desktop_vnc_resolution: "1920x1080"
 desktop_vnc_depth: 24
-desktop_vnc_password: "changeme"
 
 desktop_novnc_version: "1.5.0"
 
