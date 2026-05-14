@@ -32,15 +32,16 @@ A single operator can spin up, hibernate, and tear down a reproducible, hardened
 - ✓ Galaxy roles: satisfied by absence (no roles in either requirements.yml) — Phase 3 (REP-03)
 - ✓ Packer source AMI pinned via `amazon-parameterstore` data source on `/aws/service/ami-amazon-linux-latest/al2023-ami-minimal-kernel-default-x86_64` (no `most_recent = true`; `:NN` version-suffix bump procedure documented inline; Phase 4 CI gate will catch unpinned regressions) — Phase 3 (REP-04) — `packer/devimage.pkr.hcl`
 - ✓ AMI handoff automated: Packer manifest post-processor → `make packer-bake` parses with `jq` → writes `users/${DEVBOX_USER}.auto.tfvars`; hand-copied `ami_id` removed from `terragrunt.hcl` — Phase 3 (REP-05) — `packer/devimage.pkr.hcl`, `Makefile`, `terragrunt.hcl`
+- ✓ Full CI pipeline: 8 parallel SHA-pinned jobs in `.github/workflows/ci.yml` covering `tofu fmt -check`, `tofu init -lockfile=readonly` + `tofu validate`, `packer validate`, `ansible-lint`, `ansible-playbook --syntax-check`, `shellcheck`, Checkov (`--hard-fail-on HIGH`), and 6 Phase-3 grep-gates — Phase 4 (CI-01..CI-06) — `.github/workflows/ci.yml`, `.checkov.yaml`, `.ansible-lint`
+- ✓ Tiered pre-commit hooks: fast (gitleaks, no-changeme, tofu_fmt, terragrunt_fmt, shellcheck, packer fmt, grep-gates, hygiene) at `pre-commit`; slow (tofu_validate, ansible-lint, packer validate, Checkov) at `pre-push` — Phase 4 (CI-07) — `.pre-commit-config.yaml`
+- ✓ Top-level `CLAUDE.md` operator quickstart (205 lines, 9 sections): prereqs, env vars, one-shot setup, daily flow, rotation procedures, troubleshooting — Phase 4 (DOC-01)
+- ✓ `ansible/firewalld-docker-fix.yml` header expanded: what (firewalld + Docker bridge conflict), why (CIS role enables firewalld), 3 OR-joined retirement criteria + `firewall-cmd --get-default-zone` verification — Phase 4 (DOC-02)
 
 ### Active
 
-<!-- Milestone 1: Security hardening + CI baseline. All hypotheses until shipped. -->
+<!-- Milestone 1 complete 2026-05-14. All 23 v1 requirements closed. -->
 
-- [ ] Add full CI pipeline (`terraform fmt -check`, `tofu validate`, `packer validate`, `ansible-lint`, `shellcheck`, `tfsec`/`checkov`) — Phase 4 (gitleaks gate already in via Phase 1)
-- [ ] Extend pre-commit to mirror full CI checks — Phase 4 (gitleaks + no-changeme already in)
-- [ ] Document the firewalld-docker workaround and audit whether it can be replaced with a CIS-compliant equivalent — Phase 4 — `ansible/firewalld-docker-fix.yml`
-- [ ] Resolve Packer SSM parameter `:NN` version pin — Phase 4 deferred follow-up (requires AWS creds to query `aws ssm get-parameter-history`)
+(none — see Deferred for one Milestone 2 follow-up: Packer SSM `:NN` version pin, awaiting AWS creds)
 
 ### Out of Scope
 
@@ -98,4 +99,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-05-14 after Phase 3 (Reproducibility & version pinning) complete*
+*Last updated: 2026-05-14 after Milestone 1 (Security hardening + CI baseline) complete — all 23 v1 requirements shipped*

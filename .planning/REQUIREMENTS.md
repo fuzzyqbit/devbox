@@ -95,22 +95,22 @@ Deferred to future milestone(s). Tracked but not in current roadmap.
 | REP-03 | Phase 3 | Complete (by absence) |
 | REP-04 | Phase 3 | Complete (SSM `:NN` pin deferred to Phase 4) |
 | REP-05 | Phase 3 | Complete |
-| CI-01 | Phase 4 | Pending |
-| CI-02 | Phase 4 | Pending |
-| CI-03 | Phase 4 | Pending |
-| CI-04 | Phase 4 | Pending |
-| CI-05 | Phase 4 | Pending |
-| CI-06 | Phase 4 | Pending |
-| CI-07 | Phase 4 | Pending |
-| DOC-01 | Phase 4 | Pending |
-| DOC-02 | Phase 4 | Pending |
+| CI-01 | Phase 4 | Complete |
+| CI-02 | Phase 4 | Complete |
+| CI-03 | Phase 4 | Complete |
+| CI-04 | Phase 4 | Complete |
+| CI-05 | Phase 4 | Complete |
+| CI-06 | Phase 4 | Complete |
+| CI-07 | Phase 4 | Complete |
+| DOC-01 | Phase 4 | Complete |
+| DOC-02 | Phase 4 | Complete |
 
 **Coverage:**
 - v1 requirements: 23 total
 - Mapped to phases: 23
-- Complete: 14 (Phase 1 SEC-01..05 + Phase 2 NET-01..04 + Phase 3 REP-01..05)
-- Pending: 9 (Phase 4: CI-01..07, DOC-01..02)
+- Complete: 23 (Milestone 1 closed — all 23/23)
+- Pending: 0
 
 ---
 *Requirements defined: 2026-05-13*
-*Last updated: 2026-05-14 after Phase 3 complete*
+*Last updated: 2026-05-14 after Milestone 1 complete (all 23 v1 requirements shipped)*
