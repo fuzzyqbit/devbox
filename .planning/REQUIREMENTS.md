@@ -86,10 +86,10 @@ Deferred to future milestone(s). Tracked but not in current roadmap.
 | SEC-03 | Phase 1 | Complete |
 | SEC-04 | Phase 1 | Complete |
 | SEC-05 | Phase 1 | Complete |
-| NET-01 | Phase 2 | Pending |
-| NET-02 | Phase 2 | Pending |
-| NET-03 | Phase 2 | Pending |
-| NET-04 | Phase 2 | Pending |
+| NET-01 | Phase 2 | Complete |
+| NET-02 | Phase 2 | Complete |
+| NET-03 | Phase 2 | Complete |
+| NET-04 | Phase 2 | Complete |
 | REP-01 | Phase 3 | Pending |
 | REP-02 | Phase 3 | Pending |
 | REP-03 | Phase 3 | Pending |
@@ -108,9 +108,9 @@ Deferred to future milestone(s). Tracked but not in current roadmap.
 **Coverage:**
 - v1 requirements: 23 total
 - Mapped to phases: 23
-- Complete: 5 (Phase 1 — SEC-01..SEC-05)
-- Pending: 18 (Phases 2-4)
+- Complete: 9 (Phase 1 SEC-01..05 + Phase 2 NET-01..04)
+- Pending: 14 (Phases 3-4)
 
 ---
 *Requirements defined: 2026-05-13*
-*Last updated: 2026-05-13 after Phase 1 complete*
+*Last updated: 2026-05-13 after Phase 2 complete*

@@ -25,12 +25,13 @@ A single operator can spin up, hibernate, and tear down a reproducible, hardened
 - ✓ Secrets published to AWS SSM Parameter Store SecureString and fetched at boot by a systemd oneshot via IAM instance profile (scoped to `/devbox/${devbox_user}/*`); IMDSv2 enforced on the EC2 — Phase 1 (SEC-03) — `terraform/main.tf`, `ansible/roles/secrets/`
 - ✓ Per-operator SSH keypair `${devbox_user}-devbox`; hardcoded `key_name = "me"` removed — Phase 1 (SEC-04) — `terragrunt.hcl`
 - ✓ `gitleaks` v8.30.1 + `no-changeme` guard in `.pre-commit-config.yaml` and `.github/workflows/security.yml` — Phase 1 (SEC-05) — `.pre-commit-config.yaml`, `.github/workflows/security.yml`, `.gitleaks.toml`
+- ✓ Security group `:22` ingress dropped entirely; operator connects via AWS SSM Session Manager (`AmazonSSMManagedInstanceCore` attached to `aws_iam_role.devbox`); `:8080` and `:6080` gated on `var.allowed_web_cidrs` with default `[]` + plan-time validation refusing apply when empty unless `var.allow_open_ingress=true` — Phase 2 (NET-01, NET-02, NET-03, NET-04) — `terraform/main.tf`, `terraform/variables.tf`, `terragrunt.hcl`
+- ✓ Operator UX wired for SSM-first posture: `make devbox-ssm`, `make devbox-port-forward`, `make devbox-allowlist-me`; status/start scripts surface SSM commands; `scripts/devbox-ssm.sh` and `scripts/devbox-allowlist-me.sh` pre-flight `session-manager-plugin` — Phase 2 — `Makefile`, `scripts/`
 
 ### Active
 
 <!-- Milestone 1: Security hardening + CI baseline. All hypotheses until shipped. -->
 
-- [ ] Restrict security group ingress: replace `0.0.0.0/0` on SSH/8080/6080 with operator-supplied CIDR list (or migrate to AWS SSM Session Manager for SSH) — Phase 2
 - [ ] Pin all third-party versions: commit `.terraform.lock.hcl`, pin `ansible/requirements.yml` collection versions, pin galaxy roles, pin code-server/dnf package versions where feasible — Phase 3
 - [ ] Replace hand-copied AMI ID with Terraform `data "aws_ami"` lookup or Terragrunt input wired to Packer output — Phase 3
 - [ ] Add full CI pipeline (`terraform fmt -check`, `tofu validate`, `packer validate`, `ansible-lint`, `shellcheck`, `tfsec`/`checkov`) — Phase 4 (gitleaks gate already in via Phase 1)
@@ -94,4 +95,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-05-13 after Phase 2 plan written (NET-04 hybrid posture locked).*
+*Last updated: 2026-05-13 after Phase 2 (Network exposure remediation) complete*

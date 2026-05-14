@@ -2,52 +2,53 @@
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-05-13 after Phase 1)
+See: .planning/PROJECT.md (updated 2026-05-13 after Phase 2)
 
 **Core value:** A single operator can spin up, hibernate, and tear down a reproducible, hardened cloud workstation with one `make` target — without leaking credentials or exposing a vulnerable host to the public internet.
-**Current focus:** Phase 2 — Network exposure remediation
+**Current focus:** Phase 3 — Reproducibility & version pinning
 
 ## Current Position
 
-Phase: 2 of 4 (Network exposure remediation)
+Phase: 3 of 4 (Reproducibility & version pinning)
 Plan: 0 of TBD in current phase
 Status: Ready to plan
-Last activity: 2026-05-13 — Phase 1 complete; verifier verdict COMPLETE; 5 of 23 requirements done (SEC-01..SEC-05)
+Last activity: 2026-05-13 — Phase 2 complete; verifier verdict COMPLETE; 9 of 23 requirements done (SEC-01..05, NET-01..04). All 3 CRITICAL CONCERNS.md findings closed.
 
-Progress: [██░░░░░░░░] 22% (5 of 23 v1 requirements complete)
+Progress: [████░░░░░░] 39% (9 of 23 v1 requirements complete)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 3
-- Average duration: ~9 min (executor wall time)
-- Total execution time: ~26 min (Wave 1 ~7 min parallel + Wave 2 ~11 min + Verifier ~4 min + plan + research + check)
+- Total plans completed: 5 (Phase 1: 3 plans, Phase 2: 2 plans)
+- Average duration: ~10 min wall time per plan
+- Total phase-execution time: Phase 1 ~26 min, Phase 2 ~22 min
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
 | Phase 1 | 3 | ~26 min | ~9 min |
+| Phase 2 | 2 | ~22 min | ~11 min |
 
 **Recent Trend:**
-- Last 3 plans: 01-01 (~7 min), 01-03 (~7 min, parallel with 01-01), 01-02 (~11 min)
-- Trend: Stable; Wave 2's larger scope (Terraform IAM + IMDSv2 + 4 new task files) drove the higher duration
+- Last 5 plans: 01-01 (~7m), 01-03 (~7m parallel), 01-02 (~11m), 02-01 (~11m), 02-02 (~11m)
+- Trend: Stable; sequential waves naturally slower than parallel
 
 ## Accumulated Context
 
 ### Decisions
 
-Decisions are logged in PROJECT.md Key Decisions table. Phase 1 added:
+Decisions are logged in PROJECT.md Key Decisions table. Phase 2 added:
 
-- Phase 1: SSM Parameter Store SecureString over Secrets Manager ($0 vs $0.40/secret/mo at this scale; identical KMS encryption; path-prefix IAM scoping works)
-- Phase 1: Per-build randomization happens at AMI bake; no rotation Lambda needed
-- Phase 1: Per-operator SSH key `${devbox_user}-devbox`; public-key material lives outside the repo via `aws ec2 import-key-pair`
-- Phase 1: IMDSv2 enforced (`http_tokens=required`, `hop_limit=1`); `DevboxUser` tag exposed via `instance_metadata_tags=enabled` to avoid `ec2:DescribeTags` IAM grant
-- Phase 1: gitleaks v8.30.1 + local `no-changeme` guard; GitHub Actions SHA-pinned (real 40-char hex)
+- Phase 2 (NET-04): Hybrid posture — SSM Session Manager for shell (eliminates :22 ingress), CIDR allowlist for code-server/noVNC
+- Phase 2: `var.allowed_web_cidrs` default `[]` with plan-time validation refusing apply unless `var.allow_open_ingress=true` (escape hatch off by default)
+- Phase 2: AL2023 SSM Agent preinstalled — no Ansible role added; `session-manager-plugin` declared as operator-side CLI prereq (surface to Phase 4 DOC-01)
+- Phase 2: `devbox-port-forward` covers :8080 only (`AWS-StartPortForwardingSession` single-port); :6080 either gets CIDR allowlist or a second SSM session
 
 ### Pending Decisions
 
-- Phase 2: AWS SSM Session Manager (removes port 22 ingress entirely) vs CIDR allowlist (simpler, but still exposes 22 to operator IPs). Recorded in PROJECT.md as Pending.
+- Phase 3: How to source the AMI ID — `data "aws_ami"` filter vs Terragrunt input wired from Packer manifest output
+- Phase 3: Specific pinned versions for ansible-galaxy collections (Phase 1 already pinned `community.aws=9.0.0`; others still float)
 
 ### Pending Todos
 
@@ -55,11 +56,11 @@ None.
 
 ### Blockers/Concerns
 
-- Operator migration required before next `make tg-apply`:
-  1. `aws ec2 import-key-pair --key-name "${USER}-devbox" --public-key-material "fileb://$HOME/.ssh/${USER}-devbox.pub"` (Phase 1 renamed `key_name` from `"me"`)
-  2. `var.iam_instance_profile` removed from `terraform/variables.tf` — any external consumers must drop the input
-  3. Pre-Phase-1 baked AMIs still ship `changeme`; rebake before re-launch
-- Remaining CONCERNS.md HIGH items: 12 (CRITICAL all closed by Phase 1; remaining HIGH spread across Phase 2-4)
+- Operator migration required before next `make tg-apply` (in addition to Phase 1 items):
+  - Set `CODE_SERVER_ALLOWED_CIDRS` / `VNC_ALLOWED_CIDRS` env vars OR run `make devbox-allowlist-me` (auto-populates `users/${DEVBOX_USER}.auto.tfvars`); otherwise `tofu plan` refuses
+  - Install `session-manager-plugin` locally (`brew install --cask session-manager-plugin` on Mac)
+  - Existing in-flight devbox: SG tighten on next apply will not kick active sessions, but SSH reconnects fail; use `make devbox-ssm` instead
+- Remaining CONCERNS.md HIGH items: ~8 (all 3 CRITICAL closed; HIGH spread across Phase 3 reproducibility and Phase 4 CI gaps)
 
 ## Deferred Items
 
@@ -71,6 +72,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-05-13 18:50
-Stopped at: Phase 1 verification COMPLETE; STATE/ROADMAP/PROJECT/REQUIREMENTS updated; ready for `/gsd-plan-phase 2`
+Last session: 2026-05-13 (Phase 2 close)
+Stopped at: Phase 2 verification COMPLETE; STATE/ROADMAP/PROJECT/REQUIREMENTS updated; ready for `/gsd-plan-phase 3`
 Resume file: None
