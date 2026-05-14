@@ -13,9 +13,9 @@ output "private_ip" {
   value       = aws_instance.devbox.private_ip
 }
 
-output "ssh_command" {
-  description = "SSH command to connect"
-  value       = "ssh -i ~/.ssh/${var.key_name}.pem ec2-user@${aws_instance.devbox.public_ip}"
+output "ssm_start_session_command" {
+  description = "Operator shell access via SSM Session Manager. Run `make devbox-ssm` for the same effect (it also pre-flights session-manager-plugin)."
+  value       = "aws ssm start-session --target ${aws_instance.devbox.id} --region ${data.aws_region.current.region}"
 }
 
 output "code_server_url" {
