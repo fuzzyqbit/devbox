@@ -89,29 +89,32 @@ Close every CRITICAL and HIGH finding in `.planning/codebase/CONCERNS.md`, and i
 **Depends on**: Phases 1, 2, 3 (CI gates the work done in those phases; running CI earlier would force premature failure on known-pending issues). Phase 4 also extends the `.pre-commit-config.yaml` introduced by Phase 1.3.
 **Requirements**: CI-01, CI-02, CI-03, CI-04, CI-05, CI-06, CI-07, DOC-01, DOC-02
 **Success Criteria** (what must be TRUE):
-  1. `.github/workflows/ci.yml` exists, runs on every push and PR, and a representative bad change (unformatted HCL, failing `ansible-lint`, a shellcheck violation, a `tfsec` HIGH, or a `gitleaks` hit) fails the build and blocks merge.
-  2. `.pre-commit-config.yaml` at the repo root mirrors the CI checks (`terraform_fmt`, `terragrunt_hclfmt`, `packer_validate`, `ansible-lint`, `shellcheck`, `tfsec`/`checkov`, `gitleaks`/`detect-secrets`, `end-of-file-fixer`, `trailing-whitespace`) and `pre-commit run --all-files` passes on a clean tree.
-  3. `CLAUDE.md` (currently empty) documents: operator quickstart (`make build`, `make tg-apply`, `make start`), required env vars (`DEVBOX_USER`, `AWS_REGION`), the bake → provision → start flow, the per-operator key procedure (from Phase 1), the SSM-vs-CIDR access posture (from Phase 2), and the "hardening must remain last in `ansible/playbook.yml`" invariant.
-  4. `ansible/firewalld-docker-fix.yml` carries an explanatory header that states what the workaround does, why it's required today, the two acceptable replacements (option a: per-port `firewalld --add-port`; option b: drop firewalld entirely), and the conditions under which it can be retired.
+  1. `.github/workflows/ci.yml` exists, runs on every push and PR, and a representative bad change (unformatted HCL, failing `ansible-lint`, a shellcheck violation, a Checkov HIGH, or a `gitleaks` hit) fails the build and blocks merge.
+  2. `.pre-commit-config.yaml` at the repo root mirrors the CI checks tiered fast/slow (`tofu_fmt`, `terragrunt_fmt`, `packer fmt -check`, `shellcheck`, `gitleaks`, `no-changeme`, `pre-commit-hooks` boring suite, `grep-gates` on commit; `tofu_validate`, `packer validate`, `ansible-lint`, `checkov` on push) and `pre-commit run --all-files` passes on a clean tree.
+  3. `CLAUDE.md` (currently empty) documents: operator quickstart (`make packer-bake`, `make tg-apply`, `make start`), required env vars (`DEVBOX_USER`, `AWS_REGION`), the bake → provision → start flow, the per-operator key procedure (from Phase 1), the SSM-vs-CIDR access posture (from Phase 2), the "hardening must remain last in `ansible/playbook.yml`" invariant, and the SSM `:NN` follow-up.
+  4. `ansible/firewalld-docker-fix.yml` carries an explanatory header that states what the workaround does, why it's required today, the three acceptable replacements (CIS lifted; containers layer removed; per-port allowances in roles/hardening), the verification command (`firewall-cmd --get-default-zone`), and the conditions under which it can be retired.
 **Suggested Plans**:
-  - `4.1 GitHub Actions CI workflow` (CI-01, CI-02, CI-03, CI-04, CI-05, CI-06): create `.github/workflows/ci.yml` running `terraform fmt -check`, `tofu validate`, `terragrunt hclfmt --check`, `packer validate`, `ansible-lint`, `ansible-playbook --syntax-check`, `shellcheck scripts/*.sh`, `tfsec` (or `checkov`) with HIGH/CRITICAL failure threshold, and `gitleaks detect`; pin all action versions to SHAs.
-  - `4.2 Pre-commit mirror` (CI-07): extend the `.pre-commit-config.yaml` introduced by Phase 1.3 to cover the full CI matrix; verify `pre-commit run --all-files` on the post-Phase-3 tree.
-  - `4.3 Documentation pass` (DOC-01, DOC-02): populate `CLAUDE.md` (operator quickstart, env vars, flow, Phase 1/2 decisions, "hardening last" invariant, port-drift caveat between Terraform SG and Ansible role defaults); add the explanatory header + retirement criteria to `ansible/firewalld-docker-fix.yml`.
+  - `4.1 GitHub Actions CI workflow` (CI-01, CI-02, CI-03, CI-04, CI-05, CI-06): create `.github/workflows/ci.yml` running 8 parallel jobs (fmt-check, tofu-validate, packer-validate, ansible-lint, ansible-syntax-check, shellcheck, checkov with `--hard-fail-on HIGH`, grep-gates); pin every action to its 40-char SHA; reuse Phase 1's `actions/checkout` SHA; create `.checkov.yaml` + `.ansible-lint` config files.
+  - `4.2 Pre-commit tiered hooks` (CI-07): extend `.pre-commit-config.yaml` introduced by Phase 1.3 — fast hooks (`tofu_fmt`, `terragrunt_fmt`, `shellcheck`, `packer fmt -check`, pre-commit-hooks suite, `grep-gates`) at `pre-commit` stage; slow hooks (`tofu_validate`, `packer validate`, `ansible-lint==26.4.0`, `checkov`) at `pre-push` stage. Document the three `pre-commit install` invocations.
+  - `4.3 Documentation pass` (DOC-01, DOC-02): populate `CLAUDE.md` (9 sections: what-this-is, prerequisites, env vars, per-operator setup, daily flow, rotations, troubleshooting, invariants, follow-ups); expand `ansible/firewalld-docker-fix.yml` header with 3 numbered retirement criteria + verification command + cross-reference to CLAUDE.md.
 **Risks / Notes**:
-  - `tfsec` may flag findings unrelated to Phases 1-3 (e.g. self-signed cert, missing CloudTrail) — calibrate the failure threshold to HIGH/CRITICAL only for Milestone 1; defer MEDIUM/LOW to a follow-up.
-  - GitHub Actions runners must be able to install Packer, OpenTofu, Terragrunt, Ansible; use official setup actions and pin versions to match `ansible/roles/terraform/defaults/main.yml` to avoid CI-vs-AMI drift.
-  - Documentation (4.3) is fully independent of CI/pre-commit (4.1, 4.2) and can land in parallel.
-**Parallelizable**: 4.1 and 4.2 share `.pre-commit-config.yaml` only loosely; serialize a single shared edit, then parallelize. 4.3 runs in parallel with both — it only edits Markdown.
-**Plans**: TBD
+  - Checkov may flag findings unrelated to Phases 1-3 (e.g. EBS encryption, missing CloudTrail); calibrate the failure threshold to HIGH/CRITICAL only for Milestone 1; defer MEDIUM/LOW to a follow-up. Triage real findings as they emerge — do NOT preemptively add `--skip-check` IDs (planner authority limit).
+  - GitHub Actions runners must install OpenTofu, Packer, Terragrunt, Ansible; use SHA-pinned setup actions (opentofu/setup-opentofu, hashicorp/setup-packer, actions/setup-python) to match `ansible/roles/terraform/defaults/main.yml` versions and avoid CI-vs-AMI drift.
+  - 04-01 and 04-02 BOTH consume `.checkov.yaml` + `.ansible-lint` — 04-01 creates them, 04-02's pre-push hooks reference them. Wave 1 disjoint-file safe but order-of-merge affects whether 04-02's Smoke 4 has the configs available; both plans handle the ordering gracefully.
+**Parallelizable**: 04-01 and 04-02 touch disjoint files (`.github/workflows/ci.yml` + new configs vs. `.pre-commit-config.yaml`); 04-03 only touches `CLAUDE.md` + the Ansible header. All three plans are Wave 1 with `depends_on: []` — fully parallel.
+**Plans**: 3 plans
+- [ ] 04-01-PLAN.md — `.github/workflows/ci.yml` with 8 parallel SHA-pinned jobs + `.checkov.yaml` (hard-fail-on HIGH) + `.ansible-lint` (excludes vendored CIS role) (CI-01..CI-06). Wave 1.
+- [ ] 04-02-PLAN.md — Extend `.pre-commit-config.yaml` with tiered fast/slow hooks: tofu_fmt/terragrunt_fmt/shellcheck/packer-fmt/grep-gates on pre-commit stage; tofu_validate/ansible-lint/packer-validate/checkov on pre-push stage (CI-07). Wave 1; parallel with 04-01 and 04-03.
+- [ ] 04-03-PLAN.md — Populate `CLAUDE.md` (9-section operator quickstart) + expand `ansible/firewalld-docker-fix.yml` header with 3 retirement criteria + verification command (DOC-01, DOC-02). Wave 1; parallel with 04-01 and 04-02.
 
 ## Progress
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Secrets remediation | 0/3 | Not started | - |
-| 2. Network exposure remediation | 0/2 | Not started | - |
-| 3. Reproducibility & version pinning | 0/2 | Not started | - |
-| 4. CI, pre-commit, and documentation | 0/3 | Not started | - |
+| 1. Secrets remediation | 3/3 | ✓ Complete | 2026-05-13 |
+| 2. Network exposure remediation | 2/2 | ✓ Complete | 2026-05-13 |
+| 3. Reproducibility & version pinning | 2/2 | ✓ Complete | 2026-05-14 |
+| 4. CI, pre-commit, and documentation | 0/3 | Planned | - |
 
 ## Parallelization Plan
 
@@ -119,9 +122,9 @@ Coarse-granularity execution with `parallelization=true` and `mode=yolo`:
 
 - **Phase 1 must land first.** It closes 2 of 3 CRITICAL findings and lays the IAM instance-profile groundwork that Phase 2 (SSM option) reuses.
 - **Phases 2 and 3 can run in parallel after Phase 1.** Phase 2 owns `terraform/main.tf` ingress + IAM policy for SSM; Phase 3 owns `ansible/requirements.yml`, `packer/devimage.pkr.hcl`, `.gitignore`, `.terraform.lock.hcl`, and the AMI-handoff change in `terragrunt.hcl`. Disjoint file sets.
-- **Phase 4 lands last** because CI must gate the cleaned-up state, not the pre-cleanup state. Within Phase 4, plan 4.3 (docs) parallelizes with 4.1+4.2.
+- **Phase 4 lands last** because CI must gate the cleaned-up state, not the pre-cleanup state. All three Phase 4 plans (04-01, 04-02, 04-03) run in parallel — disjoint file sets.
 
-Suggested ordering: `1 → (2 ∥ 3) → 4`.
+Suggested ordering: `1 → (2 ∥ 3) → 4(01 ∥ 02 ∥ 03)`.
 
 ## Coverage
 
@@ -143,15 +146,15 @@ All 23 v1 requirements mapped to exactly one phase. No orphans.
 | REP-03 | Phase 3 |
 | REP-04 | Phase 3 |
 | REP-05 | Phase 3 |
-| CI-01 | Phase 4 |
-| CI-02 | Phase 4 |
-| CI-03 | Phase 4 |
-| CI-04 | Phase 4 |
-| CI-05 | Phase 4 |
-| CI-06 | Phase 4 |
-| CI-07 | Phase 4 |
-| DOC-01 | Phase 4 |
-| DOC-02 | Phase 4 |
+| CI-01 | Phase 4 (plan 04-01) |
+| CI-02 | Phase 4 (plan 04-01) |
+| CI-03 | Phase 4 (plan 04-01) |
+| CI-04 | Phase 4 (plan 04-01) |
+| CI-05 | Phase 4 (plan 04-01) |
+| CI-06 | Phase 4 (plan 04-01) |
+| CI-07 | Phase 4 (plan 04-02) |
+| DOC-01 | Phase 4 (plan 04-03) |
+| DOC-02 | Phase 4 (plan 04-03) |
 
 **Totals:**
 - v1 requirements: 23
@@ -161,3 +164,4 @@ All 23 v1 requirements mapped to exactly one phase. No orphans.
 ---
 *Roadmap created: 2026-05-13*
 *Milestone scope: 1 — Security hardening + CI baseline*
+*Last updated: 2026-05-14 after Phase 4 planning*
