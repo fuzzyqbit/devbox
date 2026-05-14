@@ -48,7 +48,9 @@ variable "devbox_user" {
   default     = ""
   description = "Operator username; keys SSM parameter paths /devbox/<user>/* and recorded in packer-manifest custom_data for the AMI handoff. Required."
   validation {
-    condition     = can(regex("^[a-z_][a-z0-9_-]*$", var.devbox_user))
+    # Allow empty (so `packer validate` works without `-var "devbox_user=..."` for CI gates);
+    # Make targets always pass a real value, where the regex applies.
+    condition     = var.devbox_user == "" || can(regex("^[a-z_][a-z0-9_-]*$", var.devbox_user))
     error_message = "The devbox_user value must match the regex ^[a-z_][a-z0-9_-]*$ (lowercase letter or underscore followed by lowercase alphanumerics/dashes/underscores)."
   }
 }
