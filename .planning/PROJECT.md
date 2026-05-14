@@ -73,7 +73,7 @@ A single operator can spin up, hibernate, and tear down a reproducible, hardened
 | 14-layer toggleable Ansible role structure with `layer_config.yml` | Operators can opt out of layers (e.g., skip Java) without forking; manifest written to `/etc/devimage-manifest.yml` | ✓ Good |
 | Per-build randomized secrets for code-server / VNC, delivered via AWS SSM Parameter Store SecureString | Eliminates `changeme` default; SSM SecureString chosen over Secrets Manager — $0/month at this scale vs $0.40/secret/month, identical KMS encryption, sufficient IAM granularity via path-prefix scoping. Per-build rotation happens at AMI bake; no rotation Lambda needed. | ✓ Phase 1 |
 | Per-operator SSH key name `${devbox_user}-devbox` (replaces hardcoded `key_name = "me"`) | Per-operator isolation: no shared keypair authorized across all devboxes. Keys live outside the repo (`aws ec2 import-key-pair`), keeping public-key material out of tfstate. Rotation = `delete-key-pair` + `import-key-pair` + `terraform destroy/apply` to push the new public key. | ✓ Phase 1 |
-| AWS SSM Session Manager vs SSH ingress CIDR list | Decide during Milestone 1 planning; SSM removes need for port 22 ingress entirely but adds IAM complexity | — Pending |
+| AWS SSM Session Manager vs SSH ingress CIDR list (NET-04) | **Hybrid posture chosen:** SSM Session Manager for shell access (eliminates :22 ingress entirely) + operator-supplied CIDR allowlist for code-server (:8080) and noVNC (:6080). Rationale: Phase 1 already laid the IAM groundwork (`aws_iam_role.devbox` + IMDSv2-enforced instance), so attaching `arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore` is a 3-line Terraform change; web ports cannot run "through SSM" the same way as SSH without imposing a daily port-forwarding tax, so CIDR-restricted public ingress is retained for them. NET-01 satisfied by **deletion** of the :22 ingress rule (strictly more restrictive than narrowing to a CIDR). Rollback: revert the Phase 2 commits — operator surface reverts to `ssh -i ~/.ssh/${USER}-devbox.pem ec2-user@<ip>` with the old SG (would need a one-shot manual CIDR add). | ✓ Phase 2 |
 | CI on GitHub Actions vs alternative | Default to GH Actions (free for personal use, matches repo host) | — Pending (Milestone 1) |
 
 ## Evolution
@@ -94,4 +94,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-05-13 after Phase 1 (Secrets remediation) complete*
+*Last updated: 2026-05-13 after Phase 2 plan written (NET-04 hybrid posture locked).*
