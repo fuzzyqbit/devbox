@@ -23,6 +23,32 @@
 #
 # This play assumes the `containers` layer ran in the main playbook. Skip
 # it otherwise (no docker → no `docker` zone → set-default-zone fails).
+#
+# Retirement criteria — this play SHOULD be deleted when ANY of:
+#   (1) The CIS scan requirement that demands `firewalld present and running`
+#       is lifted from this project's hardening posture. Today, the AL2023 CIS
+#       role's defaults (ansible/roles/AMAZON2023-CIS/defaults/) require firewalld
+#       to be installed. If a future CIS profile relaxes this, OR we switch to a
+#       different hardening baseline (e.g., DISA STIG), this workaround is moot —
+#       remove firewalld entirely and rely on the EC2 SG. This matches the comment
+#       at ansible/roles/hardening/defaults/main.yml lines 4-13.
+#
+#   (2) The `containers` layer is removed from `ansible/layer_config.yml`. Without
+#       Docker, no `docker` zone is registered, the default-zone-to-docker rewrite
+#       is moot, and the host can stay on the stock `public` zone. Remove this play.
+#
+#   (3) Per-port allowances are added to the `public` zone (option (a) from line
+#       14 above) inside the `roles/hardening` role itself — e.g., a
+#       firewalld_port: list iterated over with the firewalld module. Once those
+#       are in place, this workaround is redundant; delete it.
+#
+# Verification of retirement: after removing this play, `make packer-bake` must
+# succeed and the resulting AMI's `firewall-cmd --get-default-zone` must be
+# either `public` (option a) or the firewalld package must be absent (option b).
+# Either is acceptable; the workaround state (default zone = docker) is NOT.
+#
+# Cross-reference: CLAUDE.md Troubleshooting → "firewalld blocking ports inside
+# the AMI" mentions this header as the canonical explanation.
 
 - name: firewalld default zone = docker (workaround)
   hosts: all
