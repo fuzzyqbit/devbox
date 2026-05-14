@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Open an AWS SSM Session Manager interactive shell to the operator's devbox.
-# Replaces the old `ssh -i ~/.ssh/${KEY_NAME}.pem ec2-user@${PUBLIC_IP}` flow now
-# that Phase 2 closed :22 ingress on the security group.
+# Replaces the old per-operator-key SSH-over-public-:22 flow now that Phase 2
+# closed :22 ingress on the security group.
 #
 # See: .planning/phases/02-network-exposure-remediation/02-RESEARCH.md (Pattern 5)
 # Requires: session-manager-plugin (https://docs.aws.amazon.com/systems-manager/latest/userguide/session-manager-working-with-install-plugin.html)
