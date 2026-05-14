@@ -1,0 +1,224 @@
+---
+# Phase 4 (CI-01..CI-06): every push and PR runs fmt/validate/lint/security
+# gates in parallel. 8 jobs, no needs: deps, all on ubuntu-latest.
+#
+# Separate from .github/workflows/security.yml (Phase 1) which stays focused
+# on secret-scanning (RESEARCH line 14). security.yml runs unconditionally
+# (planning-doc commits included); ci.yml uses paths-ignore for planning
+# churn (RESEARCH Pattern 4, lines 420-435).
+#
+# All third-party actions SHA-pinned per RESEARCH Pattern 1 (lines 168-186)
+# and Phase 1 plan 01-03 policy. To bump an action SHA, re-resolve via
+#   curl -sL https://api.github.com/repos/<org>/<repo>/git/refs/tags/<tag> \
+#     | python3 -c "import sys,json;print(json.load(sys.stdin)['object']['sha'])"
+#
+# Phase-3 invariants asserted by the grep-gates job (single fail-fast block):
+#   1. Source AMI not floating          (REP-04 — packer must not use most_recent=true)
+#   2. No hand-copied AMI ID            (REP-05 — terragrunt.hcl must not pin ami-XXXX literals)
+#   3. No <RESOLVED-VERSION> placeholder (REP-06 — template artifact must not ship)
+#   4. No bare collection-version pins   (REP-02 — ansible/requirements.yml uses ==X.Y.Z)
+#   5. Terraform lockfile is tracked     (REP-01 — terraform/.terraform.lock.hcl in git)
+#   6. Lockfile-exclusion not in .gitignore (REP-01 defense — no terraform/.terraform.lock.hcl ignore)
+#   7. All third-party actions SHA-pinned (CI hardening — no @v4, @main, @master)
+
+name: ci
+
+on:
+  push:
+    paths-ignore:
+      - '.planning/**'
+      - '**/*.md'
+      - 'CLAUDE.md'
+  pull_request:
+    paths-ignore:
+      - '.planning/**'
+      - '**/*.md'
+      - 'CLAUDE.md'
+
+permissions:
+  contents: read
+
+jobs:
+  # ---------------------------------------------------------------- 1
+  fmt-check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4.3.1
+      - name: Install OpenTofu
+        uses: opentofu/setup-opentofu@fc711fa910b93cba0f3fbecaafc9f42fd0c411cb  # v2.0.0
+        with:
+          tofu_version: 1.10.6
+      - name: Install Packer
+        uses: hashicorp/setup-packer@c3d53c525d422944e50ee27b840746d6522b08de  # v3.2.0
+        with:
+          version: 1.12.0
+      - name: Install Terragrunt
+        run: |
+          curl -fsSL https://github.com/gruntwork-io/terragrunt/releases/download/v0.81.10/terragrunt_linux_amd64 -o /usr/local/bin/terragrunt
+          chmod +x /usr/local/bin/terragrunt
+          terragrunt --version
+      - name: Format check
+        run: |
+          cd terraform && tofu fmt -check -recursive
+          cd ../packer && packer fmt -check .
+          cd .. && terragrunt hclfmt --check
+
+  # ---------------------------------------------------------------- 2
+  tofu-validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4.3.1
+      - name: Install OpenTofu
+        uses: opentofu/setup-opentofu@fc711fa910b93cba0f3fbecaafc9f42fd0c411cb  # v2.0.0
+        with:
+          tofu_version: 1.10.6
+      - name: tofu init -lockfile=readonly
+        # Phase 3 REP-01 gate: CI must NOT silently rewrite the committed
+        # lockfile. Any provider drift causes init to fail loudly.
+        run: |
+          cd terraform
+          tofu init -lockfile=readonly
+          tofu validate
+
+  # ---------------------------------------------------------------- 3
+  packer-validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4.3.1
+      - name: Install Packer
+        uses: hashicorp/setup-packer@c3d53c525d422944e50ee27b840746d6522b08de  # v3.2.0
+        with:
+          version: 1.12.0
+      - name: packer init + validate
+        # var.devbox_user defaults to "" since Phase 3 fix (commit f156070);
+        # no -var flag needed here. STATE.md line 47.
+        run: |
+          cd packer
+          packer init .
+          packer validate .
+
+  # ---------------------------------------------------------------- 4
+  ansible-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4.3.1
+      - name: Setup Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065  # v5
+        with:
+          python-version: '3.11'
+      - name: Install ansible-lint + collections
+        # RESEARCH Pitfall 5 (lines 554-559): collections MUST be installed
+        # before ansible-lint resolves fqcn references.
+        run: |
+          pip install ansible-lint==26.4.0 ansible-core
+          ansible-galaxy collection install -r ansible/requirements.yml
+      - name: Run ansible-lint
+        run: ansible-lint ansible/playbook.yml
+
+  # ---------------------------------------------------------------- 5
+  ansible-syntax-check:
+    # SEPARATE job per RESEARCH Open Question 1 (lines 653-657) — both
+    # lint and syntax-check satisfy CI-04 literally and they catch
+    # different classes of bugs.
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4.3.1
+      - name: Setup Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065  # v5
+        with:
+          python-version: '3.11'
+      - name: Install ansible-core + collections
+        run: |
+          pip install 'ansible-core==2.16.*'
+          ansible-galaxy collection install -r ansible/requirements.yml
+      - name: ansible-playbook --syntax-check
+        run: ansible-playbook --syntax-check ansible/playbook.yml -i localhost,
+
+  # ---------------------------------------------------------------- 6
+  shellcheck:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4.3.1
+      - name: shellcheck scripts
+        # shellcheck is pre-installed on ubuntu-latest (RESEARCH line 252,
+        # 684). Covers all 6 scripts in scripts/: _common, devbox-start,
+        # devbox-stop, devbox-status, devbox-ssm, devbox-allowlist-me.
+        run: shellcheck scripts/*.sh
+
+  # ---------------------------------------------------------------- 7
+  checkov:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4.3.1
+      - name: Run Checkov
+        # RESEARCH Pitfall 2 (lines 532-535): checkov-action ships its
+        # bundled checkov version. We do NOT set checkov_version here
+        # because the action input is not guaranteed across v12 minors.
+        # If a future regression requires version pinning, switch to:
+        #   - run: pip install checkov==3.2.528 && checkov -d terraform/ --config-file .checkov.yaml
+        # TODO(phase-04-01): verify v12.1347.0 supports checkov_version input; track in SUMMARY.
+        uses: bridgecrewio/checkov-action@99bb2caf247dfd9f03cf984373bc6043d4e32ebf  # v12.1347.0
+        with:
+          directory: terraform/
+          framework: terraform
+          config_file: .checkov.yaml
+
+  # ---------------------------------------------------------------- 8
+  grep-gates:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4.3.1
+      - name: Phase-3 invariants + action-SHA pin policy
+        # Each assertion preceded by a comment naming the invariant.
+        # Invariant 4 uses the corrected form: filter comments AND require
+        # any version: line to start its value with '==' (quoted or not).
+        # The original plan grep `version:[[:space:]]*[^=]` matched ANY
+        # non-= first char including '"' — a self-invalidating-grep-gate.
+        # See SUMMARY "Deviations" for the Rule-1 bug-fix note.
+        run: |
+          set -euo pipefail
+
+          # 1. Source AMI must not use most_recent=true (REP-04)
+          ! grep -rE 'most_recent[[:space:]]*=[[:space:]]*true' packer/
+
+          # 2. No hand-copied AMI ID in terragrunt.hcl (REP-05)
+          ! grep -E '^[[:space:]]*ami_id[[:space:]]*=[[:space:]]*"ami-' terragrunt.hcl
+
+          # 3. No raw <RESOLVED-VERSION> placeholder (REP-06)
+          ! grep -r -- '<RESOLVED-VERSION>' packer/
+
+          # 4. No bare collection-version pins (REP-02)
+          #    Get non-comment lines that start with 'version:' and whose
+          #    value does NOT begin with '==' (quoted or unquoted).
+          #    Bug-fix vs plan: the plan's grep was self-invalidating
+          #    because '"==X.Y.Z"' starts with '"', not '='. The fix
+          #    explicitly excludes the legal '==' form.
+          if grep -vE '^[[:space:]]*#' ansible/requirements.yml \
+               | grep -E '^[[:space:]]*version:' \
+               | grep -vE 'version:[[:space:]]*"?==' ; then
+            echo "FAIL: bare-version pin found in ansible/requirements.yml (REP-02)" >&2
+            exit 1
+          fi
+
+          # 5. Terraform lockfile is tracked (REP-01)
+          git ls-files terraform/.terraform.lock.hcl | grep -q .
+
+          # 6. Lockfile-exclusion not in .gitignore (REP-01 defense)
+          ! grep -E '^[^#]*terraform/\.terraform\.lock\.hcl' .gitignore
+
+          # 7. Every third-party action SHA-pinned (CI hardening)
+          if grep -rhE 'uses: [^ ]+@(v[0-9]+|main|master|HEAD)\b' .github/workflows/ \
+               | grep -v '@[a-f0-9]\{40\}' ; then
+            echo "FAIL: tag-or-branch ref in .github/workflows/ (not SHA-pinned)" >&2
+            exit 1
+          fi
+
+          echo "All 7 Phase-3 + CI hardening invariants pass."
