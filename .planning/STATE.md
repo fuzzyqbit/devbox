@@ -2,26 +2,25 @@
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-05-13 after Phase 2)
+See: .planning/PROJECT.md (updated 2026-05-14 after Phase 3)
 
 **Core value:** A single operator can spin up, hibernate, and tear down a reproducible, hardened cloud workstation with one `make` target — without leaking credentials or exposing a vulnerable host to the public internet.
-**Current focus:** Phase 3 — Reproducibility & version pinning
+**Current focus:** Phase 4 — CI, pre-commit, and documentation
 
 ## Current Position
 
-Phase: 3 of 4 (Reproducibility & version pinning)
+Phase: 4 of 4 (CI, pre-commit, and documentation)
 Plan: 0 of TBD in current phase
 Status: Ready to plan
-Last activity: 2026-05-13 — Phase 2 complete; verifier verdict COMPLETE; 9 of 23 requirements done (SEC-01..05, NET-01..04). All 3 CRITICAL CONCERNS.md findings closed.
+Last activity: 2026-05-14 — Phase 3 complete with one acceptable follow-up (SSM `:NN` pin deferred); 14 of 23 requirements done
 
-Progress: [████░░░░░░] 39% (9 of 23 v1 requirements complete)
+Progress: [██████░░░░] 61% (14 of 23 v1 requirements complete)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 5 (Phase 1: 3 plans, Phase 2: 2 plans)
+- Total plans completed: 7 (Phase 1: 3, Phase 2: 2, Phase 3: 2)
 - Average duration: ~10 min wall time per plan
-- Total phase-execution time: Phase 1 ~26 min, Phase 2 ~22 min
 
 **By Phase:**
 
@@ -29,38 +28,39 @@ Progress: [████░░░░░░] 39% (9 of 23 v1 requirements complete
 |-------|-------|-------|----------|
 | Phase 1 | 3 | ~26 min | ~9 min |
 | Phase 2 | 2 | ~22 min | ~11 min |
+| Phase 3 | 2 | ~19 min (parallel) | ~9 min |
 
 **Recent Trend:**
-- Last 5 plans: 01-01 (~7m), 01-03 (~7m parallel), 01-02 (~11m), 02-01 (~11m), 02-02 (~11m)
-- Trend: Stable; sequential waves naturally slower than parallel
+- Phase 3 ran both plans in parallel worktrees; merge required manual conflict resolution because the worktree branched pre-Phase-2
+- Trend: Parallel worktrees pay off only when branch points are recent; otherwise merge cost eats the saving
 
 ## Accumulated Context
 
 ### Decisions
 
-Decisions are logged in PROJECT.md Key Decisions table. Phase 2 added:
+PROJECT.md Key Decisions table. Phase 3 added:
 
-- Phase 2 (NET-04): Hybrid posture — SSM Session Manager for shell (eliminates :22 ingress), CIDR allowlist for code-server/noVNC
-- Phase 2: `var.allowed_web_cidrs` default `[]` with plan-time validation refusing apply unless `var.allow_open_ingress=true` (escape hatch off by default)
-- Phase 2: AL2023 SSM Agent preinstalled — no Ansible role added; `session-manager-plugin` declared as operator-side CLI prereq (surface to Phase 4 DOC-01)
-- Phase 2: `devbox-port-forward` covers :8080 only (`AWS-StartPortForwardingSession` single-port); :6080 either gets CIDR allowlist or a second SSM session
+- Phase 3 (REP-02): `==X.Y.Z` PEP 440 exact pinning for Galaxy collections (bare `version:` is ambiguous per Ansible docs)
+- Phase 3 (REP-02): Hold `community.aws==9.0.0` (bumping to 11.x raises ansible-core floor to 2.17 — defer)
+- Phase 3 (REP-04): Pin Packer source via `amazon-parameterstore` data source on the public AWS SSM path (vs hard-coding AMI ID — preserves cross-region; vs `most_recent` filter — preserves reproducibility)
+- Phase 3 (REP-05): Manifest post-processor + `make packer-bake` + `users/${DEVBOX_USER}.auto.tfvars` handoff (vs `data "aws_ami"` — avoids `most_recent` reintroduction; vs SSM Parameter Store handoff — no IAM coupling needed)
+- Phase 3 (fix): `var.devbox_user` validation relaxed to allow `""` so `packer validate` works as CI gate without `-var`; Makefile passes real value at runtime
 
 ### Pending Decisions
 
-- Phase 3: How to source the AMI ID — `data "aws_ami"` filter vs Terragrunt input wired from Packer manifest output
-- Phase 3: Specific pinned versions for ansible-galaxy collections (Phase 1 already pinned `community.aws=9.0.0`; others still float)
+- Phase 4: Which CI tool for tfsec/checkov (both work; pick one)
+- Phase 4: Pre-commit framework hook ordering when ansible-lint is slow (skip on commit, run on push? configurable)
 
 ### Pending Todos
 
-None.
+- Resolve Packer SSM `:NN` version suffix when AWS creds are available (Phase 4 task or follow-up)
 
 ### Blockers/Concerns
 
-- Operator migration required before next `make tg-apply` (in addition to Phase 1 items):
-  - Set `CODE_SERVER_ALLOWED_CIDRS` / `VNC_ALLOWED_CIDRS` env vars OR run `make devbox-allowlist-me` (auto-populates `users/${DEVBOX_USER}.auto.tfvars`); otherwise `tofu plan` refuses
-  - Install `session-manager-plugin` locally (`brew install --cask session-manager-plugin` on Mac)
-  - Existing in-flight devbox: SG tighten on next apply will not kick active sessions, but SSH reconnects fail; use `make devbox-ssm` instead
-- Remaining CONCERNS.md HIGH items: ~8 (all 3 CRITICAL closed; HIGH spread across Phase 3 reproducibility and Phase 4 CI gaps)
+- Operator migration before next `make tg-apply`:
+  - Run `make packer-bake DEVBOX_USER=$USER` (writes `users/${USER}.auto.tfvars`) — previously the AMI ID was hand-copied in `terragrunt.hcl`
+  - Phase 2 prereqs (session-manager-plugin, allowlist env vars) still apply
+- Phase 3 left a known acceptable gap: SSM parameter path is unpinned (no `:NN`); Phase 4's CI grep gate will flag any future regression
 
 ## Deferred Items
 
@@ -69,9 +69,10 @@ None.
 | Observability | CloudWatch metrics + login event shipping | v2 | 2026-05-13 (init) |
 | Lifecycle | Idle auto-stop + scheduled nightly stop | v2 | 2026-05-13 (init) |
 | Image lifecycle | Old AMI deregistration + inventory | v2 | 2026-05-13 (init) |
+| Reproducibility | SSM `:NN` version suffix on Packer source | Phase 4 follow-up | 2026-05-14 (Phase 3 close) |
 
 ## Session Continuity
 
-Last session: 2026-05-13 (Phase 2 close)
-Stopped at: Phase 2 verification COMPLETE; STATE/ROADMAP/PROJECT/REQUIREMENTS updated; ready for `/gsd-plan-phase 3`
+Last session: 2026-05-14 (Phase 3 close)
+Stopped at: Phase 3 verification GAPS → in-flight fix (`packer validate` validation relaxed) → STATE/ROADMAP/PROJECT/REQUIREMENTS updated; ready for `/gsd-plan-phase 4` (the final milestone phase)
 Resume file: None

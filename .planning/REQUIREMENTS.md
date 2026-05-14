@@ -90,11 +90,11 @@ Deferred to future milestone(s). Tracked but not in current roadmap.
 | NET-02 | Phase 2 | Complete |
 | NET-03 | Phase 2 | Complete |
 | NET-04 | Phase 2 | Complete |
-| REP-01 | Phase 3 | Pending |
-| REP-02 | Phase 3 | Pending |
-| REP-03 | Phase 3 | Pending |
-| REP-04 | Phase 3 | Pending |
-| REP-05 | Phase 3 | Pending |
+| REP-01 | Phase 3 | Complete |
+| REP-02 | Phase 3 | Complete |
+| REP-03 | Phase 3 | Complete (by absence) |
+| REP-04 | Phase 3 | Complete (SSM `:NN` pin deferred to Phase 4) |
+| REP-05 | Phase 3 | Complete |
 | CI-01 | Phase 4 | Pending |
 | CI-02 | Phase 4 | Pending |
 | CI-03 | Phase 4 | Pending |
@@ -108,9 +108,9 @@ Deferred to future milestone(s). Tracked but not in current roadmap.
 **Coverage:**
 - v1 requirements: 23 total
 - Mapped to phases: 23
-- Complete: 9 (Phase 1 SEC-01..05 + Phase 2 NET-01..04)
-- Pending: 14 (Phases 3-4)
+- Complete: 14 (Phase 1 SEC-01..05 + Phase 2 NET-01..04 + Phase 3 REP-01..05)
+- Pending: 9 (Phase 4: CI-01..07, DOC-01..02)
 
 ---
 *Requirements defined: 2026-05-13*
-*Last updated: 2026-05-13 after Phase 2 complete*
+*Last updated: 2026-05-14 after Phase 3 complete*

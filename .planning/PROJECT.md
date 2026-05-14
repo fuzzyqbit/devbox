@@ -27,17 +27,20 @@ A single operator can spin up, hibernate, and tear down a reproducible, hardened
 - ✓ `gitleaks` v8.30.1 + `no-changeme` guard in `.pre-commit-config.yaml` and `.github/workflows/security.yml` — Phase 1 (SEC-05) — `.pre-commit-config.yaml`, `.github/workflows/security.yml`, `.gitleaks.toml`
 - ✓ Security group `:22` ingress dropped entirely; operator connects via AWS SSM Session Manager (`AmazonSSMManagedInstanceCore` attached to `aws_iam_role.devbox`); `:8080` and `:6080` gated on `var.allowed_web_cidrs` with default `[]` + plan-time validation refusing apply when empty unless `var.allow_open_ingress=true` — Phase 2 (NET-01, NET-02, NET-03, NET-04) — `terraform/main.tf`, `terraform/variables.tf`, `terragrunt.hcl`
 - ✓ Operator UX wired for SSM-first posture: `make devbox-ssm`, `make devbox-port-forward`, `make devbox-allowlist-me`; status/start scripts surface SSM commands; `scripts/devbox-ssm.sh` and `scripts/devbox-allowlist-me.sh` pre-flight `session-manager-plugin` — Phase 2 — `Makefile`, `scripts/`
+- ✓ Terraform provider lockfile committed for 4 platforms (`darwin_{arm64,amd64}`, `linux_{amd64,arm64}`); `hashicorp/aws ~> 6.0` — Phase 3 (REP-01) — `terraform/.terraform.lock.hcl`, `terraform/main.tf`
+- ✓ All Ansible Galaxy collections pinned with `==X.Y.Z` (community.general==12.6.0, community.crypto==3.2.0, ansible.posix==2.1.0, community.aws==9.0.0) — Phase 3 (REP-02) — `ansible/requirements.yml`, `ansible/roles/AMAZON2023-CIS/collections/requirements.yml`
+- ✓ Galaxy roles: satisfied by absence (no roles in either requirements.yml) — Phase 3 (REP-03)
+- ✓ Packer source AMI pinned via `amazon-parameterstore` data source on `/aws/service/ami-amazon-linux-latest/al2023-ami-minimal-kernel-default-x86_64` (no `most_recent = true`; `:NN` version-suffix bump procedure documented inline; Phase 4 CI gate will catch unpinned regressions) — Phase 3 (REP-04) — `packer/devimage.pkr.hcl`
+- ✓ AMI handoff automated: Packer manifest post-processor → `make packer-bake` parses with `jq` → writes `users/${DEVBOX_USER}.auto.tfvars`; hand-copied `ami_id` removed from `terragrunt.hcl` — Phase 3 (REP-05) — `packer/devimage.pkr.hcl`, `Makefile`, `terragrunt.hcl`
 
 ### Active
 
 <!-- Milestone 1: Security hardening + CI baseline. All hypotheses until shipped. -->
 
-- [ ] Pin all third-party versions: commit `.terraform.lock.hcl`, pin `ansible/requirements.yml` collection versions, pin galaxy roles, pin code-server/dnf package versions where feasible — Phase 3
-- [ ] Replace hand-copied AMI ID with Terraform `data "aws_ami"` lookup or Terragrunt input wired to Packer output — Phase 3
 - [ ] Add full CI pipeline (`terraform fmt -check`, `tofu validate`, `packer validate`, `ansible-lint`, `shellcheck`, `tfsec`/`checkov`) — Phase 4 (gitleaks gate already in via Phase 1)
 - [ ] Extend pre-commit to mirror full CI checks — Phase 4 (gitleaks + no-changeme already in)
 - [ ] Document the firewalld-docker workaround and audit whether it can be replaced with a CIS-compliant equivalent — Phase 4 — `ansible/firewalld-docker-fix.yml`
-- [ ] Replace Packer base AMI `most_recent = true` with a pinned source AMI for reproducibility — Phase 3
+- [ ] Resolve Packer SSM parameter `:NN` version pin — Phase 4 deferred follow-up (requires AWS creds to query `aws ssm get-parameter-history`)
 
 ### Out of Scope
 
@@ -95,4 +98,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-05-13 after Phase 2 (Network exposure remediation) complete*
+*Last updated: 2026-05-14 after Phase 3 (Reproducibility & version pinning) complete*
