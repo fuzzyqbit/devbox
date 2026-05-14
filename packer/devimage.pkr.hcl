@@ -16,6 +16,24 @@ locals {
   ami_name  = "${var.ami_name_prefix}-al2023-${local.timestamp}"
 }
 
+# REP-04: pin the source AMI to an AWS-managed SSM Parameter Store entry instead
+# of a floating glob filter with `most_recent` enabled. Ideally the literal `name`
+# below carries a trailing `:NN` parameter-version suffix (Pattern 4 in
+# .planning/phases/03-reproducibility-version-pinning/03-RESEARCH.md:256-290) so
+# the resolution is fully deterministic across days. The version pin is currently
+# OMITTED — the executor that landed this change did not have AWS credentials to
+# resolve the live parameter version. Pin the trailing `:NN` BEFORE running any
+# real `packer build` for reproducibility:
+#   aws ssm get-parameter-history \
+#     --name /aws/service/ami-amazon-linux-latest/al2023-ami-minimal-kernel-default-x86_64 \
+#     --region us-east-1 \
+#     --query 'Parameters[-1].{Version: Version, LastModifiedDate: LastModifiedDate}'
+# Then edit the `name` below to append `:NN` where NN is the integer Version field.
+data "amazon-parameterstore" "al2023_minimal" {
+  name   = "/aws/service/ami-amazon-linux-latest/al2023-ami-minimal-kernel-default-x86_64"
+  region = var.aws_region
+}
+
 source "amazon-ebs" "al2023" {
   ami_name      = local.ami_name
   instance_type = var.instance_type
@@ -24,15 +42,7 @@ source "amazon-ebs" "al2023" {
   vpc_id    = var.vpc_id != "" ? var.vpc_id : null
   subnet_id = var.subnet_id != "" ? var.subnet_id : null
 
-  source_ami_filter {
-    filters = {
-      name                = "al2023-ami-minimal-*-x86_64"
-      root-device-type    = "ebs"
-      virtualization-type = "hvm"
-    }
-    most_recent = true
-    owners      = ["amazon"]
-  }
+  source_ami = data.amazon-parameterstore.al2023_minimal.value
 
   ssh_username = "ec2-user"
 
@@ -45,10 +55,10 @@ source "amazon-ebs" "al2023" {
 
   tags = merge(
     {
-      Name       = local.ami_name
-      Builder    = "packer"
-      BaseOS     = "al2023"
-      BuildTime  = local.timestamp
+      Name      = local.ami_name
+      Builder   = "packer"
+      BaseOS    = "al2023"
+      BuildTime = local.timestamp
     },
     var.extra_tags
   )
@@ -69,5 +79,18 @@ build {
       "ANSIBLE_SSH_ARGS=-o ForwardAgent=yes -o ControlMaster=auto -o ControlPersist=60s"
     ]
     user = "ec2-user"
+  }
+
+  # REP-05: emit packer-manifest.json after each build. `make packer-bake` parses
+  # this file with `jq` to extract the built AMI ID and writes it into
+  # users/${DEVBOX_USER}.auto.tfvars (Terraform auto-loaded). See Pattern 5 in
+  # .planning/phases/03-reproducibility-version-pinning/03-RESEARCH.md:292-346.
+  post-processor "manifest" {
+    output     = "${path.root}/packer-manifest.json"
+    strip_path = true
+    custom_data = {
+      devbox_user = var.devbox_user
+      base_ami_id = data.amazon-parameterstore.al2023_minimal.value
+    }
   }
 }

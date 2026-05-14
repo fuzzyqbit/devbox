@@ -39,3 +39,12 @@ variable "extra_tags" {
   default     = {}
   description = "Additional tags to apply to the AMI"
 }
+
+# REP-05: recorded in the packer-manifest.json `custom_data` block so the
+# AMI handoff path (manifest → users/${devbox_user}.auto.tfvars) preserves
+# the operator-of-record alongside the artifact_id.
+variable "devbox_user" {
+  type        = string
+  default     = ""
+  description = "Operator username; recorded in the packer-manifest custom_data so the AMI handoff (Pattern 5 in 03-RESEARCH.md) carries operator provenance."
+}
