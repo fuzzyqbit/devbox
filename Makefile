@@ -1,4 +1,4 @@
-.PHONY: help validate build fmt clean init start stop status secrets-show tf-init tf-plan tf-apply tf-destroy tg-init tg-reinit tg-plan tg-apply tg-auto-apply tg-destroy tg-auto-destroy
+.PHONY: help validate build fmt clean init start stop status devbox-ssm devbox-port-forward devbox-allowlist-me secrets-show tf-init tf-plan tf-apply tf-destroy tg-init tg-reinit tg-plan tg-apply tg-auto-apply tg-destroy tg-auto-destroy
 
 # User detection: override with  make <target> DEVBOX_USER=jsmith
 DEVBOX_USER ?= $(shell whoami)
@@ -25,6 +25,11 @@ help:
 	@echo "  start        Start the devbox EC2 instance"
 	@echo "  stop         Stop the devbox EC2 instance"
 	@echo "  status       Show instance status and connection info"
+	@echo ""
+	@echo "SSM access (Phase 2 — replaces public :22 ingress)"
+	@echo "  devbox-ssm           Open an SSM Session Manager shell to the devbox"
+	@echo "  devbox-port-forward  Forward :8080 from the devbox to localhost over SSM"
+	@echo "  devbox-allowlist-me  Resolve your public IP and write allowlist.auto.tfvars"
 	@echo ""
 	@echo "Secrets"
 	@echo "  secrets-show   Print the operator's code-server and VNC passwords from SSM"
@@ -102,6 +107,35 @@ stop:
 
 status:
 	DEVBOX_USER=$(DEVBOX_USER) ./scripts/devbox-status.sh
+
+# --- SSM access (Phase 2) ---
+
+devbox-ssm:
+	DEVBOX_USER=$(DEVBOX_USER) ./scripts/devbox-ssm.sh
+
+# Forwards :8080 (code-server) only. For :6080 (noVNC), either add your IP to
+# allowed_web_cidrs (make devbox-allowlist-me) or run a second port-forward
+# session manually with portNumber=6080.
+devbox-port-forward:
+	@set -euo pipefail; \
+	command -v session-manager-plugin >/dev/null 2>&1 || { \
+	  echo "ERROR: session-manager-plugin not installed. brew install --cask session-manager-plugin" >&2; \
+	  exit 1; \
+	}; \
+	INSTANCE_ID=$$(DEVBOX_USER=$(DEVBOX_USER) terragrunt output -raw instance_id); \
+	REGION=$$(DEVBOX_USER=$(DEVBOX_USER) terragrunt output -raw aws_region); \
+	echo "Forwarding :8080 from $$INSTANCE_ID to localhost..."; \
+	echo "Browse to https://localhost:8080 (code-server)."; \
+	echo "For noVNC :6080, run 'make devbox-allowlist-me' or open a second forwarding session."; \
+	echo "Ctrl-C to stop forwarding."; \
+	exec aws ssm start-session \
+	  --target "$$INSTANCE_ID" \
+	  --region "$$REGION" \
+	  --document-name AWS-StartPortForwardingSession \
+	  --parameters '{"portNumber":["8080"],"localPortNumber":["8080"]}'
+
+devbox-allowlist-me:
+	@./scripts/devbox-allowlist-me.sh
 
 # --- Secrets (per-user, SSM Parameter Store) ---
 
