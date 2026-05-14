@@ -2,77 +2,57 @@
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-05-14 after Milestone 1 complete)
+See: .planning/PROJECT.md (updated 2026-05-14 after v1.0 milestone close)
 
 **Core value:** A single operator can spin up, hibernate, and tear down a reproducible, hardened cloud workstation with one `make` target — without leaking credentials or exposing a vulnerable host to the public internet.
-**Current focus:** Milestone 1 complete; awaiting Milestone 2 scope (or maintenance mode)
+**Current focus:** None — v1.0 shipped; v2 not yet scoped.
 
 ## Current Position
 
-Milestone: 1 of 1 (Security hardening + CI baseline) — ✓ COMPLETE
-Phase: 4 of 4 (CI, pre-commit, and documentation) — ✓ COMPLETE
-Status: Milestone closed; ready for `/gsd-complete-milestone` or `/gsd-new-milestone`
-Last activity: 2026-05-14 — Phase 4 verification COMPLETE; all 23 v1 requirements shipped
+Milestone: v1.0 ARCHIVED (see `.planning/milestones/v1-ROADMAP.md`)
+Phase: n/a
+Plan: n/a
+Status: Awaiting `/gsd-new-milestone`
+Last activity: 2026-05-14 — v1.0 milestone closed and tagged
 
-Progress: [██████████] 100% (23 of 23 v1 requirements complete)
+Progress: [██████████] v1.0 100% (23/23 requirements)
 
-## Performance Metrics
+## Performance Metrics (v1.0)
 
-**Velocity:**
-- Total plans completed: 10 (Phase 1: 3, Phase 2: 2, Phase 3: 2, Phase 4: 3)
-- Average duration: ~9 min wall time per plan
-
-**By Phase:**
-
-| Phase | Plans | Total | Avg/Plan |
-|-------|-------|-------|----------|
+| Phase | Plans | Total wall | Avg/Plan |
+|-------|------:|-----------:|---------:|
 | Phase 1 | 3 | ~26 min | ~9 min |
 | Phase 2 | 2 | ~22 min | ~11 min |
 | Phase 3 | 2 | ~19 min (parallel) | ~9 min |
 | Phase 4 | 3 | ~10 min (parallel) | ~7 min |
-| **Total** | **10** | **~77 min** | **~8 min** |
+| **v1.0 total** | **10** | **~77 min execution** | **~8 min** |
 
-**Trend:** Parallel-safe phases (3 + 4) demonstrably faster wall-clock. The 04 wave (3 parallel plans) is the fastest phase despite being the largest by total content.
+Calendar window: 2026-05-13 17:04 → 2026-05-14 10:58 (~18 hours wall clock; ~77 min active executor time).
+Commits: 66 in `b0bd004..7e63829`. Files changed: 75 (+14488 / −69 LOC).
+
+**Trend:** Parallel-safe phases (3 + 4) demonstrably faster wall-clock than serial (1 + 2).
 
 ## Accumulated Context
 
-### Decisions
+See PROJECT.md Key Decisions table. Locked v1.0 decisions:
 
-PROJECT.md Key Decisions table. Milestone 1 summary:
+- SSM Parameter Store SecureString (vs Secrets Manager)
+- Hybrid network posture (SSM SM + CIDR allowlist for web)
+- Packer manifest → auto.tfvars AMI handoff
+- Checkov (NOT tfsec / Trivy / KICS — supply-chain incidents March 2026)
+- Parallel CI jobs; tiered pre-commit (fast at commit, slow at push)
 
-- **Secrets**: SSM Parameter Store SecureString (vs Secrets Manager — $0 vs $0.40/secret/mo at this scale; identical KMS encryption)
-- **Network**: Hybrid posture (SSM Session Manager + CIDR allowlist for web ports)
-- **Reproducibility**: Packer manifest → auto.tfvars handoff (vs `data "aws_ami"` — avoids `most_recent` non-determinism)
-- **CI scanner**: Checkov (tfsec deprecated; Trivy + KICS supply-chain compromised March 2026)
-- **CI layout**: Parallel jobs (~90s vs ~6 min serial)
-- **Pre-commit**: Tiered (fast at pre-commit, slow at pre-push)
+## Deferred / Carried Forward
 
-### Pending Todos
-
-- Resolve Packer SSM parameter `:NN` version suffix when AWS creds are available (Milestone 2 follow-up)
-
-### Blockers/Concerns
-
-**Operator migration before next `make tg-apply`:**
-1. `brew install --cask session-manager-plugin` (Mac) or AWS doc install for Linux
-2. `aws ec2 import-key-pair --key-name "${USER}-devbox" --public-key-material "fileb://$HOME/.ssh/${USER}-devbox.pub"`
-3. `make devbox-allowlist-me` (Phase 2) writes per-operator CIDR
-4. `make packer-bake DEVBOX_USER=$USER` (Phase 3) writes per-operator AMI ID to `users/${USER}.auto.tfvars`
-5. `pre-commit install && pre-commit install --hook-type pre-push` (Phase 4) installs both hook tiers
-
-All operator steps documented in top-level `CLAUDE.md`.
-
-## Deferred Items
-
-| Category | Item | Status | Deferred At |
-|----------|------|--------|-------------|
-| Observability | CloudWatch metrics + login event shipping | v2 | 2026-05-13 (init) |
-| Lifecycle | Idle auto-stop + scheduled nightly stop | v2 | 2026-05-13 (init) |
-| Image lifecycle | Old AMI deregistration + inventory | v2 | 2026-05-13 (init) |
-| Reproducibility | SSM `:NN` version suffix on Packer source | Milestone 2 follow-up | 2026-05-14 (Phase 3 close) |
+| Category | Item | Status | Originated |
+|----------|------|--------|-----------|
+| Observability | CloudWatch metrics + login event shipping | v2 backlog | v1.0 init |
+| Lifecycle | Idle auto-stop + scheduled nightly stop | v2 backlog | v1.0 init |
+| Image lifecycle | Old AMI deregistration + inventory | v2 backlog | v1.0 init |
+| Reproducibility | SSM `:NN` version suffix on Packer source | v2 follow-up | v1.0 Phase 3 |
 
 ## Session Continuity
 
-Last session: 2026-05-14 (Milestone 1 close)
-Stopped at: All 4 phases verified COMPLETE; PROJECT/REQUIREMENTS/ROADMAP/STATE updated to milestone-closed; ready for `/gsd-complete-milestone` (archive Milestone 1) or `/gsd-new-milestone` (define v2 scope from Deferred items + ongoing operator UX feedback)
+Last session: 2026-05-14 (v1.0 milestone close)
+Stopped at: v1.0 archived to `.planning/milestones/v1-*.md`; ROADMAP.md collapsed to one-liner with archive link; REQUIREMENTS.md removed (fresh one will be written at v2 init); PROJECT.md has Current State + Next Milestone Goals; git tag v1.0 pending.
 Resume file: None

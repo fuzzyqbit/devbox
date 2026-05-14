@@ -1,5 +1,22 @@
 # devbox
 
+## Current State
+
+**Shipped:** v1.0 (2026-05-14) — Security hardening + CI baseline
+
+Personal cloud workstation that bakes an AL2023 AMI and provisions per-user EC2 from it. End-to-end secure-by-default: per-build secrets via SSM Parameter Store + IAM instance profile + IMDSv2; SSM Session Manager for shell (no port 22); CIDR-allowlisted code-server (:8080) + noVNC (:6080); reproducible builds via committed `.terraform.lock.hcl` + pinned Galaxy collections + Packer source via SSM Parameter Store + manifest-driven AMI handoff; CI + tiered pre-commit gates against every Phase 1-3 invariant.
+
+**Active milestone:** none (v2 not yet scoped)
+
+**Deferred to v2:** observability (CloudWatch metrics + login events), lifecycle automation (idle auto-stop, scheduled stop), image lifecycle (old AMI deregistration + inventory), Packer SSM `:NN` version pin (requires AWS creds).
+
+## Next Milestone Goals
+
+To be defined via `/gsd-new-milestone`. Likely v2 themes:
+- **Cost / lifecycle**: auto-stop idle devboxes; AMI inventory + deregistration
+- **Observability**: CloudWatch metrics + login audit trail
+- **Reproducibility hardening**: pin remaining floating versions (code-server major.minor, dnf system packages where feasible)
+
 ## What This Is
 
 Personal infrastructure-as-code project that builds a hardened Amazon Linux 2023 AMI (Packer + Ansible) and provisions per-user EC2 dev environments from it (Terragrunt + Terraform/OpenTofu). The resulting EC2 instance runs code-server (browser VS Code) on :8080, noVNC on :6080, and SSH on :22, with a Make-based operator surface and lifecycle scripts for start/stop/status. No application source code lives here — purely declarative IaC + bash glue.
@@ -99,4 +116,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-05-14 after Milestone 1 (Security hardening + CI baseline) complete — all 23 v1 requirements shipped*
+*Last updated: 2026-05-14 after v1.0 milestone close (archived to `.planning/milestones/v1-*.md`).*
