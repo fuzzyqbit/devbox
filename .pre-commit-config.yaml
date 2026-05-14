@@ -59,10 +59,17 @@ repos:
       - id: terragrunt_fmt
         stages: [pre-commit]
 
-  - repo: https://github.com/koalaman/shellcheck-precommit
-    rev: v0.11.0
+  # shellcheck — local hook calling the system `shellcheck` binary (operator has
+  # shellcheck 0.11.0 installed via brew; constraints specify local hook over the
+  # upstream koalaman/shellcheck-precommit repo because that upstream requires
+  # Docker, which is not a project dependency).
+  - repo: local
     hooks:
       - id: shellcheck
+        name: ShellCheck (system binary)
+        entry: shellcheck
+        language: system
+        types: [shell]
         stages: [pre-commit]
 
   - repo: https://github.com/pre-commit/pre-commit-hooks
@@ -94,6 +101,10 @@ repos:
 
       - id: grep-gates
         name: regression grep gates (Phase 3 invariants)
+        # Mirrors plan 04-01's ci.yml `grep-gates` job (.github/workflows/ci.yml
+        # lines 189-208). Invariant #4 uses the same triple-grep comment-filtered
+        # form as ci.yml because the simpler `version:[[:space:]]*[^=]` regex
+        # produces false-positives on the quote character of `version: "==X.Y.Z"`.
         entry: |
           bash -euo pipefail -c '
             # 1. Source AMI must not use most_recent=true (REP-04)
@@ -101,9 +112,13 @@ repos:
             # 2. No hand-copied ami_id in terragrunt.hcl (REP-05)
             ! grep -E "^[[:space:]]*ami_id[[:space:]]*=[[:space:]]*\"ami-" terragrunt.hcl && \
             # 3. No raw <RESOLVED-VERSION> placeholder in packer/ (REP-04 follow-up)
-            ! grep -- "<RESOLVED-VERSION>" packer/ && \
-            # 4. ansible/requirements.yml uses ==X.Y.Z (REP-02) — comment-filtered to avoid self-invalidation
-            ! (grep -vE "^[[:space:]]*#" ansible/requirements.yml | grep -E "^[[:space:]]*version:[[:space:]]*[^=]") && \
+            ! grep -r -- "<RESOLVED-VERSION>" packer/ && \
+            # 4. ansible/requirements.yml uses ==X.Y.Z (REP-02) — comment-filtered
+            #    form mirrors ci.yml: list non-comment version: lines, then flag
+            #    any whose value does NOT start with optional-quote then ==
+            ! (grep -vE "^[[:space:]]*#" ansible/requirements.yml \
+                | grep -E "^[[:space:]]*version:" \
+                | grep -vE "version:[[:space:]]*\"?==") && \
             # 5. terraform/.terraform.lock.hcl is tracked (REP-01)
             git ls-files terraform/.terraform.lock.hcl | grep -q . && \
             # 6. No re-add of lockfile to .gitignore (REP-01)
