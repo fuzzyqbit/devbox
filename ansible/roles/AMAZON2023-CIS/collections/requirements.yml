@@ -1,14 +1,19 @@
 ---
-
+# Vendored CIS role's collection dependencies. `type: git` sources resolve
+# `version:` as a git ref (tag), so no `==` operator (per Ansible docs:
+# https://docs.ansible.com/ansible/latest/collections_guide/collections_installing.html#installing-a-collection-from-a-git-repository).
+# Phase 3 (REP-03): pinned to tagged release matching the top-level
+# ansible/requirements.yml — keep the two files in lockstep.
 collections:
     - name: community.general
       source: https://github.com/ansible-collections/community.general
       type: git
-
+      version: 12.6.0
     - name: community.crypto
       source: https://github.com/ansible-collections/community.crypto
       type: git
-
+      version: 3.2.0
     - name: ansible.posix
       source: https://github.com/ansible-collections/ansible.posix
       type: git
+      version: 2.1.0

@@ -1,7 +1,16 @@
 ---
+# Galaxy collections used by ansible/playbook.yml.
+# Phase 3 (REP-02): every collection pinned with `==X.Y.Z` (PEP 440 exact equality).
+# Bump policy: before changing a version, review the collection's meta/runtime.yml
+# for ansible-core floor changes. Keep this file in lockstep with
+# ansible/roles/AMAZON2023-CIS/collections/requirements.yml.
+# Source: https://docs.ansible.com/ansible/latest/collections_guide/collections_installing.html
 collections:
   - name: community.general
+    version: "==12.6.0"
   - name: community.crypto
+    version: "==3.2.0"
   - name: ansible.posix
+    version: "==2.1.0"
   - name: community.aws
-    version: "9.0.0"   # bump in Phase 3 (REP-02) along with the other collections
+    version: "==9.0.0"
