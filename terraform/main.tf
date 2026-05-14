@@ -84,42 +84,48 @@ resource "aws_iam_instance_profile" "devbox" {
   tags        = local.common_tags
 }
 
+# --- SSM Session Manager: attach the AWS-managed core policy to the Phase 1 role ---
+# Enables `aws ssm start-session` to reach this instance. The agent (amazon-ssm-agent)
+# is preinstalled in AL2023 and only needs this managed policy to come Online.
+# See .planning/phases/02-network-exposure-remediation/02-RESEARCH.md:71 (managed policy ARN)
+# and Pattern 2 at 02-RESEARCH.md:220-233.
+resource "aws_iam_role_policy_attachment" "devbox_ssm_core" {
+  role       = aws_iam_role.devbox.name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
+}
+
 # --- Security Group ---
+
+# SSH (:22) ingress intentionally absent. Shell access is brokered by AWS SSM
+# Session Manager — see PROJECT.md Key Decisions (NET-04) and
+# .planning/phases/02-network-exposure-remediation/02-RESEARCH.md.
+# Web ports (:8080, :6080) are gated by var.allowed_web_cidrs.
+# Operator workflow: `make devbox-allowlist-me` writes the operator's /32 into
+# allowlist.auto.tfvars (gitignored); `make tg-apply` applies it.
 
 resource "aws_security_group" "devbox" {
   name_prefix = "${local.name_prefix}-"
   description = "Security group for devimage instance"
   vpc_id      = var.vpc_id
 
-  # SSH
   ingress {
-    description = "SSH"
-    from_port   = 22
-    to_port     = 22
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  # code-server (HTTPS)
-  ingress {
-    description = "code-server"
+    description = "code-server (HTTPS) restricted to operator CIDR allowlist"
     from_port   = 8080
     to_port     = 8080
     protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
+    cidr_blocks = var.allowed_web_cidrs
   }
 
-  # noVNC (HTTPS)
   ingress {
-    description = "noVNC"
+    description = "noVNC (HTTPS) restricted to operator CIDR allowlist"
     from_port   = 6080
     to_port     = 6080
     protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
+    cidr_blocks = var.allowed_web_cidrs
   }
 
   egress {
-    description = "All outbound"
+    description = "All outbound (required for SSM agent channels: ssmmessages, ec2messages, ssm)"
     from_port   = 0
     to_port     = 0
     protocol    = "-1"
