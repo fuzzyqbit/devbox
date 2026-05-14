@@ -40,11 +40,22 @@ remote_state {
   }
 }
 
+# Phase 3 (REP-05): ami_id is intentionally not set in `inputs` below. It is
+# supplied by users/${local.user}.auto.tfvars, which `make packer-bake` writes
+# after a successful Packer build and which Terraform auto-loads from the
+# module directory. If the file is missing, var.ami_id has no default (see
+# terraform/variables.tf) so `terragrunt plan` errors loudly — exactly the
+# loud-failure mode the handoff design wants. See Pattern 5 in
+# .planning/phases/03-reproducibility-version-pinning/03-RESEARCH.md:292-346.
 inputs = {
   devbox_user = local.user
-  ami_id      = "ami-0b7cfe2135f319a55"
-  # Per-operator SSH key. Operator must `aws ec2 import-key-pair` once before tg-apply.
-  # See `make secrets-show` and Phase 1 docs for the rotation procedure.
+  # Phase 3 (REP-05): ami_id is intentionally NOT set here. It flows from
+  # users/${local.user}.auto.tfvars (Terraform auto-loaded), written by
+  # `make packer-bake`. If absent, `tofu plan` errors loudly — that's the
+  # design (loud failure beats stale hand-copied AMI). See PROJECT.md Key
+  # Decisions and 03-RESEARCH.md Pattern 5.
+  # Phase 1 (SEC-04): per-operator SSH key. Operator must
+  # `aws ec2 import-key-pair --key-name "${USER}-devbox" ...` once before tg-apply.
   key_name         = "${local.user}-devbox"
   subnet_id        = "subnet-07513680b824b3dbe"
   vpc_id           = "vpc-0dafcc61f21dac9cd"

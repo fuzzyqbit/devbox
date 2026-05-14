@@ -40,10 +40,13 @@ variable "extra_tags" {
   description = "Additional tags to apply to the AMI"
 }
 
+# Phase 1 (SEC-03): keys SSM parameter paths /devbox/<user>/* for boot-time secret fetch.
+# Phase 3 (REP-05): recorded in packer-manifest.json `custom_data` so the AMI handoff
+# (manifest → users/${devbox_user}.auto.tfvars) preserves operator-of-record alongside artifact_id.
 variable "devbox_user" {
   type        = string
   default     = ""
-  description = "Operator username; keys SSM parameter paths /devbox/<user>/*. Required."
+  description = "Operator username; keys SSM parameter paths /devbox/<user>/* and recorded in packer-manifest custom_data for the AMI handoff. Required."
   validation {
     condition     = can(regex("^[a-z_][a-z0-9_-]*$", var.devbox_user))
     error_message = "The devbox_user value must match the regex ^[a-z_][a-z0-9_-]*$ (lowercase letter or underscore followed by lowercase alphanumerics/dashes/underscores)."

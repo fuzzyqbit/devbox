@@ -1,5 +1,6 @@
 # Packer
 packer/packer_cache/
+packer/packer-manifest.json
 *.pkr.hcl.lock
 
 # Terraform
@@ -22,8 +23,16 @@ terraform/backend.tf
 # Claude Code (local settings, not project files)
 .claude/
 
-# Phase 2: operator CIDR allowlist (written by `make devbox-allowlist-me`).
-# Contains the operator's public /32; gitignored so per-operator network
-# topology does not land in version control.
+# Phase 2 (NET): operator CIDR allowlist written by `make devbox-allowlist-me`
+# (contains operator public /32).
+# Phase 3 (REP-05): per-operator AMI handoff tfvars written by `make packer-bake`
+# (Terraform auto-loads from module dir; per-user file under users/ carries the
+# just-built AMI ID).
+# Both gitignored: generated, per-operator, not for version control.
 *.auto.tfvars
 allowlist.auto.tfvars
+users/*.auto.tfvars
+
+# Root-level Terraform lock (terragrunt generates this at project root;
+# the committed lock file lives at terraform/.terraform.lock.hcl)
+.terraform.lock.hcl
