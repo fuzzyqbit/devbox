@@ -1,0 +1,26 @@
+# ansible-lint configuration for Phase 4 (CI-04)
+#
+# Source: RESEARCH §"Pattern 6" (lines 478-487) + upstream config reference
+#         https://ansible.readthedocs.io/projects/lint/configuring/
+#
+# Profile policy: "production" is the strictest built-in profile and is
+# appropriate for a CI gate. It enforces idempotency, fqcn, no-changed-when,
+# and similar production-grade rules. Local pre-commit (plan 04-02) can
+# inherit this file as-is.
+
+profile: production
+
+exclude_paths:
+  - ansible/roles/AMAZON2023-CIS/   # vendored upstream role (Phase 0); do not lint third-party code
+  - ansible/firewalld-docker-fix.yml # known workaround, documented in DOC-02 by plan 04-03 (see CLAUDE.md troubleshooting section once populated)
+  - .planning/                      # planning markdown, not Ansible YAML
+  - .github/                        # GitHub Actions workflows are YAML but not Ansible
+
+# Use UTF-8 + parse as plain YAML where appropriate.
+parseable: true
+
+# Mock variables that come from facts/vault and are not statically resolvable
+# during lint. (Empty by default — populate if/when production profile flags
+# legitimate cases that cannot be fixed at the playbook level.)
+mock_modules: []
+mock_roles: []

@@ -1,0 +1,35 @@
+# Checkov configuration for Phase 4 (CI-06)
+#
+# Source: RESEARCH §"Pattern 5" (lines 448-461) — IaC security scan with
+#         severity-graded failure semantics.
+#
+# Semantics (per checkov docs, https://www.checkov.io/2.Basics/CLI%20Command%20Reference.html):
+#   hard-fail-on: severity threshold that returns non-zero exit (gates CI).
+#                 "HIGH" includes HIGH and CRITICAL findings.
+#   soft-fail-on: severity threshold that emits a finding but exits zero
+#                 (reported as informational; does NOT block merge).
+#
+# Policy on skip-check entries: EVERY skip MUST carry an inline comment
+# explaining the carve-out (which Phase finding, why accepted, follow-up
+# ticket if applicable). Triage real findings here as they emerge — do
+# NOT add IDs preemptively. RESEARCH Assumption A3 (line 645) notes that
+# the post-Phase-3 tree may surface HIGH findings on first run; capture
+# them in the plan's SUMMARY and triage with an explicit follow-up commit.
+
+framework: terraform
+
+directory:
+  - terraform/
+
+hard-fail-on: HIGH
+soft-fail-on: MEDIUM
+
+# Empty by policy. Add entries ONLY with a comment explaining the carve-out.
+# Example shape (do not uncomment):
+#   - CKV_AWS_24  # carve-out for SSM-agent egress 0.0.0.0/0 (required for SSM-only access posture; Phase 1 SEC-04)
+skip-check: []
+
+# Run quietly in CI — full findings are written to the runner log via
+# checkov-action's default output handler.
+quiet: false
+compact: true
