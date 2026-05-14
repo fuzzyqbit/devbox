@@ -24,9 +24,15 @@ remote_state {
   }
 }
 
+# Phase 3 (REP-05): ami_id is intentionally not set in `inputs` below. It is
+# supplied by users/${local.user}.auto.tfvars, which `make packer-bake` writes
+# after a successful Packer build and which Terraform auto-loads from the
+# module directory. If the file is missing, var.ami_id has no default (see
+# terraform/variables.tf) so `terragrunt plan` errors loudly — exactly the
+# loud-failure mode the handoff design wants. See Pattern 5 in
+# .planning/phases/03-reproducibility-version-pinning/03-RESEARCH.md:292-346.
 inputs = {
   devbox_user      = local.user
-  ami_id           = "ami-0b7cfe2135f319a55"
   key_name         = "me"
   subnet_id        = "subnet-07513680b824b3dbe"
   vpc_id           = "vpc-0dafcc61f21dac9cd"
