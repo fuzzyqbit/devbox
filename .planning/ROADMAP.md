@@ -59,7 +59,9 @@ Close every CRITICAL and HIGH finding in `.planning/codebase/CONCERNS.md`, and i
   - Document the lockout-recovery procedure in `CLAUDE.md` — losing SSM and CIDR access on a stopped instance is recoverable; on a running instance it is not.
   - Existing devboxes will need a one-shot `terragrunt apply` after the change; flag this in the milestone changelog.
 **Parallelizable**: 2.1 and 2.2 both edit `terraform/main.tf`; serialize them. Phase 2 as a whole can run in parallel with Phase 3 (different file domains: networking/IAM vs. version-pinning).
-**Plans**: TBD
+**Plans**: 2 plans
+- [ ] 02-01-PLAN.md — Tighten Terraform: drop :22 ingress, gate :8080/:6080 on var.allowed_web_cidrs, attach AmazonSSMManagedInstanceCore to aws_iam_role.devbox, record NET-04 hybrid posture in PROJECT.md (NET-01, NET-02, NET-03, NET-04). Wave 1.
+- [ ] 02-02-PLAN.md — Operator UX: make devbox-ssm / devbox-port-forward / devbox-allowlist-me targets + scripts; rewrite status/start connection-info blocks for SSM-first posture. Wave 2; depends on 02-01.
 
 ### Phase 3: Reproducibility & version pinning
 **Goal**: Guarantee byte-deterministic builds by committing `.terraform.lock.hcl`, pinning every Galaxy collection and role to an exact version, pinning the Packer source AMI, and automating the AMI ID handoff from Packer to Terraform.
