@@ -25,3 +25,9 @@ terraform/backend.tf
 
 # Root-level Terraform lock (terragrunt generates this at project root)
 .terraform.lock.hcl
+
+# Phase 2: operator CIDR allowlist (written by `make devbox-allowlist-me`).
+# Contains the operator's public /32; gitignored so per-operator network
+# topology does not land in version control.
+*.auto.tfvars
+allowlist.auto.tfvars
