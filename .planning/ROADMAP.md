@@ -80,7 +80,9 @@ Close every CRITICAL and HIGH finding in `.planning/codebase/CONCERNS.md`, and i
   - The AMI handoff automation requires Packer to have IAM permission to write SSM parameters or tag the AMI; this matches the principle from Phase 1.2 (instance profile pattern) but for the build user, not the runtime instance.
   - `3.1` and `3.2` are independent file sets and can be parallelized cleanly.
 **Parallelizable**: 3.1 and 3.2 in parallel within Phase 3. Phase 3 in parallel with Phase 2 (disjoint files; only the optional IAM-policy-shape conversation overlaps, and that was already decided in Phase 1.2).
-**Plans**: TBD
+**Plans**: 2 plans
+- [ ] 03-01-PLAN.md — Commit OpenTofu lockfile across 4 platforms; tighten hashicorp/aws to ~> 6.0; pin Galaxy collections with ==X.Y.Z; pin vendored CIS git-source collections to tagged refs (REP-01, REP-02, REP-03). Wave 1.
+- [ ] 03-02-PLAN.md — Pin Packer source AMI via SSM Parameter Store :NN version pin; add Packer manifest post-processor; new `make packer-bake` target writes `users/${DEVBOX_USER}.auto.tfvars`; remove hand-copied ami_id from terragrunt.hcl (REP-04, REP-05). Wave 1.
 
 ### Phase 4: CI, pre-commit, and documentation
 **Goal**: Install automated gates so every change to the repo is checked by `fmt`/`validate`/`lint`/`security`/`secret-scan` before merge, mirror those checks locally via pre-commit, and document the operator quickstart plus the firewalld-docker workaround with retirement criteria.
