@@ -1,19 +1,37 @@
 ---
-# Phase 1 (SEC-05): secret-leak gates. Phase 4 will extend this file with
-# terraform_fmt, terragrunt_hclfmt, packer_validate, ansible-lint, shellcheck,
-# tfsec/checkov, end-of-file-fixer, trailing-whitespace.
+# Tiered pre-commit hooks for the devbox IaC repo (Phase 1 + Phase 4 combined).
 #
-# Operator one-time setup:
-#   brew install gitleaks pre-commit   # (or dnf/apt + pip install pre-commit)
-#   pre-commit install                 # wires into .git/hooks/pre-commit
+# FAST hooks (pre-commit stage): gitleaks, no-changeme, tofu_fmt, terragrunt_fmt,
+# shellcheck, packer-fmt, grep-gates, pre-commit-hooks (end-of-file-fixer,
+# trailing-whitespace, check-merge-conflict, check-yaml). Target: < 5 s on every
+# commit.
+#
+# SLOW hooks (pre-push stage): tofu_validate, packer-validate, ansible-lint,
+# checkov. Target: < 60 s on every push.
+#
+# Mirrors plan 04-01's ci.yml — local feedback before bytes leave the workstation.
+#
+# Operator one-time setup (post-clone):
+#   pre-commit install                       # wires .git/hooks/pre-commit
+#   pre-commit install --hook-type pre-push  # wires .git/hooks/pre-push (slow tier)
+#   pre-commit install --install-hooks       # pre-warm venvs (avoids 90 s lag on
+#                                            # first ansible-lint run)
+#
+# RESEARCH refs: §Pattern 3 (lines 296-317 — tiered stages); Pitfall 1
+# (lines 522-528 — pre-warm venvs); Pitfall 3 (lines 538-544 — every fast hook
+# carries explicit stages: [pre-commit] so flipping default_stages cannot silently
+# move them to pre-push).
 
 default_stages: [pre-commit]
 
 repos:
+  # --- Phase 1 hooks (preserved verbatim; explicit stage added per Pitfall 3) ---
+
   - repo: https://github.com/gitleaks/gitleaks
     rev: v8.30.1
     hooks:
       - id: gitleaks
+        stages: [pre-commit]    # explicit; Phase 4 added per RESEARCH Pitfall 3
 
   # Belt-and-braces guard against literal weak defaults. gitleaks does NOT
   # detect the bare word "changeme" by default, so this local hook closes the
@@ -25,3 +43,109 @@ repos:
         entry: bash -c 'if git grep -nIE "changeme" -- ":!*.md" ":!.planning/**" ":!.pre-commit-config.yaml"; then echo "Found literal changeme — generate per-build secrets via Ansible password lookup (see ansible/roles/secrets/)"; exit 1; fi'
         language: system
         pass_filenames: false
+        stages: [pre-commit]    # explicit; Phase 4 added per RESEARCH Pitfall 3
+
+  # --- Phase 4 fast hooks (run on every commit) ---
+
+  - repo: https://github.com/tofuutils/pre-commit-opentofu
+    rev: v2.3.0
+    hooks:
+      - id: tofu_fmt
+        stages: [pre-commit]
+
+  - repo: https://github.com/antonbabenko/pre-commit-terraform
+    rev: v1.105.0
+    hooks:
+      - id: terragrunt_fmt
+        stages: [pre-commit]
+
+  - repo: https://github.com/koalaman/shellcheck-precommit
+    rev: v0.11.0
+    hooks:
+      - id: shellcheck
+        stages: [pre-commit]
+
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: end-of-file-fixer
+        stages: [pre-commit]
+      - id: trailing-whitespace
+        stages: [pre-commit]
+      - id: check-merge-conflict
+        stages: [pre-commit]
+      - id: check-yaml
+        stages: [pre-commit]
+        exclude: |
+          (?x)^(
+            ansible/.*\.yml|
+            \.gitleaks\.toml
+          )$
+
+  - repo: local
+    hooks:
+      - id: packer-fmt
+        name: packer fmt -check
+        entry: bash -c 'cd packer && packer fmt -check .'
+        language: system
+        pass_filenames: false
+        files: ^packer/.*\.(pkr\.hcl|pkrvars\.hcl)$
+        stages: [pre-commit]
+
+      - id: grep-gates
+        name: regression grep gates (Phase 3 invariants)
+        entry: |
+          bash -euo pipefail -c '
+            # 1. Source AMI must not use most_recent=true (REP-04)
+            ! grep -rE "most_recent[[:space:]]*=[[:space:]]*true" packer/ && \
+            # 2. No hand-copied ami_id in terragrunt.hcl (REP-05)
+            ! grep -E "^[[:space:]]*ami_id[[:space:]]*=[[:space:]]*\"ami-" terragrunt.hcl && \
+            # 3. No raw <RESOLVED-VERSION> placeholder in packer/ (REP-04 follow-up)
+            ! grep -- "<RESOLVED-VERSION>" packer/ && \
+            # 4. ansible/requirements.yml uses ==X.Y.Z (REP-02) — comment-filtered to avoid self-invalidation
+            ! (grep -vE "^[[:space:]]*#" ansible/requirements.yml | grep -E "^[[:space:]]*version:[[:space:]]*[^=]") && \
+            # 5. terraform/.terraform.lock.hcl is tracked (REP-01)
+            git ls-files terraform/.terraform.lock.hcl | grep -q . && \
+            # 6. No re-add of lockfile to .gitignore (REP-01)
+            ! grep -E "^[^#]*terraform/\\.terraform\\.lock\\.hcl" .gitignore
+          '
+        language: system
+        pass_filenames: false
+        stages: [pre-commit]
+
+  # --- Phase 4 slow hooks (run on every push) ---
+
+  - repo: https://github.com/tofuutils/pre-commit-opentofu
+    rev: v2.3.0
+    hooks:
+      - id: tofu_validate
+        stages: [pre-push]
+
+  - repo: https://github.com/ansible/ansible-lint
+    rev: v26.4.0
+    hooks:
+      - id: ansible-lint
+        stages: [pre-push]
+        # ansible-lint must find collections to resolve FQCNs (RESEARCH Pitfall 5).
+        # Operator pre-warms the venv with `pre-commit install --install-hooks`;
+        # this hook also needs Ansible collections installed via:
+        #   ansible-galaxy collection install -r ansible/requirements.yml
+        # — run that once per operator (it is idempotent).
+
+  - repo: local
+    hooks:
+      - id: packer-validate
+        name: packer validate
+        entry: bash -c 'cd packer && packer init . && packer validate .'
+        language: system
+        pass_filenames: false
+        files: ^packer/.*\.(pkr\.hcl|pkrvars\.hcl)$
+        stages: [pre-push]
+
+      - id: checkov
+        name: checkov terraform/
+        entry: bash -c 'checkov -d terraform/ --config-file .checkov.yaml'
+        language: system
+        pass_filenames: false
+        files: ^terraform/.*\.(tf|tfvars)$
+        stages: [pre-push]
