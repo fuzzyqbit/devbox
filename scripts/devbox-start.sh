@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=_common.sh disable=SC1091
 source "$SCRIPT_DIR/_common.sh"
 
 usage() {
@@ -61,6 +62,9 @@ PUBLIC_IP="$(aws ec2 describe-instances \
   --query 'Reservations[0].Instances[0].PublicIpAddress' \
   --output text)"
 
+# KEY_NAME query retained for parity with status.sh; no longer surfaced in the
+# Phase 2 connection-info block (Phase 1 SSH path is closed). Pending cleanup.
+# shellcheck disable=SC2034
 KEY_NAME="$(aws ec2 describe-instances \
   --instance-ids "$INSTANCE_ID" \
   --region "$REGION" \
@@ -68,7 +72,10 @@ KEY_NAME="$(aws ec2 describe-instances \
   --output text)"
 
 echo "=== Connection Info ($DEVBOX_USER) ==="
-echo "Public IP:    $PUBLIC_IP"
-echo "SSH:          ssh -i ~/.ssh/${KEY_NAME}.pem ec2-user@${PUBLIC_IP}"
-echo "code-server:  https://${PUBLIC_IP}:8080"
-echo "noVNC:        https://${PUBLIC_IP}:6080"
+echo "Public IP:           $PUBLIC_IP"
+echo "Shell (SSM):         aws ssm start-session --target $INSTANCE_ID --region $REGION"
+echo "                     (or: make devbox-ssm DEVBOX_USER=$DEVBOX_USER)"
+echo "code-server:         https://${PUBLIC_IP}:8080   (requires your IP in allowed_web_cidrs)"
+echo "noVNC:               https://${PUBLIC_IP}:6080   (requires your IP in allowed_web_cidrs)"
+echo ""
+echo "First time? Run: make devbox-allowlist-me && make tg-apply"

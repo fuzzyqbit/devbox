@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=_common.sh disable=SC1091
 source "$SCRIPT_DIR/_common.sh"
 
 usage() {
@@ -44,10 +45,21 @@ echo "Private IP:    $PRIVATE_IP"
 echo "Key Name:      $KEY_NAME"
 echo "Launch Time:   $LAUNCH_TIME"
 
-if [[ "$STATE" == "running" && "$PUBLIC_IP" != "N/A" ]]; then
+if [[ "$STATE" == "running" ]]; then
   echo ""
   echo "=== Connection Info ==="
-  echo "SSH:          ssh -i ~/.ssh/${KEY_NAME}.pem ec2-user@${PUBLIC_IP}"
-  echo "code-server:  https://${PUBLIC_IP}:8080"
-  echo "noVNC:        https://${PUBLIC_IP}:6080"
+  # Shell access is brokered by SSM — no public IP needed.
+  echo "Shell (SSM):          aws ssm start-session --target ${INSTANCE_ID} --region ${REGION}"
+  echo "                      (or: make devbox-ssm DEVBOX_USER=${DEVBOX_USER})"
+  if [[ "$PUBLIC_IP" != "N/A" ]]; then
+    echo "code-server (browser): https://${PUBLIC_IP}:8080   (requires your IP in allowed_web_cidrs)"
+    echo "noVNC (browser):       https://${PUBLIC_IP}:6080   (requires your IP in allowed_web_cidrs)"
+    echo ""
+    echo "Don't want public web ingress? Use SSM port forwarding:"
+    echo "  make devbox-port-forward DEVBOX_USER=${DEVBOX_USER}"
+    echo "  Then browse to https://localhost:8080 and https://localhost:6080"
+  fi
+  echo ""
+  echo "If browser access fails: your public IP probably changed."
+  echo "  make devbox-allowlist-me && make tg-apply"
 fi
