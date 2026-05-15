@@ -274,10 +274,9 @@ make sbom-diff        # diff this box's SBOM against .planning/codebase/SBOM.md 
 These reduce the trustworthiness of the planned SBOM vs the actual installed set on a running devbox. Listed here so consumers know what to verify:
 
 1. **CIS rule 2.2.1 cascade**: `hardening` role removes `xorg-x11-server-common`, which dnf dependency-resolves through `tigervnc-server`, `gnome-shell`, `gnome-session`. The desktop layer is effectively uninstalled on a hardened box unless rule 2.2.1 is overridden. Fix path documented (override in playbook `vars:`).
-2. **External salt-minion**: some operator AMIs ship with a salt-minion that runs `pkg.removed` states against `gnome-session` and others post-boot. Mitigation: `/etc/dnf/protected.d/devbox-desktop.conf` + a post-salt systemd oneshot to reinstall (proposed; not yet wired).
-3. **Packer source AMI**: SSM parameter path is unpinned (no `:NN` suffix). Two operators bake the same SHA on different days and could get different base AMIs. Phase 3 REP-04 deferred follow-up.
-4. **Upstream-installer floats**: `aws` CLI, `starship`, `rustup`-driven toolchain, `pipx`-installed tools — all install "latest" at bake. Pin these in role defaults if reproducibility matters more than freshness.
-5. **dnf-resolved versions**: anything not explicitly versioned in this file inherits whatever AL2023's repo is shipping on bake day. The committed lockfiles cover Terraform providers and Galaxy collections but not dnf packages.
+2. **Packer source AMI**: SSM parameter path is unpinned (no `:NN` suffix). Two operators bake the same SHA on different days and could get different base AMIs. Phase 3 REP-04 deferred follow-up.
+3. **Upstream-installer floats**: `aws` CLI, `starship`, `rustup`-driven toolchain, `pipx`-installed tools — all install "latest" at bake. Pin these in role defaults if reproducibility matters more than freshness.
+4. **dnf-resolved versions**: anything not explicitly versioned in this file inherits whatever AL2023's repo is shipping on bake day. The committed lockfiles cover Terraform providers and Galaxy collections but not dnf packages.
 
 ---
 
