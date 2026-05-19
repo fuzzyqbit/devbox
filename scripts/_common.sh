@@ -9,8 +9,8 @@ PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 TF_DIR="$PROJECT_DIR/terraform"
 
 DEVBOX_USER="${DEVBOX_USER:-}"
-INSTANCE_ID=""
-REGION=""
+INSTANCE_ID="${INSTANCE_ID:-}"
+REGION="${REGION:-}"
 
 # Parse common flags. Callers should invoke: parse_args "$@"
 parse_args() {

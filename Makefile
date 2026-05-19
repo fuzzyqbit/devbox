@@ -63,7 +63,7 @@ help:
 	@echo "  tf-destroy       Destroy with confirmation prompt"
 	@echo "  tf-auto-destroy  Destroy without prompt"
 	@echo ""
-	@echo "Instance lifecycle"
+	@echo "Instance lifecycle (override resolution: INSTANCE_ID=i-... REGION=us-east-1)"
 	@echo "  start        Start the devbox EC2 instance"
 	@echo "  stop         Stop the devbox EC2 instance"
 	@echo "  status       Show instance status and connection info"
@@ -141,20 +141,27 @@ tf-auto-destroy:
 	cd terraform && $(TF_BIN) destroy -auto-approve $(TF_VAR_ARGS)
 
 # --- Instance lifecycle ---
+#
+# Override INSTANCE_ID / REGION to bypass `tofu output` resolution:
+#   make status INSTANCE_ID=i-0abc123 REGION=us-east-1
+# (Useful before first apply, or when state is unavailable.)
+
+INSTANCE_ID ?=
+REGION ?=
 
 start:
-	DEVBOX_USER=$(DEVBOX_USER) ./scripts/devbox-start.sh
+	DEVBOX_USER=$(DEVBOX_USER) INSTANCE_ID=$(INSTANCE_ID) REGION=$(REGION) ./scripts/devbox-start.sh
 
 stop:
-	DEVBOX_USER=$(DEVBOX_USER) ./scripts/devbox-stop.sh
+	DEVBOX_USER=$(DEVBOX_USER) INSTANCE_ID=$(INSTANCE_ID) REGION=$(REGION) ./scripts/devbox-stop.sh
 
 status:
-	DEVBOX_USER=$(DEVBOX_USER) ./scripts/devbox-status.sh
+	DEVBOX_USER=$(DEVBOX_USER) INSTANCE_ID=$(INSTANCE_ID) REGION=$(REGION) ./scripts/devbox-status.sh
 
 # --- SSM access (Phase 2) ---
 
 devbox-ssm:
-	DEVBOX_USER=$(DEVBOX_USER) ./scripts/devbox-ssm.sh
+	DEVBOX_USER=$(DEVBOX_USER) INSTANCE_ID=$(INSTANCE_ID) REGION=$(REGION) ./scripts/devbox-ssm.sh
 
 # Forwards :8080 (code-server) only. For :6080 (noVNC), either add your IP to
 # allowed_web_cidrs (make devbox-allowlist-me) or run a second port-forward
