@@ -1,18 +1,18 @@
 #!/usr/bin/env bash
-# Resolve the operator's current source IP and write a gitignored
-# allowlist.auto.tfvars that populates var.allowed_web_cidrs.
+# Write a gitignored allowlist.auto.tfvars that narrows var.allowed_web_cidrs
+# from its default (10.0.0.0/8 — see terraform/variables.tf) to an explicit
+# list the operator supplies.
 #
 # Phase 2 hybrid posture: code-server (:8080) and noVNC (:6080) ingress is
-# restricted to var.allowed_web_cidrs (terraform/variables.tf, added in 02-01).
+# restricted to var.allowed_web_cidrs. Phase 5 follow-up: the Terraform default
+# is RFC1918 (10.0.0.0/8) and no public-internet egress is ever performed by
+# this script — the project lives inside a private VPC and never reaches out to
+# checkip.amazonaws.com or any other public endpoint.
 #
-# Two modes:
-#   1. Connected (default) — fetches public IP from https://checkip.amazonaws.com
-#      and writes <ip>/32 to allowlist.auto.tfvars. Works when operator has
-#      public-internet egress.
-#   2. Airgapped — operator supplies CIDR(s) explicitly. Triggered by --cidr
-#      flag (repeatable) or DEVBOX_OPERATOR_CIDR env var (comma-separated).
-#      No outbound call is made. Required for GovCloud, isolated VPCs, direct-
-#      connect-only networks, or anywhere checkip.amazonaws.com is blocked.
+# Input is operator-supplied only (one of):
+#   --cidr <CIDR>            (repeatable on the command line)
+#   DEVBOX_OPERATOR_CIDR     (env, comma-separated)
+#   bare IP (auto-promoted to /32)
 #
 # Output:  ./allowlist.auto.tfvars (gitignored — see .gitignore Phase-2 stanza)
 # Next:    make tf-apply
@@ -23,46 +23,40 @@ usage() {
   cat <<EOF
 Usage: $(basename "$0") [OPTIONS]
 
-Resolve operator source IP and write a gitignored allowlist.auto.tfvars
-populating var.allowed_web_cidrs.
+Write allowlist.auto.tfvars narrowing var.allowed_web_cidrs to an explicit
+list of operator-supplied CIDRs. No outbound network calls — works in any
+airgapped, GovCloud, or isolated-VPC environment.
 
-Connected mode (default):
-  Resolves your current public IP from https://checkip.amazonaws.com.
-
-Airgapped mode (--cidr or DEVBOX_OPERATOR_CIDR env):
-  Skips the public lookup entirely; uses operator-supplied CIDRs only.
-  Required when running in GovCloud, isolated VPCs, or any network
-  without egress to checkip.amazonaws.com.
+If you do not run this script, the Terraform default (10.0.0.0/8) applies —
+the box accepts code-server (:8080) and noVNC (:6080) traffic from the full
+RFC1918 private range. This script tightens that to /32 or /<smaller>.
 
 Options:
-  --cidr CIDR         Operator-supplied CIDR (repeatable). When provided,
-                      airgapped mode activates — no outbound HTTP call.
-                      Example: --cidr 10.42.0.0/24 --cidr 10.43.5.7/32
-  --extra-cidr CIDR   Additional CIDR appended to the auto-discovered /32
-                      in connected mode. Ignored in airgapped mode (use
-                      --cidr instead).
+  --cidr CIDR         CIDR or bare IP to allowlist (repeatable). Bare IPs are
+                      auto-promoted to /32.
+                      Example: --cidr 10.42.5.7 --cidr 10.43.0.0/24
   --output PATH       Output path (default: ./allowlist.auto.tfvars)
   -h, --help          Show this help
 
 Env vars:
   DEVBOX_OPERATOR_CIDR  Comma-separated CIDRs; equivalent to repeated --cidr.
-                        If set and non-empty, airgapped mode activates.
 
 Examples:
-  $(basename "$0")                                  # connected: auto-discover /32
-  $(basename "$0") --extra-cidr 10.0.0.0/24         # connected: /32 + office range
-  $(basename "$0") --cidr 10.42.0.0/24              # airgapped: explicit only
-  DEVBOX_OPERATOR_CIDR=10.0.0.0/8 $(basename "$0")  # airgapped via env
+  $(basename "$0") --cidr 10.42.5.7              # narrow to single host
+  $(basename "$0") --cidr 10.42.0.0/24           # narrow to subnet
+  DEVBOX_OPERATOR_CIDR=10.0.0.0/16 $(basename "$0")
 
-Behind a captive portal? Override manually:
-  echo 'allowed_web_cidrs = ["YOUR.IP.HERE/32"]' > allowlist.auto.tfvars
+To skip the script entirely and keep the 10/8 default:
+  make tf-apply
+
+To revoke a custom allowlist and revert to the default:
+  rm allowlist.auto.tfvars && make tf-apply
 EOF
   exit 0
 }
 
 TFVARS_PATH="${TFVARS_PATH:-./allowlist.auto.tfvars}"
 OPERATOR_CIDRS=()
-EXTRA_CIDRS=()
 
 # Seed operator CIDRs from env var if present (comma-separated).
 if [[ -n "${DEVBOX_OPERATOR_CIDR:-}" ]]; then
@@ -76,91 +70,54 @@ fi
 while [[ $# -gt 0 ]]; do
   case $1 in
     --cidr)        OPERATOR_CIDRS+=("$2"); shift 2 ;;
-    --extra-cidr)  EXTRA_CIDRS+=("$2"); shift 2 ;;
     --output)      TFVARS_PATH="$2"; shift 2 ;;
     -h|--help)     usage ;;
     *)             echo "Unknown option: $1" >&2; exit 1 ;;
   esac
 done
 
-CIDR_LIST=""
-MODE=""
-SOURCE_NOTE=""
+if [[ ${#OPERATOR_CIDRS[@]} -eq 0 ]]; then
+  cat >&2 <<EOF
+ERROR: no CIDR supplied.
 
-if [[ ${#OPERATOR_CIDRS[@]} -gt 0 ]]; then
-  # ----- Airgapped mode -----
-  MODE="airgapped"
-  for c in "${OPERATOR_CIDRS[@]}"; do
-    # Sanity-check shape — Terraform's cidrhost() is the authoritative gate, but
-    # catch obvious typos here so the operator sees a clearer error.
-    if [[ ! "$c" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}(/[0-9]{1,2})?$ ]]; then
-      echo "ERROR: --cidr / DEVBOX_OPERATOR_CIDR value '$c' is not a valid CIDR (expected A.B.C.D or A.B.C.D/N)." >&2
-      exit 1
-    fi
-    # Default to /32 if no prefix supplied (operator gave bare IP).
-    [[ "$c" == */* ]] || c="${c}/32"
-    [[ -z "$CIDR_LIST" ]] && CIDR_LIST="\"${c}\"" || CIDR_LIST="${CIDR_LIST}, \"${c}\""
-  done
-  SOURCE_NOTE="Source: operator-supplied (--cidr / DEVBOX_OPERATOR_CIDR). No public lookup."
-  echo "Airgapped mode: skipping public IP lookup; using ${#OPERATOR_CIDRS[@]} operator-supplied CIDR(s)."
-else
-  # ----- Connected mode -----
-  MODE="connected"
-  echo "Resolving public IP from https://checkip.amazonaws.com ..."
-  PUBLIC_IP=$(curl -sS --max-time 5 https://checkip.amazonaws.com 2>/dev/null | tr -d '[:space:]' || true)
+Pass at least one CIDR (or bare IP — auto-promoted to /32) via --cidr or
+DEVBOX_OPERATOR_CIDR:
 
-  if [[ -z "$PUBLIC_IP" ]]; then
-    cat >&2 <<EOF
-ERROR: checkip.amazonaws.com unreachable (timeout or network failure).
+  $(basename "$0") --cidr 10.42.5.7
+  DEVBOX_OPERATOR_CIDR=10.42.0.0/24 $(basename "$0")
 
-If you are in an airgapped network (GovCloud, isolated VPC, no egress), pass
-the CIDR explicitly:
-
-  $(basename "$0") --cidr YOUR.IP.HERE/32
-  # or
-  DEVBOX_OPERATOR_CIDR=YOUR.IP.HERE/32 $(basename "$0")
-
-Or override manually:
-  echo 'allowed_web_cidrs = ["YOUR.IP.HERE/32"]' > $TFVARS_PATH
+To skip this script and keep the Terraform default (10.0.0.0/8), just run:
+  make tf-apply
 EOF
-    exit 1
-  fi
-
-  # Defense against captive-portal HTML: response must look exactly like IPv4.
-  if [[ ! "$PUBLIC_IP" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]]; then
-    cat >&2 <<EOF
-ERROR: checkip.amazonaws.com returned unexpected payload: '$PUBLIC_IP'
-
-Behind a captive portal, or in an airgapped network?
-Use --cidr instead:
-  $(basename "$0") --cidr YOUR.IP.HERE/32
-Or override manually:
-  echo 'allowed_web_cidrs = ["YOUR.IP.HERE/32"]' > $TFVARS_PATH
-EOF
-    exit 1
-  fi
-
-  CIDR_LIST="\"${PUBLIC_IP}/32\""
-  for c in "${EXTRA_CIDRS[@]+"${EXTRA_CIDRS[@]}"}"; do
-    CIDR_LIST="${CIDR_LIST}, \"${c}\""
-  done
-  SOURCE_NOTE="Source: checkip.amazonaws.com → ${PUBLIC_IP}/32"
+  exit 1
 fi
+
+CIDR_LIST=""
+for c in "${OPERATOR_CIDRS[@]}"; do
+  # Sanity-check shape. Terraform's cidrhost() is the authoritative gate; this
+  # catches obvious typos with a clearer error.
+  if [[ ! "$c" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}(/[0-9]{1,2})?$ ]]; then
+    echo "ERROR: --cidr / DEVBOX_OPERATOR_CIDR value '$c' is not a valid CIDR (expected A.B.C.D or A.B.C.D/N)." >&2
+    exit 1
+  fi
+  # Default to /32 if no prefix supplied (operator gave bare IP).
+  [[ "$c" == */* ]] || c="${c}/32"
+  [[ -z "$CIDR_LIST" ]] && CIDR_LIST="\"${c}\"" || CIDR_LIST="${CIDR_LIST}, \"${c}\""
+done
 
 # Atomic write — write to a temp file, then mv into place.
 TMP_FILE="${TFVARS_PATH}.tmp.$$"
 cat > "$TMP_FILE" <<EOF
 # AUTO-GENERATED by make devbox-allowlist-me on $(date -u +%Y-%m-%dT%H:%M:%SZ)
 # Operator: ${USER:-unknown}
-# Mode: ${MODE}
-# ${SOURCE_NOTE}
-# Refresh by re-running 'make devbox-allowlist-me' after IP changes.
+# Source: operator-supplied (--cidr / DEVBOX_OPERATOR_CIDR). No public lookup.
+# Narrows var.allowed_web_cidrs from its Terraform default (10.0.0.0/8).
+# Refresh by re-running 'make devbox-allowlist-me' after operator network changes.
 # Gitignored — see .gitignore Phase-2 stanza.
 allowed_web_cidrs = [${CIDR_LIST}]
 EOF
 mv "$TMP_FILE" "$TFVARS_PATH"
 
-echo ""
 echo "Wrote ${TFVARS_PATH}:"
 echo "----------------------------------------"
 cat "$TFVARS_PATH"

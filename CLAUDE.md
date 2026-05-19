@@ -86,23 +86,21 @@ procedure: see section 6.
 
 ### Step 2 — CIDR allowlist for code-server / noVNC (Phase 2 NET-02/03)
 
-`:8080` (code-server) and `:6080` (noVNC) are restricted to a CIDR allowlist; the default
-is `[]` and plan-time validation refuses `tf-apply` when empty unless
-`var.allow_open_ingress=true`. The helper resolves your current source IP and writes
-`allowlist.auto.tfvars` (gitignored):
+`:8080` (code-server) and `:6080` (noVNC) are restricted to `var.allowed_web_cidrs`.
+The Terraform default is `["10.0.0.0/8"]` — the RFC1918 private range, appropriate
+when the devbox lives inside a private VPC reached over VPC peering / Direct Connect /
+VPN. `make tf-apply` works out-of-the-box with that default; no script needed.
+
+To narrow further (e.g. a single jump host or subnet), write `allowlist.auto.tfvars`
+via the helper. The helper is **operator-supplied only — no public-internet calls**:
 
 ```bash
-# Connected (default) — fetches public IP from https://checkip.amazonaws.com
-make devbox-allowlist-me
-
-# Airgapped (GovCloud / isolated VPC / no egress to checkip.amazonaws.com)
-./scripts/devbox-allowlist-me.sh --cidr 10.42.0.0/24 --cidr 10.43.5.7/32
-# or via env var
-DEVBOX_OPERATOR_CIDR="10.42.0.0/24,10.43.5.7" make devbox-allowlist-me
+./scripts/devbox-allowlist-me.sh --cidr 10.42.5.7              # narrow to single host
+./scripts/devbox-allowlist-me.sh --cidr 10.42.0.0/24           # narrow to subnet
+DEVBOX_OPERATOR_CIDR="10.42.0.0/24" make devbox-allowlist-me   # via env var
 ```
 
-Re-run whenever your source IP / network changes. The airgapped path skips the
-outbound HTTP call entirely.
+To revert to the 10/8 default: `rm allowlist.auto.tfvars && make tf-apply`.
 
 ## 5. Daily flow
 
