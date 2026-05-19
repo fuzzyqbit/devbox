@@ -141,8 +141,8 @@ jobs:
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4.3.1
       - name: shellcheck scripts
         # shellcheck is pre-installed on ubuntu-latest (RESEARCH line 252,
-        # 684). Covers all 6 scripts in scripts/: _common, devbox-start,
-        # devbox-stop, devbox-status, devbox-ssm, devbox-allowlist-me.
+        # 684). Covers all scripts in scripts/ (_common, devbox-start,
+        # devbox-stop, devbox-status, devbox-ssm).
         run: shellcheck scripts/*.sh
 
   # ---------------------------------------------------------------- 7

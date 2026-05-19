@@ -20,14 +20,11 @@ terraform/terraform.tfstate.d/
 # Claude Code (local settings, not project files)
 .claude/
 
-# Phase 2 (NET): operator CIDR allowlist written by `make devbox-allowlist-me`
-# (contains operator public /32).
-# Phase 3 (REP-05): per-operator AMI handoff tfvars written by `make packer-bake`
-# (Terraform auto-loads from module dir; per-user file under users/ carries the
-# just-built AMI ID).
-# Both gitignored: generated, per-operator, not for version control.
+# Per-operator AMI handoff tfvars written by `make packer-bake` (Terraform
+# auto-loads from module dir; per-user file under users/ carries the just-built
+# AMI ID). Also catches any per-operator tfvars an operator drops in to override
+# CIDR allowlists, etc. — kept local, never committed.
 *.auto.tfvars
-allowlist.auto.tfvars
 users/*.auto.tfvars
 
 # Root-level Terraform lock (occasionally synthesized by stray `tofu init`

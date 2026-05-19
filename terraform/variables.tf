@@ -63,11 +63,11 @@ variable "extra_tags" {
 variable "allowed_web_cidrs" {
   type        = list(string)
   default     = ["10.0.0.0/8"]
-  description = "CIDR blocks permitted to reach code-server (:8080) and noVNC (:6080). Default 10.0.0.0/8 covers the RFC1918 private range — appropriate when the devbox lives inside a private VPC and is reached over VPC peering / Direct Connect / VPN. Operators in connected AWS who want tighter scoping should narrow via `make devbox-allowlist-me` (writes allowlist.auto.tfvars, gitignored) or set an explicit list in a tfvars file. Empty list refuses apply unless var.allow_open_ingress = true. SSH (:22) ingress is intentionally absent — shell access is brokered by AWS SSM Session Manager."
+  description = "CIDR blocks permitted to reach code-server (:8080) and noVNC (:6080). Default 10.0.0.0/8 covers the RFC1918 private range — appropriate when the devbox lives inside a private VPC and is reached over VPC peering / Direct Connect / VPN. Operator-managed externally: narrow via a per-operator tfvars file, a `-var` flag, or `TF_VAR_allowed_web_cidrs`. Empty list refuses apply unless var.allow_open_ingress = true. SSH (:22) ingress is intentionally absent — shell access is brokered by AWS SSM Session Manager."
 
   validation {
     condition     = length(var.allowed_web_cidrs) > 0 || var.allow_open_ingress
-    error_message = "allowed_web_cidrs must contain at least one CIDR (e.g. 203.0.113.42/32). Run `make devbox-allowlist-me` to auto-populate your current public IP, or set the value explicitly in an allowlist.auto.tfvars file. To bypass this gate intentionally (NOT recommended), set var.allow_open_ingress = true."
+    error_message = "allowed_web_cidrs must contain at least one CIDR (e.g. 203.0.113.42/32). Supply via a per-operator tfvars file, a `-var` flag, or `TF_VAR_allowed_web_cidrs`. To bypass this gate intentionally (NOT recommended), set var.allow_open_ingress = true."
   }
 
   validation {

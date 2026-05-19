@@ -99,9 +99,9 @@ resource "aws_iam_role_policy_attachment" "devbox_ssm_core" {
 # SSH (:22) ingress intentionally absent. Shell access is brokered by AWS SSM
 # Session Manager — see PROJECT.md Key Decisions (NET-04) and
 # .planning/phases/02-network-exposure-remediation/02-RESEARCH.md.
-# Web ports (:8080, :6080) are gated by var.allowed_web_cidrs.
-# Operator workflow: `make devbox-allowlist-me` writes the operator's /32 into
-# allowlist.auto.tfvars (gitignored); `make tg-apply` applies it.
+# Web ports (:8080, :6080) are gated by var.allowed_web_cidrs (default
+# ["10.0.0.0/8"]). Operator-managed externally — supply via per-operator
+# tfvars / `-var` / `TF_VAR_allowed_web_cidrs` and run `make tf-apply`.
 
 resource "aws_security_group" "devbox" {
   name_prefix = "${local.name_prefix}-"

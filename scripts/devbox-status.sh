@@ -60,6 +60,6 @@ if [[ "$STATE" == "running" ]]; then
     echo "  Then browse to https://localhost:8080 and https://localhost:6080"
   fi
   echo ""
-  echo "If browser access fails: your public IP probably changed."
-  echo "  make devbox-allowlist-me && make tg-apply"
+  echo "If browser access fails: check var.allowed_web_cidrs in your tfvars."
+  echo "  Update it externally (per-operator tfvars / -var / TF_VAR_allowed_web_cidrs) then re-run: make tf-apply"
 fi

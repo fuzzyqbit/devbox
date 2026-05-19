@@ -1,8 +1,9 @@
 # Phase 5: shared per-environment defaults previously held in `terragrunt.hcl`
 # `inputs`. Terraform auto-loads `terraform.tfvars` from the module directory.
-# Per-operator values (`ami_id`, `key_name`, `allowed_web_cidrs`) flow via
-# `users/${USER}.auto.tfvars` (gitignored, written by `make packer-bake` /
-# `make devbox-allowlist-me`) or via `-var` flags from the Makefile.
+# Per-operator values (`ami_id`, `key_name`) flow via
+# `users/${USER}.auto.tfvars` (gitignored, written by `make packer-bake`) or
+# via `-var` flags from the Makefile. `allowed_web_cidrs` is operator-managed
+# externally — supply via your own tfvars / `-var` / `TF_VAR_allowed_web_cidrs`.
 
 aws_region       = "us-east-1"
 vpc_id           = "vpc-0dafcc61f21dac9cd"

@@ -1,6 +1,6 @@
 .PHONY: help validate build fmt clean packer-init packer-bake \
         start stop status \
-        devbox-ssm devbox-port-forward devbox-allowlist-me secrets-show \
+        devbox-ssm devbox-port-forward secrets-show \
         tf-init tf-reinit tf-plan tf-apply tf-auto-apply tf-destroy tf-auto-destroy
 
 # User detection: override with  make <target> DEVBOX_USER=jsmith
@@ -21,21 +21,12 @@ TF_STATE_LOCK_TABLE ?= devimage-tfstate-locks
 TF_STATE_BUCKET ?= devimage-tfstate-$(shell aws sts get-caller-identity --query Account --output text 2>/dev/null)
 TF_STATE_KEY     = users/$(DEVBOX_USER)/devbox.tfstate
 
-# CIDR aggregation: union of CODE_SERVER_ALLOWED_CIDRS + VNC_ALLOWED_CIDRS
-# (comma-separated env vars), trimmed, deduped, emitted as a JSON array for
-# `tofu -var`. Empty env → []. Operators who prefer file-based config can
-# leave the env vars unset and let `make devbox-allowlist-me` write
-# allowlist.auto.tfvars (gitignored) instead. The validation block in
-# terraform/variables.tf is the gate that rejects an empty result unless
-# var.allow_open_ingress = true.
-TF_CIDR_LIST = $(shell printf '%s,%s' "$$CODE_SERVER_ALLOWED_CIDRS" "$$VNC_ALLOWED_CIDRS" \
-                       | tr ',' '\n' | sed 's/[[:space:]]//g' \
-                       | grep -v '^$$' | sort -u \
-                       | jq -R . | jq -s -c . 2>/dev/null || echo '[]')
+# CIDR allowlist for web ports (:8080 / :6080) is operator-managed externally.
+# var.allowed_web_cidrs defaults to ["10.0.0.0/8"] in terraform/variables.tf;
+# narrow via per-operator tfvars, -var flag, or TF_VAR_allowed_web_cidrs env.
 
 TF_VAR_ARGS = -var "devbox_user=$(DEVBOX_USER)" \
-              -var "key_name=$(DEVBOX_USER)-devbox" \
-              -var 'allowed_web_cidrs=$(TF_CIDR_LIST)'
+              -var "key_name=$(DEVBOX_USER)-devbox"
 
 TF_BACKEND_ARGS = -backend-config="bucket=$(TF_STATE_BUCKET)" \
                   -backend-config="key=$(TF_STATE_KEY)" \
@@ -71,7 +62,6 @@ help:
 	@echo "SSM access (Phase 2 — replaces public :22 ingress)"
 	@echo "  devbox-ssm           Open an SSM Session Manager shell to the devbox"
 	@echo "  devbox-port-forward  Forward :8080 from the devbox to localhost over SSM"
-	@echo "  devbox-allowlist-me  Resolve your public IP and write allowlist.auto.tfvars"
 	@echo ""
 	@echo "Secrets"
 	@echo "  secrets-show   Print the operator's code-server and VNC passwords from SSM"
@@ -175,9 +165,9 @@ status: tf-ensure-init
 devbox-ssm: tf-ensure-init
 	DEVBOX_USER=$(DEVBOX_USER) INSTANCE_ID=$(INSTANCE_ID) REGION=$(REGION) ./scripts/devbox-ssm.sh
 
-# Forwards :8080 (code-server) only. For :6080 (noVNC), either add your IP to
-# allowed_web_cidrs (make devbox-allowlist-me) or run a second port-forward
-# session manually with portNumber=6080.
+# Forwards :8080 (code-server) only. For :6080 (noVNC), either narrow your
+# allowed_web_cidrs externally or run a second port-forward session manually
+# with portNumber=6080.
 devbox-port-forward:
 	@set -euo pipefail; \
 	command -v session-manager-plugin >/dev/null 2>&1 || { \
@@ -188,16 +178,13 @@ devbox-port-forward:
 	REGION=$$(cd terraform && $(TF_BIN) output -raw aws_region); \
 	echo "Forwarding :8080 from $$INSTANCE_ID to localhost..."; \
 	echo "Browse to https://localhost:8080 (code-server)."; \
-	echo "For noVNC :6080, run 'make devbox-allowlist-me' or open a second forwarding session."; \
+	echo "For noVNC :6080, open a second forwarding session manually with portNumber=6080."; \
 	echo "Ctrl-C to stop forwarding."; \
 	exec aws ssm start-session \
 	  --target "$$INSTANCE_ID" \
 	  --region "$$REGION" \
 	  --document-name AWS-StartPortForwardingSession \
 	  --parameters '{"portNumber":["8080"],"localPortNumber":["8080"]}'
-
-devbox-allowlist-me:
-	@./scripts/devbox-allowlist-me.sh
 
 # --- Secrets (per-user, SSM Parameter Store) ---
 
