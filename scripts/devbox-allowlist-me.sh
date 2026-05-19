@@ -6,8 +6,8 @@
 # Phase 2 hybrid posture: code-server (:8080) and noVNC (:6080) ingress is
 # restricted to var.allowed_web_cidrs. Phase 5 follow-up: the Terraform default
 # is RFC1918 (10.0.0.0/8) and no public-internet egress is ever performed by
-# this script — the project lives inside a private VPC and never reaches out to
-# checkip.amazonaws.com or any other public endpoint.
+# this script — the project lives inside a private VPC and never reaches out
+# to any public endpoint.
 #
 # Input is operator-supplied only (one of):
 #   --cidr <CIDR>            (repeatable on the command line)
