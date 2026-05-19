@@ -125,6 +125,10 @@ tf-init:
 	cd terraform && $(TF_BIN) init $(TF_BACKEND_ARGS)
 
 tf-reinit:
+	@[ -n "$(TF_STATE_BUCKET)" ] && [ "$(TF_STATE_BUCKET)" != "devimage-tfstate-" ] || { \
+	  echo "ERROR: could not resolve AWS account ID via 'aws sts get-caller-identity'." >&2; \
+	  echo "       Check your AWS credentials/profile, or override TF_STATE_BUCKET=... explicitly." >&2; \
+	  exit 1; }
 	cd terraform && $(TF_BIN) init -reconfigure $(TF_BACKEND_ARGS)
 
 tf-plan: tf-ensure-init
