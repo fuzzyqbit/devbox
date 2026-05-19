@@ -3,8 +3,24 @@
         devbox-ssm devbox-port-forward secrets-show \
         tf-init tf-reinit tf-plan tf-apply tf-auto-apply tf-destroy tf-auto-destroy
 
-# User detection: override with  make <target> DEVBOX_USER=jsmith
-DEVBOX_USER ?= $(shell whoami)
+# DEVBOX_USER: REQUIRED. Threads through every state key, SG name, SSH key,
+# and SSM parameter prefix. No `whoami` default — local shell user routinely
+# differs from the AWS-side operator identity. Pass explicitly, or `export`
+# it in your shell rc.
+#   make <target> DEVBOX_USER=jsmith
+#   export DEVBOX_USER=jsmith
+DEVBOX_USER ?=
+
+# Guard: most targets refuse to run with an unset DEVBOX_USER (state key would
+# resolve to users//devbox.tfstate, a foot-gun). Targets that need this guard
+# list it as a prerequisite.
+.PHONY: _require-devbox-user
+_require-devbox-user:
+	@[ -n "$(DEVBOX_USER)" ] || { \
+	  echo "ERROR: DEVBOX_USER is not set." >&2; \
+	  echo "       Set per-invocation:  make <target> DEVBOX_USER=jsmith" >&2; \
+	  echo "       Or in your shell:    export DEVBOX_USER=jsmith" >&2; \
+	  exit 1; }
 
 # IaC binary: default OpenTofu (canonical per CLAUDE.md §8 — the committed
 # terraform/.terraform.lock.hcl is OpenTofu-flavoured). Operator may override to
@@ -88,7 +104,7 @@ build: packer-init
 # 3) Extracts the AMI ID from the most-recent build entry (sort_by(.build_time)).
 # 4) Writes users/$(DEVBOX_USER).auto.tfvars — auto-loaded by Terraform.
 # Operator flow:  make packer-bake DEVBOX_USER=$$(whoami)  &&  make tf-apply
-packer-bake: packer-init
+packer-bake: packer-init _require-devbox-user
 	@rm -f packer/packer-manifest.json
 	cd packer && DEVBOX_USER=$(DEVBOX_USER) packer build -var "devbox_user=$(DEVBOX_USER)" .
 	@AMI_ID=$$(jq -r '.builds | sort_by(.build_time) | .[-1].artifact_id | split(":") | .[1]' packer/packer-manifest.json); \
@@ -110,21 +126,21 @@ fmt:
 # tf-plan/apply/destroy + status/start/stop/devbox-ssm self-healing across
 # DEVBOX_USER switches and fresh clones.
 .PHONY: tf-ensure-init
-tf-ensure-init:
+tf-ensure-init: _require-devbox-user
 	@CACHED=$$(jq -r '.backend.config.key // empty' terraform/.terraform/terraform.tfstate 2>/dev/null || true); \
 	if [ "$$CACHED" != "$(TF_STATE_KEY)" ]; then \
 	  echo "[tf-ensure-init] backend cache mismatch (cached='$$CACHED', want='$(TF_STATE_KEY)'); reinitializing..."; \
 	  $(MAKE) --no-print-directory tf-reinit DEVBOX_USER=$(DEVBOX_USER) TF_BIN=$(TF_BIN); \
 	fi
 
-tf-init:
+tf-init: _require-devbox-user
 	@[ -n "$(TF_STATE_BUCKET)" ] && [ "$(TF_STATE_BUCKET)" != "devimage-tfstate-" ] || { \
 	  echo "ERROR: could not resolve AWS account ID via 'aws sts get-caller-identity'." >&2; \
 	  echo "       Check your AWS credentials/profile, or override TF_STATE_BUCKET=... explicitly." >&2; \
 	  exit 1; }
 	cd terraform && $(TF_BIN) init $(TF_BACKEND_ARGS)
 
-tf-reinit:
+tf-reinit: _require-devbox-user
 	@[ -n "$(TF_STATE_BUCKET)" ] && [ "$(TF_STATE_BUCKET)" != "devimage-tfstate-" ] || { \
 	  echo "ERROR: could not resolve AWS account ID via 'aws sts get-caller-identity'." >&2; \
 	  echo "       Check your AWS credentials/profile, or override TF_STATE_BUCKET=... explicitly." >&2; \
@@ -172,7 +188,7 @@ devbox-ssm: tf-ensure-init
 # Forwards :8080 (code-server) only. For :6080 (noVNC), either narrow your
 # allowed_web_cidrs externally or run a second port-forward session manually
 # with portNumber=6080.
-devbox-port-forward:
+devbox-port-forward: _require-devbox-user
 	@set -euo pipefail; \
 	command -v session-manager-plugin >/dev/null 2>&1 || { \
 	  echo "ERROR: session-manager-plugin not installed. brew install --cask session-manager-plugin" >&2; \
@@ -192,7 +208,7 @@ devbox-port-forward:
 
 # --- Secrets (per-user, SSM Parameter Store) ---
 
-secrets-show:
+secrets-show: _require-devbox-user
 	@set -euo pipefail; \
 	echo "Resolving secrets for DEVBOX_USER=$(DEVBOX_USER)..."; \
 	cs_pwd=$$(aws ssm get-parameter \
