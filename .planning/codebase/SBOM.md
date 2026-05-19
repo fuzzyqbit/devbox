@@ -106,11 +106,12 @@ Networking: see `ansible/firewalld-docker-fix.yml` (Phase 0 WIP, documented reti
 |-----------|---------|--------|
 | HashiCorp Terraform | `1.9.3` | upstream zip |
 | OpenTofu | `1.9.0` | upstream tarball |
-| Terragrunt | `0.67.4` | upstream binary |
 | `tflint` | `0.53.0` | upstream zip |
 | `terraform-docs` | `0.18.0` | upstream tarball |
 
 **Note:** operator workstation tofu version must satisfy the committed `terraform/.terraform.lock.hcl` (Phase 3 REP-01). The lockfile records `hashicorp/aws ~> 6.0` resolved to `v6.45.0` with 4 platform hashes.
+
+**Phase 5 (May 2026):** Terragrunt removed. Makefile drives `tofu` directly; backend wired via partial `terraform/backend.tf` + `-backend-config` flags at init time.
 
 ---
 

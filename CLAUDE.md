@@ -19,7 +19,7 @@ are sufficient for a fresh clone.
 
 ```bash
 # macOS
-brew install awscli packer opentofu terragrunt ansible ansible-lint jq \
+brew install awscli packer opentofu ansible ansible-lint jq \
              gitleaks pre-commit shellcheck
 brew install --cask session-manager-plugin
 # Optional (CI is authoritative; install locally for `pre-commit run --hook-stage pre-push`):
@@ -28,7 +28,7 @@ brew install checkov
 
 ```bash
 # Fedora / RHEL
-dnf install -y awscli packer opentofu terragrunt ansible-core jq \
+dnf install -y awscli packer opentofu ansible-core jq \
                gitleaks ShellCheck
 pip install ansible-lint==26.4.0 pre-commit==4.6.0 checkov==3.2.528
 # session-manager-plugin: download the .rpm from
@@ -36,9 +36,14 @@ pip install ansible-lint==26.4.0 pre-commit==4.6.0 checkov==3.2.528
 ```
 
 Required floor versions: `aws` CLI v2.x, `packer` ≥ 1.12, `tofu` ≥ 1.10 (NOT `terraform`
-— the lockfile is OpenTofu-flavoured), `terragrunt` ≥ 0.81, `ansible-core` ≥ 2.16 +
+— the lockfile is OpenTofu-flavoured), `ansible-core` ≥ 2.16 +
 `ansible-lint` ≥ 26, `jq`, `gitleaks` ≥ 8.30, `pre-commit` ≥ 4.6, `shellcheck` ≥ 0.10,
 `checkov` ≥ 3.2 (optional — CI is the source of truth).
+
+> **Phase 5 note:** Terragrunt was dropped post-v1.0. The Makefile now drives `tofu`
+> directly with `-backend-config` flags; `tf-init` derives the state bucket from
+> `aws sts get-caller-identity`. If you still see `tg-*` targets referenced in old
+> notes, use the `tf-*` equivalents (`tg-apply` → `tf-apply`, etc.).
 
 ### Pre-commit hooks — install all three stages
 
@@ -55,8 +60,10 @@ pre-commit install --install-hooks       # pre-warm hook environments (avoids fi
 
 | Variable | Default | Purpose |
 |----------|---------|---------|
-| `DEVBOX_USER` | `$(whoami)` | Threads through every Makefile target. Controls the S3 tfstate key (`users/${DEVBOX_USER}/devbox.tfstate`), the SSH keypair name (`${DEVBOX_USER}-devbox`), the security-group name prefix, and the SSM parameter prefix (`/devbox/${DEVBOX_USER}/*`). Override per-invocation: `make tg-apply DEVBOX_USER=alice`. |
-| `AWS_REGION` / `AWS_DEFAULT_REGION` | inherited | Operator region. The Terraform `region` input defaults to the value baked into `terragrunt.hcl`; export this for the `aws` CLI calls in scripts. |
+| `DEVBOX_USER` | `$(whoami)` | Threads through every Makefile target. Controls the S3 tfstate key (`users/${DEVBOX_USER}/devbox.tfstate`), the SSH keypair name (`${DEVBOX_USER}-devbox`), the security-group name prefix, and the SSM parameter prefix (`/devbox/${DEVBOX_USER}/*`). Override per-invocation: `make tf-apply DEVBOX_USER=alice`. |
+| `AWS_REGION` / `AWS_DEFAULT_REGION` | inherited | Operator region. The Terraform `region` input defaults to the value baked into `terraform/terraform.tfvars`; export this for the `aws` CLI calls in scripts. |
+| `TF_STATE_BUCKET` | derived | Backend bucket name. Defaults to `devimage-tfstate-$(aws sts get-caller-identity --query Account --output text)`. Override to point at a different state bucket. |
+| `CODE_SERVER_ALLOWED_CIDRS` / `VNC_ALLOWED_CIDRS` | unset | Comma-separated CIDR allowlists. Merged + deduped, passed via `-var allowed_web_cidrs=…` to `tofu`. Empty → `make tf-apply` is refused by the validation block unless `var.allow_open_ingress=true`. Operators who prefer file-based config can run `make devbox-allowlist-me` instead. |
 | `AWS_PROFILE` | unset | Optional; pass through to the `aws` CLI for multi-account operators. |
 
 ## 4. One-time per-operator setup
@@ -79,7 +86,7 @@ procedure: see section 6.
 ### Step 2 — CIDR allowlist for code-server / noVNC (Phase 2 NET-02/03)
 
 `:8080` (code-server) and `:6080` (noVNC) are restricted to a CIDR allowlist; the default
-is `[]` and plan-time validation refuses `tg-apply` when empty unless
+is `[]` and plan-time validation refuses `tf-apply` when empty unless
 `var.allow_open_ingress=true`. The helper resolves your current public IP and writes
 `users/allowlist.auto.tfvars` (gitignored):
 
@@ -99,8 +106,12 @@ reference; targets used in the daily loop are listed below in execution order.
 #    (Phase 3 REP-04, REP-05). Writes users/${DEVBOX_USER}.auto.tfvars.
 make packer-bake DEVBOX_USER=$(whoami)
 
-# 2. Provision (or update) the EC2 instance. Idempotent; replaces the AMI if it changed.
-make tg-apply DEVBOX_USER=$(whoami)
+# 2. First-time only (or after switching DEVBOX_USER): point Terraform at this
+#    operator's S3 state key. Derives the bucket via `aws sts get-caller-identity`.
+make tf-init DEVBOX_USER=$(whoami)
+
+# 3. Provision (or update) the EC2 instance. Idempotent; replaces the AMI if it changed.
+make tf-apply DEVBOX_USER=$(whoami)
 
 # 3. Start the instance when you're ready to work.
 make start
@@ -120,9 +131,10 @@ make stop
 make status
 ```
 
-Bake variants and additional Terragrunt targets (`tg-init`, `tg-reinit`, `tg-plan`,
-`tg-auto-apply`, `tg-destroy`, `tg-auto-destroy`, plus `init`, `validate`, `build`, `fmt`,
-`clean`) are documented in `make help`; the daily loop above is sufficient for typical use.
+Bake variants and additional Terraform targets (`tf-init`, `tf-reinit`, `tf-plan`,
+`tf-auto-apply`, `tf-destroy`, `tf-auto-destroy`, plus `packer-init`, `validate`, `build`,
+`fmt`, `clean`) are documented in `make help`; the daily loop above is sufficient for
+typical use.
 
 ## 6. Rotations
 
@@ -133,13 +145,13 @@ Bake variants and additional Terragrunt targets (`tg-init`, `tg-reinit`, `tg-pla
   ssh-keygen -t ed25519 -f ~/.ssh/${USER}-devbox -C "${USER}-devbox"
   aws ec2 import-key-pair --key-name "${USER}-devbox" \
     --public-key-material "fileb://$HOME/.ssh/${USER}-devbox.pub" --region "$AWS_REGION"
-  make tg-apply DEVBOX_USER=$(whoami)
+  make tf-apply DEVBOX_USER=$(whoami)
   ```
 - **Secrets** (Phase 1 SEC-01/02/03). Per-build secrets are regenerated by the `secrets`
   role on every `make packer-bake` and re-published to SSM Parameter Store as
-  SecureStrings. To rotate: just rebake (`make packer-bake && make tg-apply`).
+  SecureStrings. To rotate: just rebake (`make packer-bake && make tf-apply`).
 - **CIDR allowlist** (Phase 2 NET-02/03). Re-run `make devbox-allowlist-me` to refresh
-  `users/allowlist.auto.tfvars` to your current public IP, then `make tg-apply`.
+  `users/allowlist.auto.tfvars` to your current public IP, then `make tf-apply`.
 
 ## 7. Troubleshooting
 
@@ -151,7 +163,7 @@ Bake variants and additional Terragrunt targets (`tg-init`, `tg-reinit`, `tg-pla
   substitute the upstream `terraform` binary; the committed lockfile
   (`terraform/.terraform.lock.hcl`) is OpenTofu-flavoured and the policy in section 8
   forbids reverting it (Phase 3 REP-01).
-- **`AMI not found`** on `make tg-apply` — Terraform is looking for the AMI ID in
+- **`AMI not found`** on `make tf-apply` — Terraform is looking for the AMI ID in
   `users/${DEVBOX_USER}.auto.tfvars`. Run `make packer-bake DEVBOX_USER=$(whoami)` first;
   it writes that file (and the file is gitignored, so it's normal for it to be absent on
   a fresh clone).

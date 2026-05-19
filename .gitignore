@@ -8,11 +8,8 @@ terraform/.terraform/
 terraform/terraform.tfstate
 terraform/terraform.tfstate.backup
 terraform/terraform.tfstate.d/
-terraform/terraform.tfvars
-terraform/backend.tf
-
-# Terragrunt
-.terragrunt-cache/
+# (terraform.tfvars + backend.tf were previously gitignored as Terragrunt-generated
+# artifacts. Phase 5 removed Terragrunt; both files are now committed.)
 
 # Ansible
 *.retry
@@ -33,6 +30,7 @@ terraform/backend.tf
 allowlist.auto.tfvars
 users/*.auto.tfvars
 
-# Root-level Terraform lock (terragrunt generates this at project root;
-# the committed lock file lives at terraform/.terraform.lock.hcl)
+# Root-level Terraform lock (occasionally synthesized by stray `tofu init`
+# from the repo root; the canonical committed lock file lives at
+# terraform/.terraform.lock.hcl)
 .terraform.lock.hcl

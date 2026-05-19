@@ -91,7 +91,7 @@ A single operator can spin up, hibernate, and tear down a reproducible, hardened
 | Decision | Rationale | Outcome |
 |----------|-----------|---------|
 | OpenTofu (`tofu`) over Terraform binary | License clarity, free, drop-in compatible | ✓ Good |
-| Terragrunt for backend generation + per-user state | Avoids hand-maintained backend.tf per user; single source of `DEVBOX_USER` threading | ✓ Good |
+| Terragrunt for backend generation + per-user state | Avoids hand-maintained backend.tf per user; single source of `DEVBOX_USER` threading | ⚠️ Removed post-v1.0 (May 2026) — Terragrunt's value didn't justify its weight at one-module / one-environment scale; replaced by partial `backend "s3" {}` in `terraform/backend.tf` + Makefile `-backend-config` derived from `aws sts get-caller-identity`. |
 | 14-layer toggleable Ansible role structure with `layer_config.yml` | Operators can opt out of layers (e.g., skip Java) without forking; manifest written to `/etc/devimage-manifest.yml` | ✓ Good |
 | Per-build randomized secrets for code-server / VNC, delivered via AWS SSM Parameter Store SecureString | Eliminates `changeme` default; SSM SecureString chosen over Secrets Manager — $0/month at this scale vs $0.40/secret/month, identical KMS encryption, sufficient IAM granularity via path-prefix scoping. Per-build rotation happens at AMI bake; no rotation Lambda needed. | ✓ Phase 1 |
 | Per-operator SSH key name `${devbox_user}-devbox` (replaces hardcoded `key_name = "me"`) | Per-operator isolation: no shared keypair authorized across all devboxes. Keys live outside the repo (`aws ec2 import-key-pair`), keeping public-key material out of tfstate. Rotation = `delete-key-pair` + `import-key-pair` + `terraform destroy/apply` to push the new public key. | ✓ Phase 1 |

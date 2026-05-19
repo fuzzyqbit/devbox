@@ -1,7 +1,7 @@
 ---
 # Tiered pre-commit hooks for the devbox IaC repo (Phase 1 + Phase 4 combined).
 #
-# FAST hooks (pre-commit stage): gitleaks, no-changeme, tofu_fmt, terragrunt_fmt,
+# FAST hooks (pre-commit stage): gitleaks, no-changeme, tofu_fmt,
 # shellcheck, packer-fmt, grep-gates, pre-commit-hooks (end-of-file-fixer,
 # trailing-whitespace, check-merge-conflict, check-yaml). Target: < 5 s on every
 # commit.
@@ -51,12 +51,6 @@ repos:
     rev: v2.3.0
     hooks:
       - id: tofu_fmt
-        stages: [pre-commit]
-
-  - repo: https://github.com/antonbabenko/pre-commit-terraform
-    rev: v1.105.0
-    hooks:
-      - id: terragrunt_fmt
         stages: [pre-commit]
 
   # shellcheck — local hook calling the system `shellcheck` binary (operator has
@@ -109,8 +103,8 @@ repos:
           bash -euo pipefail -c '
             # 1. Source AMI must not use most_recent=true (REP-04)
             ! grep -rE "most_recent[[:space:]]*=[[:space:]]*true" packer/ && \
-            # 2. No hand-copied ami_id in terragrunt.hcl (REP-05)
-            ! grep -E "^[[:space:]]*ami_id[[:space:]]*=[[:space:]]*\"ami-" terragrunt.hcl && \
+            # 2. No hand-copied ami_id in terraform.tfvars (REP-05; previously terragrunt.hcl)
+            ! grep -E "^[[:space:]]*ami_id[[:space:]]*=[[:space:]]*\"ami-" terraform/terraform.tfvars && \
             # 3. No raw <RESOLVED-VERSION> placeholder in packer/ (REP-04 follow-up)
             ! grep -r -- "<RESOLVED-VERSION>" packer/ && \
             # 4. ansible/requirements.yml uses ==X.Y.Z (REP-02) — comment-filtered

@@ -14,7 +14,7 @@
 #
 # Phase-3 invariants asserted by the grep-gates job (single fail-fast block):
 #   1. Source AMI not floating          (REP-04 — packer must not use most_recent=true)
-#   2. No hand-copied AMI ID            (REP-05 — terragrunt.hcl must not pin ami-XXXX literals)
+#   2. No hand-copied AMI ID            (REP-05 — terraform/terraform.tfvars must not pin ami-XXXX literals)
 #   3. No <RESOLVED-VERSION> placeholder (REP-06 — template artifact must not ship)
 #   4. No bare collection-version pins   (REP-02 — ansible/requirements.yml uses ==X.Y.Z)
 #   5. Terraform lockfile is tracked     (REP-01 — terraform/.terraform.lock.hcl in git)
@@ -53,16 +53,10 @@ jobs:
         uses: hashicorp/setup-packer@c3d53c525d422944e50ee27b840746d6522b08de  # v3.2.0
         with:
           version: 1.12.0
-      - name: Install Terragrunt
-        run: |
-          curl -fsSL https://github.com/gruntwork-io/terragrunt/releases/download/v0.81.10/terragrunt_linux_amd64 -o /usr/local/bin/terragrunt
-          chmod +x /usr/local/bin/terragrunt
-          terragrunt --version
       - name: Format check
         run: |
           cd terraform && tofu fmt -check -recursive
           cd ../packer && packer fmt -check .
-          cd .. && terragrunt hclfmt --check
 
   # ---------------------------------------------------------------- 2
   tofu-validate:
@@ -189,8 +183,9 @@ jobs:
           # 1. Source AMI must not use most_recent=true (REP-04)
           ! grep -rE 'most_recent[[:space:]]*=[[:space:]]*true' packer/
 
-          # 2. No hand-copied AMI ID in terragrunt.hcl (REP-05)
-          ! grep -E '^[[:space:]]*ami_id[[:space:]]*=[[:space:]]*"ami-' terragrunt.hcl
+          # 2. No hand-copied AMI ID in terraform.tfvars (REP-05; previously terragrunt.hcl,
+          #    removed Phase 5 — the file is gone, the invariant moved with the inputs)
+          ! grep -E '^[[:space:]]*ami_id[[:space:]]*=[[:space:]]*"ami-' terraform/terraform.tfvars
 
           # 3. No raw <RESOLVED-VERSION> placeholder (REP-06)
           ! grep -r -- '<RESOLVED-VERSION>' packer/
