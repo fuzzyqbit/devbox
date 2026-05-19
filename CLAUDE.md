@@ -88,14 +88,21 @@ procedure: see section 6.
 
 `:8080` (code-server) and `:6080` (noVNC) are restricted to a CIDR allowlist; the default
 is `[]` and plan-time validation refuses `tf-apply` when empty unless
-`var.allow_open_ingress=true`. The helper resolves your current public IP and writes
-`users/allowlist.auto.tfvars` (gitignored):
+`var.allow_open_ingress=true`. The helper resolves your current source IP and writes
+`allowlist.auto.tfvars` (gitignored):
 
 ```bash
+# Connected (default) — fetches public IP from https://checkip.amazonaws.com
 make devbox-allowlist-me
+
+# Airgapped (GovCloud / isolated VPC / no egress to checkip.amazonaws.com)
+./scripts/devbox-allowlist-me.sh --cidr 10.42.0.0/24 --cidr 10.43.5.7/32
+# or via env var
+DEVBOX_OPERATOR_CIDR="10.42.0.0/24,10.43.5.7" make devbox-allowlist-me
 ```
 
-Re-run whenever your home/coffee-shop IP changes.
+Re-run whenever your source IP / network changes. The airgapped path skips the
+outbound HTTP call entirely.
 
 ## 5. Daily flow
 
