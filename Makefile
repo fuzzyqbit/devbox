@@ -115,6 +115,18 @@ fmt:
 
 # --- Terraform / OpenTofu (Terragrunt-free; per-operator state key) ---
 
+# Auto-init guard: re-point the backend whenever .terraform/ is missing or its
+# cached backend key doesn't match the current DEVBOX_USER's key. Makes
+# tf-plan/apply/destroy + status/start/stop/devbox-ssm self-healing across
+# DEVBOX_USER switches and fresh clones.
+.PHONY: tf-ensure-init
+tf-ensure-init:
+	@CACHED=$$(jq -r '.backend.config.key // empty' terraform/.terraform/terraform.tfstate 2>/dev/null || true); \
+	if [ "$$CACHED" != "$(TF_STATE_KEY)" ]; then \
+	  echo "[tf-ensure-init] backend cache mismatch (cached='$$CACHED', want='$(TF_STATE_KEY)'); reinitializing..."; \
+	  $(MAKE) --no-print-directory tf-reinit DEVBOX_USER=$(DEVBOX_USER) TF_BIN=$(TF_BIN); \
+	fi
+
 tf-init:
 	@[ -n "$(TF_STATE_BUCKET)" ] && [ "$(TF_STATE_BUCKET)" != "devimage-tfstate-" ] || { \
 	  echo "ERROR: could not resolve AWS account ID via 'aws sts get-caller-identity'." >&2; \
@@ -125,19 +137,19 @@ tf-init:
 tf-reinit:
 	cd terraform && $(TF_BIN) init -reconfigure $(TF_BACKEND_ARGS)
 
-tf-plan:
+tf-plan: tf-ensure-init
 	cd terraform && $(TF_BIN) plan $(TF_VAR_ARGS)
 
-tf-apply:
+tf-apply: tf-ensure-init
 	cd terraform && $(TF_BIN) apply $(TF_VAR_ARGS)
 
-tf-auto-apply:
+tf-auto-apply: tf-ensure-init
 	cd terraform && $(TF_BIN) apply -auto-approve $(TF_VAR_ARGS)
 
-tf-destroy:
+tf-destroy: tf-ensure-init
 	cd terraform && $(TF_BIN) destroy $(TF_VAR_ARGS)
 
-tf-auto-destroy:
+tf-auto-destroy: tf-ensure-init
 	cd terraform && $(TF_BIN) destroy -auto-approve $(TF_VAR_ARGS)
 
 # --- Instance lifecycle ---
@@ -149,18 +161,18 @@ tf-auto-destroy:
 INSTANCE_ID ?=
 REGION ?=
 
-start:
+start: tf-ensure-init
 	DEVBOX_USER=$(DEVBOX_USER) INSTANCE_ID=$(INSTANCE_ID) REGION=$(REGION) ./scripts/devbox-start.sh
 
-stop:
+stop: tf-ensure-init
 	DEVBOX_USER=$(DEVBOX_USER) INSTANCE_ID=$(INSTANCE_ID) REGION=$(REGION) ./scripts/devbox-stop.sh
 
-status:
+status: tf-ensure-init
 	DEVBOX_USER=$(DEVBOX_USER) INSTANCE_ID=$(INSTANCE_ID) REGION=$(REGION) ./scripts/devbox-status.sh
 
 # --- SSM access (Phase 2) ---
 
-devbox-ssm:
+devbox-ssm: tf-ensure-init
 	DEVBOX_USER=$(DEVBOX_USER) INSTANCE_ID=$(INSTANCE_ID) REGION=$(REGION) ./scripts/devbox-ssm.sh
 
 # Forwards :8080 (code-server) only. For :6080 (noVNC), either add your IP to
