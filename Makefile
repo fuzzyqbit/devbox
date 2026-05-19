@@ -1,3 +1,5 @@
+.DEFAULT_GOAL := help
+
 .PHONY: help validate build fmt clean packer-init packer-bake \
         start stop status \
         devbox-ssm devbox-port-forward secrets-show \
