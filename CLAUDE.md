@@ -65,6 +65,7 @@ pre-commit install --install-hooks       # pre-warm hook environments (avoids fi
 | `TF_STATE_BUCKET` | derived | Backend bucket name. Defaults to `devimage-tfstate-$(aws sts get-caller-identity --query Account --output text)`. Override to point at a different state bucket. |
 | `CODE_SERVER_ALLOWED_CIDRS` / `VNC_ALLOWED_CIDRS` | unset | Comma-separated CIDR allowlists. Merged + deduped, passed via `-var allowed_web_cidrs=…` to `tofu`. Empty → `make tf-apply` is refused by the validation block unless `var.allow_open_ingress=true`. Operators who prefer file-based config can run `make devbox-allowlist-me` instead. |
 | `AWS_PROFILE` | unset | Optional; pass through to the `aws` CLI for multi-account operators. |
+| `TF_BIN` | `tofu` | IaC binary. Default OpenTofu (canonical — the committed `terraform/.terraform.lock.hcl` is OpenTofu-flavoured). Override to `terraform` for compatibility testing: `make tf-apply TF_BIN=terraform`. Lockfile + provider checksums will diverge — expect drift. |
 
 ## 4. One-time per-operator setup
 

@@ -6,6 +6,13 @@
 # User detection: override with  make <target> DEVBOX_USER=jsmith
 DEVBOX_USER ?= $(shell whoami)
 
+# IaC binary: default OpenTofu (canonical per CLAUDE.md §8 — the committed
+# terraform/.terraform.lock.hcl is OpenTofu-flavoured). Operator may override to
+# `terraform` for compatibility testing, but the lockfile + provider checksums
+# will diverge — expect drift.
+#   make tf-apply TF_BIN=terraform
+TF_BIN ?= tofu
+
 # --- Backend config (derived; Terragrunt-free) ---------------------------------
 # Phase 5 (post-v1.0): Terragrunt removed. Backend bucket name derives from the
 # caller AWS account; per-operator state key threads DEVBOX_USER.
@@ -79,7 +86,7 @@ packer-init:
 
 validate: packer-init
 	cd packer && packer validate .
-	cd terraform && tofu validate
+	cd terraform && $(TF_BIN) validate
 
 build: packer-init
 	cd packer && packer build .
@@ -103,7 +110,7 @@ packer-bake: packer-init
 
 fmt:
 	cd packer && packer fmt .
-	cd terraform && tofu fmt
+	cd terraform && $(TF_BIN) fmt
 	@echo "Format complete"
 
 # --- Terraform / OpenTofu (Terragrunt-free; per-operator state key) ---
@@ -113,25 +120,25 @@ tf-init:
 	  echo "ERROR: could not resolve AWS account ID via 'aws sts get-caller-identity'." >&2; \
 	  echo "       Check your AWS credentials/profile, or override TF_STATE_BUCKET=... explicitly." >&2; \
 	  exit 1; }
-	cd terraform && tofu init $(TF_BACKEND_ARGS)
+	cd terraform && $(TF_BIN) init $(TF_BACKEND_ARGS)
 
 tf-reinit:
-	cd terraform && tofu init -reconfigure $(TF_BACKEND_ARGS)
+	cd terraform && $(TF_BIN) init -reconfigure $(TF_BACKEND_ARGS)
 
 tf-plan:
-	cd terraform && tofu plan $(TF_VAR_ARGS)
+	cd terraform && $(TF_BIN) plan $(TF_VAR_ARGS)
 
 tf-apply:
-	cd terraform && tofu apply $(TF_VAR_ARGS)
+	cd terraform && $(TF_BIN) apply $(TF_VAR_ARGS)
 
 tf-auto-apply:
-	cd terraform && tofu apply -auto-approve $(TF_VAR_ARGS)
+	cd terraform && $(TF_BIN) apply -auto-approve $(TF_VAR_ARGS)
 
 tf-destroy:
-	cd terraform && tofu destroy $(TF_VAR_ARGS)
+	cd terraform && $(TF_BIN) destroy $(TF_VAR_ARGS)
 
 tf-auto-destroy:
-	cd terraform && tofu destroy -auto-approve $(TF_VAR_ARGS)
+	cd terraform && $(TF_BIN) destroy -auto-approve $(TF_VAR_ARGS)
 
 # --- Instance lifecycle ---
 
@@ -158,8 +165,8 @@ devbox-port-forward:
 	  echo "ERROR: session-manager-plugin not installed. brew install --cask session-manager-plugin" >&2; \
 	  exit 1; \
 	}; \
-	INSTANCE_ID=$$(cd terraform && tofu output -raw instance_id); \
-	REGION=$$(cd terraform && tofu output -raw aws_region); \
+	INSTANCE_ID=$$(cd terraform && $(TF_BIN) output -raw instance_id); \
+	REGION=$$(cd terraform && $(TF_BIN) output -raw aws_region); \
 	echo "Forwarding :8080 from $$INSTANCE_ID to localhost..."; \
 	echo "Browse to https://localhost:8080 (code-server)."; \
 	echo "For noVNC :6080, run 'make devbox-allowlist-me' or open a second forwarding session."; \

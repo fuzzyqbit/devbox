@@ -36,8 +36,11 @@ resolve_user() {
 # Requires `make tf-init DEVBOX_USER=...` to have run first (operator-scoped
 # backend key — see Makefile TF_STATE_KEY).
 resolve_instance() {
+  # TF_BIN: operator override (terraform vs tofu). Default matches Makefile.
+  local tfbin="${TF_BIN:-tofu}"
+
   if [[ -z "$INSTANCE_ID" ]]; then
-    INSTANCE_ID="$(cd "$TF_DIR" && tofu output -raw instance_id 2>/dev/null)" || {
+    INSTANCE_ID="$(cd "$TF_DIR" && "$tfbin" output -raw instance_id 2>/dev/null)" || {
       echo "Error: Could not read instance_id from Terraform state for user '$DEVBOX_USER'." >&2
       echo "Run 'make tf-init DEVBOX_USER=$DEVBOX_USER && make tf-apply DEVBOX_USER=$DEVBOX_USER' first, or pass --instance-id." >&2
       exit 1
@@ -45,7 +48,7 @@ resolve_instance() {
   fi
 
   if [[ -z "$REGION" ]]; then
-    REGION="$(cd "$TF_DIR" && tofu output -raw aws_region 2>/dev/null)" \
+    REGION="$(cd "$TF_DIR" && "$tfbin" output -raw aws_region 2>/dev/null)" \
       || REGION="${AWS_REGION:-${AWS_DEFAULT_REGION:-us-east-1}}"
   fi
 }
