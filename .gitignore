@@ -1,6 +1,5 @@
 # Packer
 packer/packer_cache/
-packer/packer-manifest.json
 *.pkr.hcl.lock
 
 # Terraform
@@ -20,10 +19,8 @@ terraform/terraform.tfstate.d/
 # Claude Code (local settings, not project files)
 .claude/
 
-# Per-operator AMI handoff tfvars written by `make packer-bake` (Terraform
-# auto-loads from module dir; per-user file under users/ carries the just-built
-# AMI ID). Also catches any per-operator tfvars an operator drops in to override
-# CIDR allowlists, etc. — kept local, never committed.
+# Per-operator tfvars an operator drops in for their own overrides (CIDR
+# allowlists, ami_id pins, etc.). Kept local, never committed.
 *.auto.tfvars
 users/*.auto.tfvars
 

@@ -83,16 +83,4 @@ build {
     user = "ec2-user"
   }
 
-  # REP-05: emit packer-manifest.json after each build. `make packer-bake` parses
-  # this file with `jq` to extract the built AMI ID and writes it into
-  # users/${DEVBOX_USER}.auto.tfvars (Terraform auto-loaded). See Pattern 5 in
-  # .planning/phases/03-reproducibility-version-pinning/03-RESEARCH.md:292-346.
-  post-processor "manifest" {
-    output     = "${path.root}/packer-manifest.json"
-    strip_path = true
-    custom_data = {
-      devbox_user = var.devbox_user
-      base_ami_id = data.amazon-parameterstore.al2023_minimal.value
-    }
-  }
 }

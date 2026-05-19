@@ -41,12 +41,10 @@ variable "extra_tags" {
 }
 
 # Phase 1 (SEC-03): keys SSM parameter paths /devbox/<user>/* for boot-time secret fetch.
-# Phase 3 (REP-05): recorded in packer-manifest.json `custom_data` so the AMI handoff
-# (manifest → users/${devbox_user}.auto.tfvars) preserves operator-of-record alongside artifact_id.
 variable "devbox_user" {
   type        = string
   default     = ""
-  description = "Operator username; keys SSM parameter paths /devbox/<user>/* and recorded in packer-manifest custom_data for the AMI handoff. Required."
+  description = "Operator username; keys SSM parameter paths /devbox/<user>/*. Required at build time."
   validation {
     # Allow empty (so `packer validate` works without `-var "devbox_user=..."` for CI gates);
     # Make targets always pass a real value, where the regex applies.
