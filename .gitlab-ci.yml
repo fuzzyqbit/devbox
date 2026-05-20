@@ -1,0 +1,246 @@
+# =============================================================================
+# .gitlab-ci.yml — Packer bake → OpenTofu apply pipeline for the devbox project.
+#
+# Runs ALONGSIDE .github/workflows/ci.yml (NOT a replacement). The GitHub
+# Actions workflows stay as the source of truth for PR gating; this file
+# gives operators a GitLab-first execution path that preserves every
+# security invariant CLAUDE.md §8 calls out.
+#
+# Stages
+#   1. validate   8 parallel gates mirroring .github/workflows/ci.yml:
+#                 tofu-fmt, packer-fmt, tofu-validate (-lockfile=readonly),
+#                 packer-validate, ansible-lint, ansible-syntax,
+#                 shellcheck, checkov, grep-gates.
+#   2. build      `packer build` produces an AMI and writes its ID into
+#                 terraform/users/${DEVBOX_USER}.auto.tfvars as a GitLab
+#                 artifact for the deploy stage to consume.
+#   3. deploy     `tofu init -lockfile=readonly` + `tofu apply` consumes
+#                 the artifact and provisions the EC2 instance.
+#                 `when: manual` on protected branches ONLY — provisions
+#                 real AWS resources, so a human must click "play".
+#
+# AWS authentication: GitLab OIDC federation (`id_tokens:` →
+# `sts assume-role-with-web-identity`). No static IAM keys touch CI vars.
+# See trust-policy block below; the IAM role binds the OIDC `sub` to a
+# specific project_path + protected branch, and `aud` to this GitLab
+# instance (T-be1-01).
+#
+# Image digest-pin policy: every `image:` line MUST be
+# `name@sha256:<64-hex>`. CLAUDE.md §8 maps the GH-Action SHA-pin policy
+# (.github/workflows/*) to `@sha256:` digest pinning for GitLab images.
+# The validate:grep-gates job's invariant #8 fails the pipeline if anyone
+# regresses this (T-be1-02). To rotate a digest, re-resolve via the
+# procedure documented in
+# .planning/quick/260520-be1-create-gitlab-ci-pipeline-packer-build-a/IMAGES.txt.
+#
+# Required GitLab CI/CD variables (Settings → CI/CD → Variables)
+#   AWS_ROLE_ARN     masked, protected      IAM role for OIDC AssumeRole
+#   AWS_REGION       protected              e.g. us-east-1
+#   DEVBOX_USER      protected              operator identity (NO whoami default)
+#   TF_STATE_BUCKET  protected              S3 backend bucket
+#   AWS_OIDC_AUD     protected, OPTIONAL    default: https://gitlab.com
+#
+# IAM Trust Policy (paste into the role AWS_ROLE_ARN resolves to)
+# Replace <ACCT>, <group>, <project> with literal values. The
+# `gitlab.com:sub` condition scopes the role to ONE project + main branch:
+#
+#   {
+#     "Version": "2012-10-17",
+#     "Statement": [{
+#       "Effect": "Allow",
+#       "Principal": { "Federated": "arn:aws:iam::<ACCT>:oidc-provider/gitlab.com" },
+#       "Action": "sts:AssumeRoleWithWebIdentity",
+#       "Condition": {
+#         "StringEquals": { "gitlab.com:aud": "https://gitlab.com" },
+#         "StringLike":   { "gitlab.com:sub": "project_path:<group>/<project>:ref_type:branch:ref:main" }
+#       }
+#     }]
+#   }
+#
+# Checkov severity policy: sourced from .checkov.yaml in the repo root
+# (hard-fail-on HIGH, soft-fail-on MEDIUM). DO NOT duplicate those flags
+# in the job scripts — drift hazard. Every skip-check needs an inline
+# justification comment per .checkov.yaml §"Policy on skip-check entries".
+# =============================================================================
+
+stages:
+  - validate
+  - build
+  - deploy
+
+variables:
+  # IaC binary. tofu is canonical — terraform/.terraform.lock.hcl is
+  # OpenTofu-flavoured per CLAUDE.md §8 / Phase 3 REP-01.
+  TF_BIN: tofu
+
+  # Backend coordinates threaded into deploy:tofu-apply. Mirrors Makefile
+  # lines 37-52 exactly (Phase 5: Terragrunt removed, backend driven by
+  # tofu -backend-config flags).
+  TF_STATE_REGION: us-east-1
+  TF_STATE_LOCK_TABLE: devimage-tfstate-locks
+  TF_STATE_KEY: "users/${DEVBOX_USER}/devbox.tfstate"
+
+  # GitLab OIDC audience. Override per self-hosted GitLab instance.
+  # The IAM trust-policy `gitlab.com:aud` condition MUST match this.
+  AWS_OIDC_AUD: "https://gitlab.com"
+
+default:
+  # Mirrors paths-ignore from .github/workflows/ci.yml lines 28-36.
+  # Planning-doc commits do NOT trigger validate/build/deploy.
+  rules:
+    - changes:
+        - '.planning/**/*'
+        - '**/*.md'
+        - 'CLAUDE.md'
+      when: never
+    - when: on_success
+
+# -----------------------------------------------------------------------------
+# Validate stage — 9 parallel gates, no `needs:` between them (each runs
+# against the source tree independently). Mirrors .github/workflows/ci.yml.
+# -----------------------------------------------------------------------------
+
+# 1a. tofu fmt -check -recursive (mirrors ci.yml fmt-check, first half)
+validate:tofu-fmt:
+  stage: validate
+  image: ghcr.io/opentofu/opentofu:1.10.6@sha256:43f73c1e01f21de343ca4428a7e1845a357790235c73758bd7dc3cc4d1324b49
+  script:
+    - cd terraform
+    - tofu fmt -check -recursive
+
+# 1b. packer fmt -check (mirrors ci.yml fmt-check, second half).
+# Split into two jobs (vs a single job that installs both binaries) to
+# avoid building a custom image and to keep the parallel shape that
+# .github/workflows/ci.yml uses.
+validate:packer-fmt:
+  stage: validate
+  image: hashicorp/packer:1.15.3@sha256:cb9c526a6351c55f05430423a8b37139a04b0fb5ce541887d476e19860b5ed92
+  script:
+    - cd packer
+    - packer fmt -check .
+
+# 2. tofu init (lockfile-readonly) + validate. Mirrors ci.yml tofu-validate.
+# -backend=false skips S3 — validate does not need state access. The
+# -lockfile=readonly flag is the Phase-3 REP-01 gate: CI must not silently
+# rewrite the committed lockfile.
+validate:tofu-validate:
+  stage: validate
+  image: ghcr.io/opentofu/opentofu:1.10.6@sha256:43f73c1e01f21de343ca4428a7e1845a357790235c73758bd7dc3cc4d1324b49
+  script:
+    - cd terraform
+    - tofu init -lockfile=readonly -backend=false
+    - tofu validate
+
+# 3. packer init + validate. Mirrors ci.yml packer-validate. var.devbox_user
+# defaults to "" since Phase 3 fix (commit f156070); no -var flag needed.
+validate:packer-validate:
+  stage: validate
+  image: hashicorp/packer:1.15.3@sha256:cb9c526a6351c55f05430423a8b37139a04b0fb5ce541887d476e19860b5ed92
+  script:
+    - cd packer
+    - packer init .
+    - packer validate .
+
+# 4. ansible-lint. The pipelinecomponents image ships ansible-core and
+# ansible-lint preinstalled, but collections must be installed before
+# lint resolves fqcn references (RESEARCH Pitfall 5).
+validate:ansible-lint:
+  stage: validate
+  image: pipelinecomponents/ansible-lint:0.26.0@sha256:e5944beda2dd60f26d71f78e595be41e3c2f2b97d0cb3a0f748943cb70659502
+  script:
+    - ansible-galaxy collection install -r ansible/requirements.yml
+    - ansible-lint ansible/playbook.yml
+
+# 5. ansible-playbook --syntax-check. SEPARATE job from ansible-lint per
+# RESEARCH Open Question 1 (ci.yml lines 117-134) — lint and syntax-check
+# catch different classes of bugs and both satisfy CI-04 literally.
+validate:ansible-syntax:
+  stage: validate
+  image: pipelinecomponents/ansible-lint:0.26.0@sha256:e5944beda2dd60f26d71f78e595be41e3c2f2b97d0cb3a0f748943cb70659502
+  script:
+    - ansible-galaxy collection install -r ansible/requirements.yml
+    - ansible-playbook --syntax-check ansible/playbook.yml -i localhost,
+
+# 6. shellcheck on every script in scripts/. Mirrors ci.yml shellcheck.
+validate:shellcheck:
+  stage: validate
+  image: koalaman/shellcheck-alpine:v0.10.0@sha256:7c6a5115899d99323b22fc84b29e924aef5b6fa985612e450a8c356969ebb577
+  script:
+    - shellcheck scripts/*.sh
+
+# 7. Checkov against terraform/. --hard-fail-on HIGH and --soft-fail-on
+# MEDIUM are sourced from .checkov.yaml — do NOT re-specify them on the
+# command line (drift hazard, see .checkov.yaml header).
+validate:checkov:
+  stage: validate
+  image: bridgecrew/checkov:3.2.527@sha256:22b308dd96e158b446c6080d19ea41ffb609ebd46962c9ace43b9b6c8aaff5cf
+  script:
+    - checkov --directory terraform/ --framework terraform --config-file .checkov.yaml
+
+# 8. grep-gates. The 7 Phase-3 + CI-hardening invariants from
+# .github/workflows/ci.yml lines 180-217 (verbatim — invariant #4 uses
+# the comment-filtered form that avoids the self-invalidating grep
+# documented in ci.yml lines 174-178), PLUS one new GitLab-specific
+# invariant (#8) that enforces the @sha256: image-pin policy this file
+# depends on.
+#
+# Re-uses the opentofu image (already digest-pinned above) since it has
+# bash + grep + git — no separate digest to rotate.
+validate:grep-gates:
+  stage: validate
+  image: ghcr.io/opentofu/opentofu:1.10.6@sha256:43f73c1e01f21de343ca4428a7e1845a357790235c73758bd7dc3cc4d1324b49
+  script:
+    - |
+      set -euo pipefail
+
+      # 1. Source AMI must not use most_recent=true (REP-04)
+      ! grep -rE 'most_recent[[:space:]]*=[[:space:]]*true' packer/
+
+      # 2. No hand-copied AMI ID in terraform.tfvars (REP-05; previously
+      #    terragrunt.hcl, removed Phase 5 — the file is gone, the
+      #    invariant moved with the inputs)
+      ! grep -E '^[[:space:]]*ami_id[[:space:]]*=[[:space:]]*"ami-' terraform/terraform.tfvars
+
+      # 3. No raw <RESOLVED-VERSION> placeholder (REP-06)
+      ! grep -r -- '<RESOLVED-VERSION>' packer/
+
+      # 4. No bare collection-version pins (REP-02)
+      #    Get non-comment lines that start with 'version:' and whose
+      #    value does NOT begin with '==' (quoted or unquoted).
+      #    Bug-fix vs original plan: the plan's grep was self-invalidating
+      #    because '"==X.Y.Z"' starts with '"', not '='. The fix below
+      #    explicitly excludes the legal '==' form. See ci.yml lines
+      #    194-204 for the canonical version of this gate.
+      if grep -vE '^[[:space:]]*#' ansible/requirements.yml \
+           | grep -E '^[[:space:]]*version:' \
+           | grep -vE 'version:[[:space:]]*"?==' ; then
+        echo "FAIL: bare-version pin found in ansible/requirements.yml (REP-02)" >&2
+        exit 1
+      fi
+
+      # 5. Terraform lockfile is tracked (REP-01)
+      git ls-files terraform/.terraform.lock.hcl | grep -q .
+
+      # 6. Lockfile-exclusion not in .gitignore (REP-01 defense)
+      ! grep -E '^[^#]*terraform/\.terraform\.lock\.hcl' .gitignore
+
+      # 7. Every third-party action SHA-pinned (CI hardening). The GH
+      #    Actions workflows still ship alongside this GitLab pipeline,
+      #    so the SHA-pin policy on .github/workflows/ must keep firing.
+      if grep -rhE 'uses: [^ ]+@(v[0-9]+|main|master|HEAD)\b' .github/workflows/ \
+           | grep -v '@[a-f0-9]\{40\}' ; then
+        echo "FAIL: tag-or-branch ref in .github/workflows/ (not SHA-pinned)" >&2
+        exit 1
+      fi
+
+      # 8. GitLab CI image digest-pin policy (NEW — this file itself).
+      #    Every `image:` line in .gitlab-ci.yml MUST be `name@sha256:HEX`.
+      #    This is the GitLab analogue of the GH-Action SHA-pin policy
+      #    (CLAUDE.md §8). T-be1-02 mitigation.
+      if grep -E '^[[:space:]]*image:[[:space:]]+' .gitlab-ci.yml \
+           | grep -v '@sha256:' ; then
+        echo "FAIL: unpinned image: line in .gitlab-ci.yml (must use @sha256:HEX)" >&2
+        exit 1
+      fi
+
+      echo "All 8 invariants pass (7 from .github/workflows/ci.yml + 1 GitLab image-pin)."
