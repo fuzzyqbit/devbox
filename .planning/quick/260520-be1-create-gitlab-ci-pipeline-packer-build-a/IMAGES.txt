@@ -1,0 +1,136 @@
+# IMAGES.txt — digest-pinned image references for .gitlab-ci.yml
+# Quick task 260520-be1. Resolved 2026-05-20 via the Docker Hub / GHCR
+# registry HTTP APIs (no `docker`/`crane` binary on this runner):
+#
+#   TOKEN=$(curl -s "https://auth.docker.io/token?service=registry.docker.io&scope=repository:<repo>:pull" \
+#             | python3 -c "import sys,json;print(json.load(sys.stdin)['token'])")
+#   curl -s -H "Authorization: Bearer ${TOKEN}" \
+#        -H "Accept: application/vnd.docker.distribution.manifest.list.v2+json" \
+#        -H "Accept: application/vnd.oci.image.index.v1+json" \
+#        "https://registry-1.docker.io/v2/<repo>/manifests/<tag>" \
+#     | python3 -c '... extract linux/amd64 manifest digest ...'
+#
+# For GHCR, swap the auth URL to:
+#   https://ghcr.io/token?service=ghcr.io&scope=repository:<repo>:pull
+# and the registry URL to https://ghcr.io/v2/<repo>/manifests/<tag>.
+#
+# Every digest below is the linux/amd64 platform manifest digest from the
+# multi-arch index (where applicable). Pin to the platform-specific digest
+# (NOT the index digest) so the runner pulls exactly the bytes that were
+# audited, not whatever the index points at on pull day.
+#
+# To rotate: re-run the curl pipeline above with a newer <tag>, copy the
+# linux/amd64 line into .gitlab-ci.yml, and bump this file.
+
+# ---------------------------------------------------------------- 1 — Packer
+# CLAUDE.md §2 floor: packer >= 1.12. 1.15.3 is the current stable line.
+hashicorp/packer:1.15.3@sha256:cb9c526a6351c55f05430423a8b37139a04b0fb5ce541887d476e19860b5ed92
+
+# ---------------------------------------------------------------- 2 — OpenTofu
+# Matches .github/workflows/ci.yml `tofu_version: 1.10.6`. Hosted on GHCR.
+ghcr.io/opentofu/opentofu:1.10.6@sha256:43f73c1e01f21de343ca4428a7e1845a357790235c73758bd7dc3cc4d1324b49
+
+# ---------------------------------------------------------------- 3 — Checkov
+# Floor 3.2.528 (.pre-commit-config.yaml) NOT YET PUBLISHED on Docker Hub
+# at resolution time (2026-05-20) — latest tag on bridgecrew/checkov is
+# 3.2.527 (released 2026-05-07). Using 3.2.527; this is a one-patch-level
+# regression from the floor and Checkov SemVer policy means the API surface
+# and skip-check IDs are stable. Bump when 3.2.528+ ships.
+bridgecrew/checkov:3.2.527@sha256:22b308dd96e158b446c6080d19ea41ffb609ebd46962c9ace43b9b6c8aaff5cf
+
+# ---------------------------------------------------------------- 4 — ansible-lint
+# Floor 0.26.4 does NOT exist on pipelinecomponents/ansible-lint — the
+# project publishes one minor per tag and only 0.26.0 is in the 0.26.x
+# series. Note: the image tag versioning (0.26.0) is independent of the
+# Python package `ansible-lint==26.4.0` referenced in ci.yml line 111
+# (that's the upstream PyPI version; pipelinecomponents bundles a
+# matching-or-newer python wheel inside their own SemVer minor).
+# Using 0.26.0; the bundled ansible-lint is the current upstream stable.
+pipelinecomponents/ansible-lint:0.26.0@sha256:e5944beda2dd60f26d71f78e595be41e3c2f2b97d0cb3a0f748943cb70659502
+
+# ---------------------------------------------------------------- 5 — shellcheck
+# CLAUDE.md §2 floor: shellcheck >= 0.10. v0.10.0 is the current floor.
+koalaman/shellcheck-alpine:v0.10.0@sha256:7c6a5115899d99323b22fc84b29e924aef5b6fa985612e450a8c356969ebb577
+
+# ---------------------------------------------------------------- 6 — aws-cli
+# AWS CLI v2.17.0 — current stable v2 baseline. Provides `aws sts
+# assume-role-with-web-identity` and `aws sts get-caller-identity` for the
+# .aws-auth template. Available as multi-arch (amd64 + arm64); pinned to
+# linux/amd64 manifest digest.
+amazon/aws-cli:2.17.0@sha256:7b7edf789765c22d75e61ad6f307c06950e15357b79ea1749104641ce3a11fec
+
+
+# ====================================================================
+# Required GitLab CI/CD variables (set by repo admin — NOT in YAML)
+# ====================================================================
+#
+# Path in GitLab UI: Settings -> CI/CD -> Variables
+#
+#   AWS_ROLE_ARN     (masked, protected)
+#                    e.g. arn:aws:iam::123456789012:role/gitlab-devbox-ci
+#                    The IAM role .gitlab-ci.yml assumes via OIDC.
+#   AWS_REGION       (protected)
+#                    e.g. us-east-1
+#                    Threads into packer build (-var aws_region=) and
+#                    tofu's AWS provider.
+#   DEVBOX_USER      (protected)
+#                    e.g. jsmith
+#                    Per-operator identity. Routes the tfstate key, the
+#                    SSH key name, the SG name prefix, and the SSM
+#                    parameter prefix. Matches Makefile §14 — NO whoami
+#                    default; pipeline fails loud if unset.
+#   TF_STATE_BUCKET  (protected)
+#                    e.g. devimage-tfstate-123456789012
+#                    S3 backend bucket for the tofu state file.
+#   AWS_OIDC_AUD     (protected; OPTIONAL)
+#                    Default: https://gitlab.com
+#                    Override for self-hosted GitLab instances. The IAM
+#                    trust-policy `aud` condition MUST match this exactly.
+#
+# All five MUST be marked "Protected" so they only flow into pipelines
+# triggered against protected branches (i.e. the default branch). AWS_ROLE_ARN
+# additionally MUST be marked "Masked" so it is redacted from job logs.
+
+
+# ====================================================================
+# Required IAM role trust policy
+# ====================================================================
+#
+# Paste this into the trust policy of the AWS IAM role that AWS_ROLE_ARN
+# resolves to. The OIDC provider must be created first via:
+#
+#   aws iam create-open-id-connect-provider \
+#     --url https://gitlab.com \
+#     --client-id-list https://gitlab.com \
+#     --thumbprint-list <gitlab.com TLS thumbprint>
+#
+# Trust-policy JSON (replace <ACCT>, <group>, <project> with literal values):
+#
+# {
+#   "Version": "2012-10-17",
+#   "Statement": [{
+#     "Effect": "Allow",
+#     "Principal": { "Federated": "arn:aws:iam::<ACCT>:oidc-provider/gitlab.com" },
+#     "Action": "sts:AssumeRoleWithWebIdentity",
+#     "Condition": {
+#       "StringEquals": { "gitlab.com:aud": "https://gitlab.com" },
+#       "StringLike":   { "gitlab.com:sub": "project_path:<group>/<project>:ref_type:branch:ref:main" }
+#     }
+#   }]
+# }
+#
+# Threat-model linkage (T-be1-01, T-be1-10):
+#  - `aud` MUST match the value the pipeline requests in `id_tokens:` (default
+#    "https://gitlab.com"). Without this, any GitLab project on the same
+#    instance can request a token and assume the role.
+#  - `sub` MUST narrow to the specific group/project AND a protected branch.
+#    Wildcarding `sub` (e.g. `project_path:*`) re-opens the boundary.
+#
+# Role permissions policy (NOT in trust policy — attached separately):
+#   - ec2:* (or scoped to RunInstances + Describe* + ModifyInstanceAttribute +
+#     StopInstances + StartInstances + CreateSecurityGroup + AuthorizeSecurityGroupIngress)
+#   - iam:PassRole on the EC2 instance profile only
+#   - s3:GetObject / PutObject / DeleteObject on the tfstate bucket only
+#   - dynamodb:GetItem / PutItem / DeleteItem on the lock table only
+#   - ssm:PutParameter / GetParameter / DeleteParameter on /devbox/* only
+#   - kms:Decrypt scoped via kms:ViaService = ssm.<region>.amazonaws.com

@@ -13,7 +13,7 @@ Milestone: v1.0 ARCHIVED (see `.planning/milestones/v1-ROADMAP.md`)
 Phase: n/a
 Plan: n/a
 Status: Awaiting `/gsd-new-milestone`
-Last activity: 2026-05-14 — v1.0 milestone closed and tagged
+Last activity: 2026-05-20 — Completed quick task 260520-be1: create gitlab CI pipeline (packer build → tofu apply)
 
 Progress: [██████████] v1.0 100% (23/23 requirements)
 
@@ -50,6 +50,12 @@ See PROJECT.md Key Decisions table. Locked v1.0 decisions:
 | Lifecycle | Idle auto-stop + scheduled nightly stop | v2 backlog | v1.0 init |
 | Image lifecycle | Old AMI deregistration + inventory | v2 backlog | v1.0 init |
 | Reproducibility | SSM `:NN` version suffix on Packer source | v2 follow-up | v1.0 Phase 3 |
+
+### Quick Tasks Completed
+
+| # | Description | Date | Commit | Directory |
+|---|-------------|------|--------|-----------|
+| 260520-be1 | create gitlab CI pipeline: packer build AMI then tofu apply EC2 from that AMI | 2026-05-20 | 72f3157 | [260520-be1-create-gitlab-ci-pipeline-packer-build-a](./quick/260520-be1-create-gitlab-ci-pipeline-packer-build-a/) |
 
 ## Session Continuity
 
