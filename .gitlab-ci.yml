@@ -1,18 +1,20 @@
 # =============================================================================
-# .gitlab-ci.yml — Packer bake → OpenTofu apply pipeline for the devbox project.
+# .gitlab-ci.yml — OpenTofu apply pipeline for the devbox project.
 #
 # Stages
 #   1. validate   8 parallel gates against the source tree:
 #                 tofu-fmt, packer-fmt, tofu-validate (-lockfile=readonly),
 #                 packer-validate, ansible-lint, ansible-syntax,
 #                 shellcheck, checkov, grep-gates.
-#   2. build      `packer build` produces an AMI and writes its ID into
-#                 terraform/users/${DEVBOX_USER}.auto.tfvars as a GitLab
-#                 artifact for the deploy stage to consume.
-#   3. deploy     `tofu init -lockfile=readonly` + `tofu apply` consumes
-#                 the artifact and provisions the EC2 instance.
+#   2. deploy     `tofu init -lockfile=readonly` + `tofu apply` provisions
+#                 the EC2 instance from the latest AMI matched by the
+#                 `data "aws_ami"` filter in terraform/main.tf.
 #                 `when: manual` on protected branches ONLY — provisions
 #                 real AWS resources, so a human must click "play".
+#
+# AMI sourcing: AMIs are baked OUT-OF-BAND (operator runs `make build` on a
+# workstation with AWS creds). Deploy picks the most-recent matching AMI via
+# the terraform `data "aws_ami"` filter. CI does NOT run packer build.
 #
 # AWS authentication: GitLab OIDC federation (`id_tokens:` →
 # `sts assume-role-with-web-identity`). No static IAM keys touch CI vars.
@@ -58,7 +60,6 @@
 
 stages:
   - validate
-  - build
   - deploy
 
 variables:
@@ -78,7 +79,7 @@ variables:
   AWS_OIDC_AUD: "https://gitlab.com"
 
 default:
-  # Markdown-only commits do NOT trigger validate/build/deploy.
+  # Markdown-only commits do NOT trigger validate/deploy.
   rules:
     - changes:
         - '**/*.md'
@@ -219,9 +220,8 @@ validate:grep-gates:
 
 # -----------------------------------------------------------------------------
 # .aws-auth template — hidden job (leading dot prefix → GitLab never runs it
-# directly). Every AWS-touching job (build:packer-bake, deploy:tofu-apply)
-# `extends:` this to inherit the id_tokens + sts assume-role-with-web-identity
-# before_script.
+# directly). deploy:tofu-apply `extends:` this to inherit the id_tokens +
+# sts assume-role-with-web-identity before_script.
 #
 # Threat model linkage:
 #   T-be1-01 (Spoofing): the IAM trust policy in the header MUST scope `sub`
@@ -241,8 +241,8 @@ validate:grep-gates:
       aud: ${AWS_OIDC_AUD}
   before_script:
     # Smoke test: the inheriting job's `image:` must already ship aws-cli + jq.
-    # The opentofu and packer images don't ship aws-cli; install if Alpine,
-    # else fail loud so the operator picks a better base image.
+    # The opentofu image doesn't ship aws-cli; install if Alpine, else fail
+    # loud so the operator picks a better base image.
     - |
       if ! command -v aws >/dev/null 2>&1 || ! command -v jq >/dev/null 2>&1; then
         if command -v apk >/dev/null 2>&1; then
@@ -268,65 +268,11 @@ validate:grep-gates:
     - aws sts get-caller-identity
 
 # -----------------------------------------------------------------------------
-# Build stage — packer bake.
-#
-# Produces an AMI and writes its ID to terraform/users/${DEVBOX_USER}.auto.tfvars
-# as a GitLab artifact for the deploy stage. Terraform auto-loads any
-# *.auto.tfvars file in its module directory.
-#
-# The AMI ID is extracted from packer's machine-readable output (the
-# `artifact` line shape is documented at packer.io: <ts>,<builder>,artifact,
-# <n>,id,<region>:ami-XXXX). This avoids adding a manifest post-processor
-# to packer/devimage.pkr.hcl, keeping the Packer config untouched between
-# the make-driven flow and the GitLab-driven flow.
-#
-# Gated to protected branches only — packer builds are ~10-15 min and
-# spin up real EC2 instances, so we don't want them firing on every PR.
-# -----------------------------------------------------------------------------
-
-build:packer-bake:
-  stage: build
-  extends: .aws-auth
-  image: hashicorp/packer:1.15.3@sha256:cb9c526a6351c55f05430423a8b37139a04b0fb5ce541887d476e19860b5ed92
-  needs:
-    - validate:tofu-fmt
-    - validate:packer-fmt
-    - validate:tofu-validate
-    - validate:packer-validate
-    - validate:ansible-lint
-    - validate:ansible-syntax
-    - validate:shellcheck
-    - validate:checkov
-    - validate:grep-gates
-  script:
-    - cd packer
-    - packer init .
-    # Build and write machine-readable output to ./build.log; `tee` keeps it
-    # visible in the runner log too.
-    - packer build -machine-readable -var "devbox_user=${DEVBOX_USER}" -var "aws_region=${AWS_REGION}" . | tee build.log
-    # Extract the AMI ID from the machine-readable output. Tolerant of multi-
-    # region builds: `tail -n1` takes the last `artifact id` line.
-    - AMI_ID=$(awk -F, '$3 == "artifact" && $5 == "id" { split($6, a, ":"); print a[length(a)] }' build.log | tail -n1)
-    - test -n "$AMI_ID" || { echo "FATAL: failed to extract AMI ID from packer build output" >&2; exit 1; }
-    - echo "Baked AMI: $AMI_ID"
-    - mkdir -p ../terraform/users
-    - printf 'ami_id = "%s"\n' "$AMI_ID" > "../terraform/users/${DEVBOX_USER}.auto.tfvars"
-    - cat "../terraform/users/${DEVBOX_USER}.auto.tfvars"
-  artifacts:
-    paths:
-      - terraform/users/${DEVBOX_USER}.auto.tfvars
-    expire_in: 1 week
-  rules:
-    # Build only fires on protected branches. Cost guardrail — packer builds
-    # spin up real EC2 instances.
-    - if: $CI_COMMIT_REF_PROTECTED == "true"
-
-# -----------------------------------------------------------------------------
 # Deploy stage — tofu apply.
 #
-# Consumes the build:packer-bake artifact (terraform/users/${DEVBOX_USER}.auto.tfvars)
-# via `needs: [{job: build:packer-bake, artifacts: true}]` and runs
-# `tofu apply` against the per-operator state key.
+# Picks the latest AMI matched by the `data "aws_ami"` filter in
+# terraform/main.tf (AMI is baked out-of-band via `make build` on an operator
+# workstation; CI does NOT run packer).
 #
 #   `lockfile=readonly` asserts the committed terraform/.terraform.lock.hcl
 #   is the single source of truth for provider versions (Phase-3 REP-01).
@@ -349,16 +295,10 @@ deploy:tofu-apply:
   stage: deploy
   extends: .aws-auth
   image: ghcr.io/opentofu/opentofu:1.10.6@sha256:43f73c1e01f21de343ca4428a7e1845a357790235c73758bd7dc3cc4d1324b49
-  needs:
-    - job: build:packer-bake
-      artifacts: true
   environment:
     name: devbox/${DEVBOX_USER}
   script:
     - cd terraform
-    # Prove the artifact landed before we touch state.
-    - ls -la users/
-    - test -f "users/${DEVBOX_USER}.auto.tfvars"
     - >
       tofu init -lockfile=readonly
       -backend-config="bucket=${TF_STATE_BUCKET}"
