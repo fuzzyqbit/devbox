@@ -23,8 +23,8 @@
 # Image digest-pin policy: every `image:` line MUST be
 # `name@sha256:<64-hex>`. The validate:grep-gates job's invariant #7 fails
 # the pipeline if anyone regresses this (T-be1-02). To rotate a digest,
-# re-resolve via the procedure documented in
-# .planning/quick/260520-be1-create-gitlab-ci-pipeline-packer-build-a/IMAGES.txt.
+# re-resolve via `docker manifest inspect <image>:<tag>` (or
+# `crane digest <image>:<tag>`) and replace the existing digest in this file.
 #
 # Required GitLab CI/CD variables (Settings → CI/CD → Variables)
 #   AWS_ROLE_ARN     masked, protected      IAM role for OIDC AssumeRole
@@ -78,10 +78,9 @@ variables:
   AWS_OIDC_AUD: "https://gitlab.com"
 
 default:
-  # Planning-doc commits do NOT trigger validate/build/deploy.
+  # Markdown-only commits do NOT trigger validate/build/deploy.
   rules:
     - changes:
-        - '.planning/**/*'
         - '**/*.md'
         - 'CLAUDE.md'
       when: never
