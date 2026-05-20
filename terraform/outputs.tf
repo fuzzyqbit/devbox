@@ -3,13 +3,8 @@ output "instance_id" {
   value       = aws_instance.devbox.id
 }
 
-output "public_ip" {
-  description = "Public IP address"
-  value       = aws_instance.devbox.public_ip
-}
-
 output "private_ip" {
-  description = "Private IP address"
+  description = "Private IP address. Devbox is private-only — reached over VPC-internal routes for code-server/noVNC and via SSM Session Manager for shell."
   value       = aws_instance.devbox.private_ip
 }
 
@@ -19,13 +14,13 @@ output "ssm_start_session_command" {
 }
 
 output "code_server_url" {
-  description = "code-server URL"
-  value       = "https://${aws_instance.devbox.public_ip}:8080"
+  description = "code-server URL (private IP — reach over VPC peering / Direct Connect / VPN, or use `make devbox-port-forward`)"
+  value       = "https://${aws_instance.devbox.private_ip}:8080"
 }
 
 output "novnc_url" {
-  description = "noVNC remote desktop URL"
-  value       = "https://${aws_instance.devbox.public_ip}:6080"
+  description = "noVNC remote desktop URL (private IP — reach over VPC peering / Direct Connect / VPN, or use SSM port forwarding with portNumber=6080)"
+  value       = "https://${aws_instance.devbox.private_ip}:6080"
 }
 
 output "security_group_id" {

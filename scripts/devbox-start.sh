@@ -55,27 +55,18 @@ fi
 
 echo ""
 
-# Fetch connection info
-PUBLIC_IP="$(aws ec2 describe-instances \
+# Fetch connection info. Private-only — no PublicIpAddress query.
+PRIVATE_IP="$(aws ec2 describe-instances \
   --instance-ids "$INSTANCE_ID" \
   --region "$REGION" \
-  --query 'Reservations[0].Instances[0].PublicIpAddress' \
-  --output text)"
-
-# KEY_NAME query retained for parity with status.sh; no longer surfaced in the
-# Phase 2 connection-info block (Phase 1 SSH path is closed). Pending cleanup.
-# shellcheck disable=SC2034
-KEY_NAME="$(aws ec2 describe-instances \
-  --instance-ids "$INSTANCE_ID" \
-  --region "$REGION" \
-  --query 'Reservations[0].Instances[0].KeyName' \
+  --query 'Reservations[0].Instances[0].PrivateIpAddress' \
   --output text)"
 
 echo "=== Connection Info ($DEVBOX_USER) ==="
-echo "Public IP:           $PUBLIC_IP"
+echo "Private IP:          $PRIVATE_IP"
 echo "Shell (SSM):         aws ssm start-session --target $INSTANCE_ID --region $REGION"
 echo "                     (or: make devbox-ssm DEVBOX_USER=$DEVBOX_USER)"
-echo "code-server:         https://${PUBLIC_IP}:8080   (requires your IP in allowed_web_cidrs)"
-echo "noVNC:               https://${PUBLIC_IP}:6080   (requires your IP in allowed_web_cidrs)"
+echo "code-server:         https://${PRIVATE_IP}:8080  (reachable from VPC; requires your CIDR in allowed_web_cidrs)"
+echo "noVNC:               https://${PRIVATE_IP}:6080  (reachable from VPC; requires your CIDR in allowed_web_cidrs)"
 echo ""
-echo "Browser access blocked? Check var.allowed_web_cidrs in your tfvars and re-run 'make tf-apply'."
+echo "Off-VPC? Use 'make devbox-port-forward' for code-server, or check var.allowed_web_cidrs."

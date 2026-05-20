@@ -50,8 +50,8 @@ variable "devbox_user" {
 
 variable "associate_public_ip" {
   type        = bool
-  default     = true
-  description = "Whether to associate a public IP address"
+  default     = false
+  description = "Whether to associate a public IP address. Default false — the devbox is reached via SSM Session Manager (shell) and VPC-internal routes (code-server/noVNC), so no public surface is needed."
 }
 
 variable "extra_tags" {

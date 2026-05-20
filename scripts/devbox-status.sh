@@ -21,15 +21,14 @@ EOF
 parse_args "$@"
 init_devbox
 
-# Fetch instance details
+# Fetch instance details. Private-only — no PublicIpAddress query.
 INFO="$(aws ec2 describe-instances \
   --instance-ids "$INSTANCE_ID" \
   --region "$REGION" \
-  --query 'Reservations[0].Instances[0].{State:State.Name,PublicIp:PublicIpAddress,PrivateIp:PrivateIpAddress,Type:InstanceType,LaunchTime:LaunchTime,KeyName:KeyName}' \
+  --query 'Reservations[0].Instances[0].{State:State.Name,PrivateIp:PrivateIpAddress,Type:InstanceType,LaunchTime:LaunchTime,KeyName:KeyName}' \
   --output json)"
 
 STATE="$(echo "$INFO" | jq -r '.State')"
-PUBLIC_IP="$(echo "$INFO" | jq -r '.PublicIp // "N/A"')"
 PRIVATE_IP="$(echo "$INFO" | jq -r '.PrivateIp // "N/A"')"
 INSTANCE_TYPE="$(echo "$INFO" | jq -r '.Type')"
 LAUNCH_TIME="$(echo "$INFO" | jq -r '.LaunchTime // "N/A"')"
@@ -40,7 +39,6 @@ echo "Instance ID:   $INSTANCE_ID"
 echo "Region:        $REGION"
 echo "State:         $STATE"
 echo "Instance Type: $INSTANCE_TYPE"
-echo "Public IP:     $PUBLIC_IP"
 echo "Private IP:    $PRIVATE_IP"
 echo "Key Name:      $KEY_NAME"
 echo "Launch Time:   $LAUNCH_TIME"
@@ -48,16 +46,16 @@ echo "Launch Time:   $LAUNCH_TIME"
 if [[ "$STATE" == "running" ]]; then
   echo ""
   echo "=== Connection Info ==="
-  # Shell access is brokered by SSM — no public IP needed.
+  # Shell access is brokered by SSM.
   echo "Shell (SSM):          aws ssm start-session --target ${INSTANCE_ID} --region ${REGION}"
   echo "                      (or: make devbox-ssm DEVBOX_USER=${DEVBOX_USER})"
-  if [[ "$PUBLIC_IP" != "N/A" ]]; then
-    echo "code-server (browser): https://${PUBLIC_IP}:8080   (requires your IP in allowed_web_cidrs)"
-    echo "noVNC (browser):       https://${PUBLIC_IP}:6080   (requires your IP in allowed_web_cidrs)"
+  if [[ "$PRIVATE_IP" != "N/A" ]]; then
+    echo "code-server (browser): https://${PRIVATE_IP}:8080  (reachable from VPC; requires your CIDR in allowed_web_cidrs)"
+    echo "noVNC (browser):       https://${PRIVATE_IP}:6080  (reachable from VPC; requires your CIDR in allowed_web_cidrs)"
     echo ""
-    echo "Don't want public web ingress? Use SSM port forwarding:"
+    echo "Off-VPC operator? Use SSM port forwarding:"
     echo "  make devbox-port-forward DEVBOX_USER=${DEVBOX_USER}"
-    echo "  Then browse to https://localhost:8080 and https://localhost:6080"
+    echo "  Then browse to https://localhost:8080 (and a second session for :6080)"
   fi
   echo ""
   echo "If browser access fails: check var.allowed_web_cidrs in your tfvars."
