@@ -64,7 +64,7 @@ stages:
 
 variables:
   # IaC binary. tofu is canonical — terraform/.terraform.lock.hcl is
-  # OpenTofu-flavoured per CLAUDE.md §8 / Phase 3 REP-01.
+  # OpenTofu-flavoured per Phase 3 REP-01.
   TF_BIN: tofu
 
   # Backend coordinates threaded into deploy:tofu-apply. Mirrors Makefile
@@ -83,7 +83,6 @@ default:
   rules:
     - changes:
         - '**/*.md'
-        - 'CLAUDE.md'
       when: never
     - when: on_success
 

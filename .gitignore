@@ -16,8 +16,9 @@ terraform/terraform.tfstate.d/
 # OS
 .DS_Store
 
-# Claude Code (local settings, not project files)
+# Claude Code (local settings + per-repo guide, not project files)
 .claude/
+CLAUDE.md
 
 # Per-operator tfvars an operator drops in for their own overrides (CIDR
 # allowlists, ami_id pins, etc.). Kept local, never committed.
