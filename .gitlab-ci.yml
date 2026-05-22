@@ -1,20 +1,35 @@
 # =============================================================================
-# .gitlab-ci.yml — OpenTofu apply pipeline for the devbox project.
+# .gitlab-ci.yml — devbox CI/CD: validate, bake AMI, deploy EC2.
+#
+# Pipeline kinds (selected via PIPELINE_KIND variable on web/schedule trigger)
+#
+#   PIPELINE_KIND=bake     packer build → publishes a new AMI to AWS.
+#                          Trigger: Web UI ("Run pipeline" + PIPELINE_KIND=bake)
+#                          OR Pipeline Schedule (Build → Pipeline schedules,
+#                          set PIPELINE_KIND=bake on the schedule). Recommended
+#                          schedule: weekly, to pick up upstream AL2023 CVEs.
+#                          NEVER fires on push/MR (cost guardrail — packer
+#                          builds spin up real EC2 instances).
+#
+#   PIPELINE_KIND=deploy   tofu apply → provisions an EC2 instance for one
+#                          operator from the latest AMI matched by
+#                          terraform/main.tf's `data "aws_ami"` filter.
+#                          Trigger: Web UI ONLY. Operator MUST set
+#                          DEVBOX_USER in the Run-pipeline form (no default).
+#                          deploy:tofu-apply is `when: manual` on top of the
+#                          web-trigger gate so a maintainer must also click
+#                          "play" — defence-in-depth against operator typos.
+#
+#   (unset)                push and MR pipelines run validate only.
 #
 # Stages
 #   1. validate   8 parallel gates against the source tree:
 #                 tofu-fmt, packer-fmt, tofu-validate (-lockfile=readonly),
 #                 packer-validate, ansible-lint, ansible-syntax,
 #                 shellcheck, checkov, grep-gates.
-#   2. deploy     `tofu init -lockfile=readonly` + `tofu apply` provisions
-#                 the EC2 instance from the latest AMI matched by the
-#                 `data "aws_ami"` filter in terraform/main.tf.
-#                 `when: manual` on protected branches ONLY — provisions
-#                 real AWS resources, so a human must click "play".
-#
-# AMI sourcing: AMIs are baked OUT-OF-BAND (operator runs `make build` on a
-# workstation with AWS creds). Deploy picks the most-recent matching AMI via
-# the terraform `data "aws_ami"` filter. CI does NOT run packer build.
+#   2. bake       packer build (PIPELINE_KIND=bake only).
+#   3. deploy     tofu init -lockfile=readonly + tofu apply
+#                 (PIPELINE_KIND=deploy + when: manual + protected branch).
 #
 # AWS authentication: GitLab OIDC federation (`id_tokens:` →
 # `sts assume-role-with-web-identity`). No static IAM keys touch CI vars.
@@ -31,9 +46,12 @@
 # Required GitLab CI/CD variables (Settings → CI/CD → Variables)
 #   AWS_ROLE_ARN     masked, protected      IAM role for OIDC AssumeRole
 #   AWS_REGION       protected              e.g. us-east-1
-#   DEVBOX_USER      protected              operator identity (NO whoami default)
 #   TF_STATE_BUCKET  protected              S3 backend bucket
 #   AWS_OIDC_AUD     protected, OPTIONAL    default: https://gitlab.com
+#
+# DEVBOX_USER is NOT a CI/CD variable — it's set per-run in the Run-pipeline
+# form (deploy) or omitted (bake/validate). Defining it as a project CI
+# variable would let an MR pipeline silently target the wrong operator.
 #
 # IAM Trust Policy (paste into the role AWS_ROLE_ARN resolves to)
 # Replace <ACCT>, <group>, <project> with literal values. The
@@ -60,9 +78,29 @@
 
 stages:
   - validate
+  - bake
   - deploy
 
 variables:
+  PIPELINE_KIND:
+    value: ""
+    options:
+      - ""
+      - "bake"
+      - "deploy"
+    description: |
+      Pipeline mode. Leave blank on push/MR (validate-only). Set to "bake"
+      on web/schedule trigger to publish a new AMI. Set to "deploy" on web
+      trigger to provision EC2 — also requires DEVBOX_USER.
+  DEVBOX_USER:
+    value: ""
+    description: |
+      Operator username. REQUIRED for PIPELINE_KIND=deploy. Threads through
+      S3 state key (users/${DEVBOX_USER}/devbox.tfstate), SSH keypair name
+      (${DEVBOX_USER}-devbox), security-group prefix, and SSM parameter
+      prefix (/devbox/${DEVBOX_USER}/*). Must match an existing keypair
+      imported per CLAUDE.md §4. Lowercase, alphanumeric + dash; no spaces.
+
   # IaC binary. tofu is canonical — terraform/.terraform.lock.hcl is
   # OpenTofu-flavoured per Phase 3 REP-01.
   TF_BIN: tofu
@@ -78,17 +116,32 @@ variables:
   # The IAM trust-policy `gitlab.com:aud` condition MUST match this.
   AWS_OIDC_AUD: "https://gitlab.com"
 
-default:
-  # Markdown-only commits do NOT trigger validate/deploy.
+# -----------------------------------------------------------------------------
+# Pipeline-level gating. Decides whether a pipeline runs at all and which
+# kind it is. Job-level `rules:` further restrict which jobs run inside.
+# -----------------------------------------------------------------------------
+workflow:
   rules:
-    - changes:
+    # Markdown-only commits do not trigger anything.
+    - if: $CI_PIPELINE_SOURCE == "push"
+      changes:
         - '**/*.md'
       when: never
-    - when: on_success
+    # Push/MR pipelines run validate only (no PIPELINE_KIND required).
+    - if: $CI_PIPELINE_SOURCE == "push"
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    # Web-triggered: must specify bake or deploy.
+    - if: $CI_PIPELINE_SOURCE == "web" && $PIPELINE_KIND == "bake"
+    - if: $CI_PIPELINE_SOURCE == "web" && $PIPELINE_KIND == "deploy"
+    # Pipeline-schedule: bake only (deploy schedules would provision an
+    # EC2 instance unattended on a cron — not appropriate for this project).
+    - if: $CI_PIPELINE_SOURCE == "schedule" && $PIPELINE_KIND == "bake"
+    - when: never
 
 # -----------------------------------------------------------------------------
 # Validate stage — 9 parallel gates, no `needs:` between them (each runs
-# against the source tree independently).
+# against the source tree independently). Runs on EVERY pipeline kind
+# (push/MR/web/schedule) so bake and deploy always see a green tree first.
 # -----------------------------------------------------------------------------
 
 # 1a. tofu fmt -check -recursive
@@ -219,8 +272,8 @@ validate:grep-gates:
 
 # -----------------------------------------------------------------------------
 # .aws-auth template — hidden job (leading dot prefix → GitLab never runs it
-# directly). deploy:tofu-apply `extends:` this to inherit the id_tokens +
-# sts assume-role-with-web-identity before_script.
+# directly). bake:packer-build + deploy:tofu-apply `extends:` this to inherit
+# the id_tokens + sts assume-role-with-web-identity before_script.
 #
 # Threat model linkage:
 #   T-be1-01 (Spoofing): the IAM trust policy in the header MUST scope `sub`
@@ -240,8 +293,8 @@ validate:grep-gates:
       aud: ${AWS_OIDC_AUD}
   before_script:
     # Smoke test: the inheriting job's `image:` must already ship aws-cli + jq.
-    # The opentofu image doesn't ship aws-cli; install if Alpine, else fail
-    # loud so the operator picks a better base image.
+    # The opentofu and packer images don't ship aws-cli; install if Alpine,
+    # else fail loud so the operator picks a better base image.
     - |
       if ! command -v aws >/dev/null 2>&1 || ! command -v jq >/dev/null 2>&1; then
         if command -v apk >/dev/null 2>&1; then
@@ -267,11 +320,41 @@ validate:grep-gates:
     - aws sts get-caller-identity
 
 # -----------------------------------------------------------------------------
-# Deploy stage — tofu apply.
+# Bake stage — packer build (PIPELINE_KIND=bake only).
+#
+# Produces a new AMI in AWS. No artifact handoff — deploy picks the latest
+# matching AMI via terraform/main.tf's `data "aws_ami"` filter on the next
+# `tofu apply`.
+#
+# Trigger paths:
+#   - Web UI: "Run pipeline" with PIPELINE_KIND=bake (operator-initiated).
+#   - Pipeline Schedule: configure once in Build → Pipeline schedules with
+#     PIPELINE_KIND=bake (recommended weekly to catch AL2023 CVEs).
+#
+# Cost guardrail: bake spins up a real EC2 instance for ~10-15 min during
+# the Packer build. NEVER fires on push/MR (workflow:rules above).
+# -----------------------------------------------------------------------------
+
+bake:packer-build:
+  stage: bake
+  extends: .aws-auth
+  image: hashicorp/packer:1.15.3@sha256:cb9c526a6351c55f05430423a8b37139a04b0fb5ce541887d476e19860b5ed92
+  script:
+    - cd packer
+    - packer init .
+    # devbox_user="" is intentional — bake produces an AMI shared across
+    # operators; per-operator wiring happens at deploy time. Phase 3 fix
+    # (commit f156070) made devbox_user default to "" so this is valid.
+    - packer build -var "devbox_user=" -var "aws_region=${AWS_REGION}" .
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "web" && $PIPELINE_KIND == "bake" && $CI_COMMIT_REF_PROTECTED == "true"
+    - if: $CI_PIPELINE_SOURCE == "schedule" && $PIPELINE_KIND == "bake"
+
+# -----------------------------------------------------------------------------
+# Deploy stage — tofu apply (PIPELINE_KIND=deploy + manual only).
 #
 # Picks the latest AMI matched by the `data "aws_ami"` filter in
-# terraform/main.tf (AMI is baked out-of-band via `make build` on an operator
-# workstation; CI does NOT run packer).
+# terraform/main.tf and provisions a per-operator EC2 instance.
 #
 #   `lockfile=readonly` asserts the committed terraform/.terraform.lock.hcl
 #   is the single source of truth for provider versions (Phase-3 REP-01).
@@ -283,11 +366,11 @@ validate:grep-gates:
 #   (TF_BACKEND_ARGS) exactly. Any drift here is a bug.
 #
 # `when: manual` blocks this job until a maintainer clicks "play" in the
-# GitLab UI on a protected branch. Combined with the
-# `if: $CI_COMMIT_REF_PROTECTED == "true"` rule, the deploy is gated on:
-# (a) a human, (b) a protected branch, and (c) someone with deploy
-# permission. This is the T-be1-10 mitigation against a hostile MR
-# triggering deploy automatically.
+# GitLab UI on a protected branch. Combined with PIPELINE_KIND=deploy and
+# protected-branch gating, the deploy is gated on (a) operator chose deploy
+# in the Run-pipeline form, (b) on a protected branch, (c) a maintainer
+# also clicked play, (d) the operator has deploy permission, (e) the
+# DEVBOX_USER fail-fast in before_script passed. T-be1-10 mitigation.
 # -----------------------------------------------------------------------------
 
 deploy:tofu-apply:
@@ -296,6 +379,25 @@ deploy:tofu-apply:
   image: ghcr.io/opentofu/opentofu:1.10.6@sha256:43f73c1e01f21de343ca4428a7e1845a357790235c73758bd7dc3cc4d1324b49
   environment:
     name: devbox/${DEVBOX_USER}
+  before_script:
+    # DEVBOX_USER fail-fast. Must run BEFORE inheriting .aws-auth's
+    # before_script so we don't waste an STS AssumeRole on a bad input.
+    # The `!extends` of .aws-auth concatenates before_scripts, so this
+    # block executes first.
+    - |
+      if [ -z "${DEVBOX_USER:-}" ]; then
+        echo "FATAL: DEVBOX_USER is required for PIPELINE_KIND=deploy." >&2
+        echo "Set it in the Run-pipeline form (lowercase, alphanumeric + dash)." >&2
+        exit 1
+      fi
+      if ! printf '%s' "$DEVBOX_USER" | grep -qE '^[a-z0-9][a-z0-9-]{0,30}[a-z0-9]$'; then
+        echo "FATAL: DEVBOX_USER='${DEVBOX_USER}' violates the per-operator naming convention." >&2
+        echo "Must be lowercase, alphanumeric + dash, 2-32 chars, no leading/trailing dash." >&2
+        exit 1
+      fi
+      echo "Deploying for DEVBOX_USER=${DEVBOX_USER}"
+    # !reference inserts the .aws-auth before_script after the fail-fast above.
+    - !reference [.aws-auth, before_script]
   script:
     - cd terraform
     - >
@@ -311,8 +413,8 @@ deploy:tofu-apply:
       -out=tfplan
     - tofu apply -auto-approve tfplan
   rules:
-    - if: $CI_COMMIT_REF_PROTECTED == "true"
-      when: manual          # human-triggered ONLY (provisions real AWS resources)
+    - if: $CI_PIPELINE_SOURCE == "web" && $PIPELINE_KIND == "deploy" && $CI_COMMIT_REF_PROTECTED == "true"
+      when: manual
       allow_failure: false  # operator-triggered failure fails the pipeline
   artifacts:
     # Keep the plan around on failure for post-mortem (T-be1-06 — tfplan may
