@@ -57,13 +57,28 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| (populated during roadmap creation) | | |
+| RUN-01 | Phase 5 | Pending |
+| RUN-02 | Phase 5 | Pending |
+| RUN-03 | Phase 5 | Pending |
+| RUN-04 | Phase 5 | Pending |
+| RUN-05 | Phase 5 | Pending |
+| RUN-06 | Phase 5 | Pending |
+| RUN-07 | Phase 5 | Pending |
+| RUN-08 | Phase 5 | Pending |
+| POL-01 | Phase 6 | Pending |
+| POL-02 | Phase 6 | Pending |
+| CI-01 | Phase 6 | Pending |
+| CI-02 | Phase 6 | Pending |
+| CI-03 | Phase 6 | Pending |
+| CI-04 | Phase 6 | Pending |
+| DOC-01 | Phase 7 | Pending |
+| DOC-02 | Phase 7 | Pending |
 
 **Coverage:**
 - v2.0 requirements: 16 total
-- Mapped to phases: 0
-- Unmapped: 16 ⚠️
+- Mapped to phases: 16
+- Unmapped: 0 ✓
 
 ---
 *Requirements defined: 2026-05-27*
-*Last updated: 2026-05-27 after initial definition*
+*Last updated: 2026-05-27 after roadmap creation*

@@ -2,11 +2,11 @@
 gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Run Script + GitLab CI Integration
-status: planning
-last_updated: "2026-05-27T11:50:13.300Z"
+status: active
+last_updated: "2026-05-27"
 last_activity: 2026-05-27
 progress:
-  total_phases: 0
+  total_phases: 3
   completed_phases: 0
   total_plans: 0
   completed_plans: 0
@@ -17,17 +17,19 @@ progress:
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-05-14 after v1.0 milestone close)
+See: .planning/PROJECT.md (updated 2026-05-27 after v2.0 milestone start)
 
-**Core value:** A single operator can spin up, hibernate, and tear down a reproducible, hardened cloud workstation with one `make` target — without leaking credentials or exposing a vulnerable host to the public internet.
-**Current focus:** None — v1.0 shipped; v2 not yet scoped.
+**Core value:** A single operator can spin up, hibernate, and tear down a reproducible, hardened cloud workstation with one command — without leaking credentials or exposing a vulnerable host to the public internet.
+**Current focus:** Phase 5 — Run Script Core (`./run` dispatcher + safety guards)
 
 ## Current Position
 
-Phase: Not started (defining requirements)
-Plan: —
-Status: Defining requirements
-Last activity: 2026-05-27 — Milestone v2.0 started
+Phase: 5 — Run Script Core
+Plan: Not started
+Status: Ready to plan
+Last activity: 2026-05-27 — v2.0 roadmap created (3 phases, 16 requirements mapped)
+
+Progress: `[ - - - ]` 0/3 phases complete
 
 ## Performance Metrics (v1.0)
 
@@ -53,15 +55,21 @@ See PROJECT.md Key Decisions table. Locked v1.0 decisions:
 - Packer manifest → auto.tfvars AMI handoff
 - Checkov (NOT tfsec / Trivy / KICS — supply-chain incidents March 2026)
 - Parallel CI jobs; tiered pre-commit (fast at commit, slow at push)
+- Terragrunt dropped post-v1.0; Makefile now drives `tofu` directly with `-backend-config` flags
+
+**v2.0 decisions:**
+- Makefile is deleted as the final step (Phase 7) — not before CI and `./run` are verified working
+- Research build order: dispatcher + guards → CI integration → docs/cleanup
+- Existing `scripts/*.sh` stay as helpers called by `./run` (no consolidation into the script body)
 
 ## Deferred / Carried Forward
 
 | Category | Item | Status | Originated |
 |----------|------|--------|-----------|
-| Observability | CloudWatch metrics + login event shipping | v2 backlog | v1.0 init |
-| Lifecycle | Idle auto-stop + scheduled nightly stop | v2 backlog | v1.0 init |
-| Image lifecycle | Old AMI deregistration + inventory | v2 backlog | v1.0 init |
-| Reproducibility | SSM `:NN` version suffix on Packer source | v2 follow-up | v1.0 Phase 3 |
+| Observability | CloudWatch metrics + login event shipping | v3 backlog | v1.0 init |
+| Lifecycle | Idle auto-stop + scheduled nightly stop | v3 backlog | v1.0 init |
+| Image lifecycle | Old AMI deregistration + inventory | v3 backlog | v1.0 init |
+| Reproducibility | SSM `:NN` version suffix on Packer source | v3 follow-up | v1.0 Phase 3 |
 
 ### Quick Tasks Completed
 
@@ -71,6 +79,7 @@ See PROJECT.md Key Decisions table. Locked v1.0 decisions:
 
 ## Session Continuity
 
-Last session: 2026-05-14 (v1.0 milestone close)
-Stopped at: v1.0 archived to `.planning/milestones/v1-*.md`; ROADMAP.md collapsed to one-liner with archive link; REQUIREMENTS.md removed (fresh one will be written at v2 init); PROJECT.md has Current State + Next Milestone Goals; git tag v1.0 pending.
+Last session: 2026-05-27 (v2.0 roadmap created)
+Stopped at: ROADMAP.md written (Phases 5-7); REQUIREMENTS.md traceability updated; ready to plan Phase 5
 Resume file: None
+Next: `/gsd:plan-phase 5`

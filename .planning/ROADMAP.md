@@ -2,7 +2,60 @@
 
 ## Active Milestone
 
-(none — Milestone 2 not yet defined; run `/gsd-new-milestone` to start)
+**v2.0 — Run Script + GitLab CI Integration**
+
+Replace the Makefile with a single `./run` shell script that works both locally and in CI,
+then wire the GitLab CI pipeline to call `./run` — single source of truth for all operator commands.
+
+## Phases
+
+- [ ] **Phase 5: Run Script Core** - `./run` dispatcher with all 20 commands and safety guards
+- [ ] **Phase 6: GitLab CI + Polish** - GitLab CI pipeline calls `./run`; colored output and doctor command
+- [ ] **Phase 7: Docs + Cleanup** - CLAUDE.md updated to `./run`; Makefile deleted
+
+## Phase Details
+
+### Phase 5: Run Script Core
+**Goal**: Operators can use `./run <command>` for all operations, with safety guards that fail fast on bad input
+**Depends on**: Phase 4 (v1.0 complete)
+**Requirements**: RUN-01, RUN-02, RUN-03, RUN-04, RUN-05, RUN-06, RUN-07, RUN-08
+**Success Criteria** (what must be TRUE):
+  1. `./run help` prints a grouped command reference covering all 20 commands
+  2. `./run build` (and all other commands) executes the correct operation end-to-end
+  3. `./run` with an unset or malformed DEVBOX_USER prints an actionable error and exits non-zero
+  4. `./run tf-apply` auto-reinitializes the backend when the cached state key mismatches DEVBOX_USER
+  5. `shellcheck ./run` passes with no errors
+**Plans**: TBD
+
+### Phase 6: GitLab CI + Polish
+**Goal**: GitLab CI pipeline calls `./run` for bake and deploy; `./run` outputs colored status messages and `./run doctor` validates the local toolchain
+**Depends on**: Phase 5
+**Requirements**: CI-01, CI-02, CI-03, CI-04, POL-01, POL-02
+**Success Criteria** (what must be TRUE):
+  1. GitLab CI bake and deploy stages invoke `./run build` and `./run tf-init` / `./run tf-apply` (no inline shell commands)
+  2. GitLab CI shellcheck job lints the `run` file alongside `scripts/*.sh`
+  3. A grep-gate CI job verifies the `run` file has the executable bit set in git
+  4. `./run doctor` reports the status of all required dependencies in one pass
+  5. Color output is suppressed when `NO_COLOR=1` or `CI=true`
+**Plans**: TBD
+
+### Phase 7: Docs + Cleanup
+**Goal**: All operator documentation references `./run`; the Makefile is deleted from the repository
+**Depends on**: Phase 6
+**Requirements**: DOC-01, DOC-02
+**Success Criteria** (what must be TRUE):
+  1. CLAUDE.md contains no `make` command references — every operator action shown as `./run <command>`
+  2. The Makefile no longer exists in the repository and `git log --diff-filter=D` confirms its deletion
+  3. A grep-gate confirms no `make ` invocations remain in documentation or CI config
+**Plans**: TBD
+
+## Progress
+
+| Phase | Milestone | Plans Complete | Status | Completed |
+|-------|-----------|----------------|--------|-----------|
+| 5. Run Script Core | v2.0 | 0/TBD | Not started | - |
+| 6. GitLab CI + Polish | v2.0 | 0/TBD | Not started | - |
+| 7. Docs + Cleanup | v2.0 | 0/TBD | Not started | - |
 
 ## Shipped Milestones
 
@@ -14,7 +67,7 @@
 
 Carried from prior milestones; pick up in a future cycle:
 
-- **Observability** (v2): CloudWatch metrics + login event shipping
-- **Lifecycle** (v2): Idle auto-stop + scheduled nightly stop
-- **Image lifecycle** (v2): Old AMI deregistration + inventory
-- **Reproducibility follow-up** (v2): Pin Packer SSM parameter `:NN` version suffix (requires AWS creds)
+- **Observability** (v3): CloudWatch metrics + login event shipping
+- **Lifecycle** (v3): Idle auto-stop + scheduled nightly stop
+- **Image lifecycle** (v3): Old AMI deregistration + inventory
+- **Reproducibility follow-up** (v3): Pin Packer SSM parameter `:NN` version suffix (requires AWS creds)
