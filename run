@@ -401,6 +401,7 @@ cmd_secrets_show() {
   local cs_pwd vnc_pwd
   local aws_err
   aws_err="$(mktemp)"
+  trap 'rm -f "$aws_err"' RETURN
   cs_pwd="$(aws ssm get-parameter \
     --name "/devbox/${DEVBOX_USER}/code-server-password" \
     --with-decryption --query 'Parameter.Value' --output text 2>"$aws_err")" \

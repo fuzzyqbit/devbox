@@ -125,20 +125,17 @@ variables:
 # -----------------------------------------------------------------------------
 workflow:
   rules:
-    # Markdown-only commits do not trigger anything.
-    - if: $CI_PIPELINE_SOURCE == "push"
-      changes:
-        - '**/*.md'
-      when: never
     # Push/MR pipelines run validate only (no PIPELINE_KIND required).
     - if: $CI_PIPELINE_SOURCE == "push"
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
     # Web-triggered: must specify bake or deploy.
     - if: $CI_PIPELINE_SOURCE == "web" && $PIPELINE_KIND == "bake"
     - if: $CI_PIPELINE_SOURCE == "web" && $PIPELINE_KIND == "deploy"
-    # Pipeline-schedule: bake only (deploy schedules would provision an
-    # EC2 instance unattended on a cron — not appropriate for this project).
-    - if: $CI_PIPELINE_SOURCE == "schedule" && $PIPELINE_KIND == "bake"
+    # Pipeline-schedule: bake only, protected branch only (deploy schedules
+    # would provision an EC2 instance unattended on a cron — not appropriate
+    # for this project; schedule on unprotected branch risks baking from
+    # unreviewed code).
+    - if: $CI_PIPELINE_SOURCE == "schedule" && $PIPELINE_KIND == "bake" && $CI_COMMIT_REF_PROTECTED == "true"
     - when: never
 
 # -----------------------------------------------------------------------------
@@ -154,7 +151,7 @@ workflow:
     - if: $CI_PIPELINE_SOURCE == "push"
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
     - if: $CI_PIPELINE_SOURCE == "web" && $PIPELINE_KIND == "bake"
-    - if: $CI_PIPELINE_SOURCE == "schedule" && $PIPELINE_KIND == "bake"
+    - if: $CI_PIPELINE_SOURCE == "schedule" && $PIPELINE_KIND == "bake" && $CI_COMMIT_REF_PROTECTED == "true"
 
 .rules-terraform:
   rules:
@@ -381,7 +378,7 @@ bake:packer-build:
     - ./run build
   rules:
     - if: $CI_PIPELINE_SOURCE == "web" && $PIPELINE_KIND == "bake" && $CI_COMMIT_REF_PROTECTED == "true"
-    - if: $CI_PIPELINE_SOURCE == "schedule" && $PIPELINE_KIND == "bake"
+    - if: $CI_PIPELINE_SOURCE == "schedule" && $PIPELINE_KIND == "bake" && $CI_COMMIT_REF_PROTECTED == "true"
 
 # -----------------------------------------------------------------------------
 # Deploy stage — tofu apply (PIPELINE_KIND=deploy + manual only).
@@ -413,10 +410,10 @@ deploy:tofu-apply:
   environment:
     name: devbox/${DEVBOX_USER}
   before_script:
-    # DEVBOX_USER fail-fast. Must run BEFORE inheriting .aws-auth's
-    # before_script so we don't waste an STS AssumeRole on a bad input.
-    # The `!extends` of .aws-auth concatenates before_scripts, so this
-    # block executes first.
+    # DEVBOX_USER fail-fast. Must run BEFORE .aws-auth's before_script
+    # so we don't waste an STS AssumeRole on a bad input. `extends:`
+    # OVERRIDES before_script (does not concatenate); the `!reference`
+    # tag below explicitly inserts .aws-auth's before_script after this.
     - |
       if [ -z "${DEVBOX_USER:-}" ]; then
         echo "FATAL: DEVBOX_USER is required for PIPELINE_KIND=deploy." >&2
