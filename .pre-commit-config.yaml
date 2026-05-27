@@ -116,7 +116,9 @@ repos:
             # 5. terraform/.terraform.lock.hcl is tracked (REP-01)
             git ls-files terraform/.terraform.lock.hcl | grep -q . && \
             # 6. No re-add of lockfile to .gitignore (REP-01)
-            ! grep -E "^[^#]*terraform/\\.terraform\\.lock\\.hcl" .gitignore
+            ! grep -E "^[^#]*terraform/\\.terraform\\.lock\\.hcl" .gitignore && \
+            # 7. run file must have executable bit in git (RUN-07 / CI-04)
+            git ls-files -s run | grep -q "^100755"
           '
         language: system
         pass_filenames: false

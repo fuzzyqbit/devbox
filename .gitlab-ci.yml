@@ -231,7 +231,7 @@ validate:shellcheck:
   stage: validate
   image: koalaman/shellcheck-alpine:v0.10.0@sha256:7c6a5115899d99323b22fc84b29e924aef5b6fa985612e450a8c356969ebb577
   script:
-    - shellcheck scripts/*.sh
+    - shellcheck scripts/*.sh run
 
 # 7. Checkov against terraform/. --hard-fail-on HIGH and --soft-fail-on
 # MEDIUM are sourced from .checkov.yaml — do NOT re-specify them on the
@@ -293,7 +293,13 @@ validate:grep-gates:
         exit 1
       fi
 
-      echo "All 7 invariants pass."
+      # 8. run file must have executable bit in git (RUN-07 / CI-04)
+      git ls-files -s run | grep -q '^100755' || {
+        echo "FAIL: run file does not have executable bit in git (must be 100755)" >&2
+        exit 1
+      }
+
+      echo "All 8 invariants pass."
 
 # -----------------------------------------------------------------------------
 # .aws-auth template — hidden job (leading dot prefix → GitLab never runs it
@@ -351,6 +357,11 @@ validate:grep-gates:
 # matching AMI via terraform/main.tf's `data "aws_ami"` filter on the next
 # `tofu apply`.
 #
+# PKR_VAR_aws_region threads the CI AWS_REGION variable through to Packer
+# via Packer's PKR_VAR_* env-var convention. devbox_user defaults to "" in
+# variables.pkr.hcl — no override needed (bake produces an AMI shared
+# across operators; per-operator wiring happens at deploy time).
+#
 # Trigger paths:
 #   - Web UI: "Run pipeline" with PIPELINE_KIND=bake (operator-initiated).
 #   - Pipeline Schedule: configure once in Build → Pipeline schedules with
@@ -364,13 +375,10 @@ bake:packer-build:
   stage: bake
   extends: .aws-auth
   image: hashicorp/packer:1.15.3@sha256:cb9c526a6351c55f05430423a8b37139a04b0fb5ce541887d476e19860b5ed92
+  variables:
+    PKR_VAR_aws_region: ${AWS_REGION}
   script:
-    - cd packer
-    - packer init .
-    # devbox_user="" is intentional — bake produces an AMI shared across
-    # operators; per-operator wiring happens at deploy time. Phase 3 fix
-    # (commit f156070) made devbox_user default to "" so this is valid.
-    - packer build -var "devbox_user=" -var "aws_region=${AWS_REGION}" .
+    - ./run build
   rules:
     - if: $CI_PIPELINE_SOURCE == "web" && $PIPELINE_KIND == "bake" && $CI_COMMIT_REF_PROTECTED == "true"
     - if: $CI_PIPELINE_SOURCE == "schedule" && $PIPELINE_KIND == "bake"
@@ -381,14 +389,14 @@ bake:packer-build:
 # Picks the latest AMI matched by the `data "aws_ami"` filter in
 # terraform/main.tf and provisions a per-operator EC2 instance.
 #
-#   `lockfile=readonly` asserts the committed terraform/.terraform.lock.hcl
-#   is the single source of truth for provider versions (Phase-3 REP-01).
+# Plan-file workflow dropped in favour of `./run tf-auto-apply` — simpler,
+# and defense-in-depth is sufficient without the plan artifact:
+# `when: manual` gate + protected branch + OIDC scoped to project/branch
+# + DEVBOX_USER fail-fast in before_script.
 #
-#   `key_name=${DEVBOX_USER}-devbox` matches Makefile line 47 — the
-#   per-operator keypair convention from Phase 1 SEC-04.
-#
-#   The four `-backend-config` flags mirror Makefile lines 49-52
-#   (TF_BACKEND_ARGS) exactly. Any drift here is a bug.
+# `./run tf-init` auto-adds `-lockfile=readonly` when CI=true (Phase 3
+# REP-01). Backend-config and -var args are derived from env vars by
+# `./run` internally (_tf_backend_args, _tf_var_args).
 #
 # `when: manual` blocks this job until a maintainer clicks "play" in the
 # GitLab UI on a protected branch. Combined with PIPELINE_KIND=deploy and
@@ -424,27 +432,9 @@ deploy:tofu-apply:
     # !reference inserts the .aws-auth before_script after the fail-fast above.
     - !reference [.aws-auth, before_script]
   script:
-    - cd terraform
-    - >
-      tofu init -lockfile=readonly
-      -backend-config="bucket=${TF_STATE_BUCKET}"
-      -backend-config="key=${TF_STATE_KEY}"
-      -backend-config="region=${TF_STATE_REGION}"
-      -backend-config="dynamodb_table=${TF_STATE_LOCK_TABLE}"
-    - >
-      tofu plan
-      -var "devbox_user=${DEVBOX_USER}"
-      -var "key_name=${DEVBOX_USER}-devbox"
-      -out=tfplan
-    - tofu apply -auto-approve tfplan
+    - ./run tf-init
+    - ./run tf-auto-apply
   rules:
     - if: $CI_PIPELINE_SOURCE == "web" && $PIPELINE_KIND == "deploy" && $CI_COMMIT_REF_PROTECTED == "true"
       when: manual
       allow_failure: false  # operator-triggered failure fails the pipeline
-  artifacts:
-    # Keep the plan around on failure for post-mortem (T-be1-06 — tfplan may
-    # surface SSM ARNs but not secret values; risk accepted for ops value).
-    paths:
-      - terraform/tfplan
-    expire_in: 1 month
-    when: on_failure
