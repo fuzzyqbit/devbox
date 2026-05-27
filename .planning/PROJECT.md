@@ -4,9 +4,9 @@
 
 **Shipped:** v1.0 (2026-05-14) — Security hardening + CI baseline
 
-Personal cloud workstation that bakes an AL2023 AMI and provisions per-user EC2 from it. End-to-end secure-by-default: per-build secrets via SSM Parameter Store + IAM instance profile + IMDSv2; SSM Session Manager for shell (no port 22); CIDR-allowlisted code-server (:8080) + noVNC (:6080); reproducible builds via committed `.terraform.lock.hcl` + pinned Galaxy collections + Packer source via SSM Parameter Store + manifest-driven AMI handoff; CI + tiered pre-commit gates against every Phase 1-3 invariant.
+Personal cloud workstation that bakes an AL2023 AMI and provisions per-user EC2 from it. End-to-end secure-by-default: per-build secrets via SSM Parameter Store + IAM instance profile + IMDSv2; SSM Session Manager for shell (no port 22); CIDR-allowlisted code-server (:8080) + noVNC (:6080); reproducible builds via committed `.terraform.lock.hcl` + pinned Galaxy collections + Packer source via SSM Parameter Store + manifest-driven AMI handoff; CI + tiered pre-commit gates against every Phase 1-3 invariant. Phase 5 added `./run` shell dispatcher replacing the Makefile as the operator surface.
 
-**Active milestone:** v2.0 — Run script + GitLab CI integration
+**Active milestone:** v2.0 — Run script + GitLab CI integration (Phase 5 complete, Phase 6-7 remaining)
 
 **Deferred to v3:** observability (CloudWatch metrics + login events), lifecycle automation (idle auto-stop, scheduled stop), image lifecycle (old AMI deregistration + inventory), Packer SSM `:NN` version pin (requires AWS creds).
 
@@ -62,7 +62,7 @@ A single operator can spin up, hibernate, and tear down a reproducible, hardened
 
 <!-- Milestone 1 complete 2026-05-14. All 23 v1 requirements closed. -->
 
-- [ ] Replace Makefile with `./run` shell script
+- [x] Replace Makefile with `./run` shell script — Phase 5 (2026-05-27)
 - [ ] GitLab CI pipeline uses `./run` commands
 - [ ] All documentation updated to reference `./run`
 
@@ -122,4 +122,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-05-27 after v2.0 milestone start.*
+*Last updated: 2026-05-27 after Phase 5 completion.*
