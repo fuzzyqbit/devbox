@@ -2,10 +2,176 @@
 set -euo pipefail
 
 # --------------------------------------------------------------------------
-# Bash 4+ guard (must be the first executable block — RUN-06, STACK.md)
+# Color output helpers (POL-01)
+# Bash 3.2-compatible — placed before the bash 4+ guard so doctor can use them.
+# NO_COLOR spec: https://no-color.org/
+# CI: GitLab sets CI=true automatically; suppress color in CI.
+# --------------------------------------------------------------------------
+if [[ -n "${NO_COLOR:-}" ]] || [[ "${CI:-}" == "true" ]]; then
+  RED=""
+  GREEN=""
+  YELLOW=""
+  BOLD=""
+  RESET=""
+else
+  RED=$'\033[0;31m'
+  GREEN=$'\033[0;32m'
+  YELLOW=$'\033[1;33m'
+  BOLD=$'\033[1m'
+  RESET=$'\033[0m'
+fi
+
+_info()  { echo "${GREEN}[INFO]${RESET} $*"; }
+_warn()  { echo "${YELLOW}[WARN]${RESET} $*" >&2; }
+_error() { echo "${RED}ERROR:${RESET} $*" >&2; }
+
+# --------------------------------------------------------------------------
+# Doctor command and helpers (POL-02)
+# All code in this section is bash 3.2-compatible: no associative arrays,
+# no ${var,,} lowercase, no |& pipe, no readarray/mapfile.
+# --------------------------------------------------------------------------
+
+_get_version() {
+  local cmd="$1"
+  local raw=""
+  # Each branch captures raw output with || true to handle non-zero exits.
+  # Post-processing pipes use || true on grep to handle no-match under pipefail.
+  case "$cmd" in
+    aws)
+      raw="$(aws --version 2>&1 | head -1)" || true
+      echo "$raw" | awk -F'[/ ]' '{print $2}'
+      ;;
+    packer)
+      raw="$(packer --version 2>&1)" || true
+      echo "$raw" | sed 's/.*v//' | head -1
+      ;;
+    tofu)
+      raw="$(tofu --version 2>&1)" || true
+      echo "$raw" | sed 's/.*v//' | head -1
+      ;;
+    ansible)
+      raw="$(ansible --version 2>&1 | head -1)" || true
+      echo "$raw" | sed 's/.*\[core //' | sed 's/\].*//'
+      ;;
+    ansible-lint)
+      raw="$(ansible-lint --version 2>&1)" || true
+      echo "$raw" | { grep -E '^ansible-lint' || true; } | head -1 | awk '{print $2}'
+      ;;
+    shellcheck)
+      raw="$(shellcheck --version 2>&1)" || true
+      echo "$raw" | { grep '^version:' || true; } | awk '{print $2}'
+      ;;
+    gitleaks)
+      raw="$(gitleaks version 2>&1)" || true
+      echo "${raw#v}"
+      ;;
+    pre-commit)
+      raw="$(pre-commit --version 2>&1)" || true
+      echo "$raw" | awk '{print $2}'
+      ;;
+    *)
+      echo "unknown"
+      ;;
+  esac
+}
+
+_check_cmd() {
+  local cmd="$1" install_hint="$2" min_major="${3:-}"
+  if ! command -v "$cmd" >/dev/null 2>&1; then
+    echo "  ${RED}FAIL${RESET}  $cmd -- not found (install: $install_hint)"
+    fail=$((fail + 1))
+    return
+  fi
+  if [[ -n "$min_major" ]]; then
+    local ver
+    ver="$(_get_version "$cmd")"
+    local major="${ver%%.*}"
+    if [[ "$major" -lt "$min_major" ]] 2>/dev/null; then
+      echo "  ${YELLOW}WARN${RESET}  $cmd -- version $ver (need >= $min_major)"
+      warn=$((warn + 1))
+      return
+    fi
+  fi
+  echo "  ${GREEN}OK${RESET}    $cmd"
+  pass=$((pass + 1))
+}
+
+_check_cmd_optional() {
+  local cmd="$1" install_hint="$2" min_major="${3:-}"
+  if ! command -v "$cmd" >/dev/null 2>&1; then
+    echo "  ${YELLOW}SKIP${RESET}  $cmd -- not found, optional (install: $install_hint)"
+    warn=$((warn + 1))
+    return
+  fi
+  if [[ -n "$min_major" ]]; then
+    local ver
+    ver="$(_get_version "$cmd")"
+    local major="${ver%%.*}"
+    if [[ "$major" -lt "$min_major" ]] 2>/dev/null; then
+      echo "  ${YELLOW}WARN${RESET}  $cmd -- version $ver (need >= $min_major)"
+      warn=$((warn + 1))
+      return
+    fi
+  fi
+  echo "  ${GREEN}OK${RESET}    $cmd"
+  pass=$((pass + 1))
+}
+
+cmd_doctor() {
+  local pass=0 fail=0 warn=0
+
+  _info "Checking required dependencies..."
+  echo ""
+
+  _check_cmd "aws" "brew install awscli" "2"
+  _check_cmd "packer" "brew install packer" "1"
+  _check_cmd "tofu" "brew install opentofu" "1"
+  _check_cmd "ansible" "brew install ansible" ""
+  _check_cmd "ansible-lint" "pip install ansible-lint" "26"
+  _check_cmd "jq" "brew install jq" ""
+  _check_cmd "shellcheck" "brew install shellcheck" "0"
+  _check_cmd "gitleaks" "brew install gitleaks" "8"
+  _check_cmd "pre-commit" "pip install pre-commit" "4"
+  _check_cmd "session-manager-plugin" "brew install --cask session-manager-plugin" ""
+
+  echo ""
+  echo "${BOLD}Optional dependencies:${RESET}"
+  echo ""
+
+  _check_cmd_optional "checkov" "pip install checkov" ""
+
+  # Check bash version (warn if < 4, since doctor itself works on 3.2)
+  echo ""
+  echo "${BOLD}Shell:${RESET}"
+  echo ""
+  if [[ "${BASH_VERSINFO[0]}" -lt 4 ]]; then
+    echo "  ${YELLOW}WARN${RESET}  bash -- version ${BASH_VERSION} (need >= 4.0 for all commands; brew install bash)"
+    warn=$((warn + 1))
+  else
+    echo "  ${GREEN}OK${RESET}    bash -- version ${BASH_VERSION}"
+    pass=$((pass + 1))
+  fi
+
+  echo ""
+  echo "${BOLD}Summary:${RESET} ${pass} passed, ${fail} failed, ${warn} warnings"
+  if [[ "$fail" -gt 0 ]]; then
+    exit 1
+  fi
+}
+
+# --------------------------------------------------------------------------
+# Doctor mini-dispatch (runs BEFORE bash 4+ guard — POL-02, Pitfall 1)
+# --------------------------------------------------------------------------
+if [[ "${1:-}" == "doctor" ]]; then
+  cmd_doctor
+  exit 0
+fi
+
+# --------------------------------------------------------------------------
+# Bash 4+ guard (protects all other commands — RUN-06, STACK.md)
 # --------------------------------------------------------------------------
 if [[ "${BASH_VERSINFO[0]}" -lt 4 ]]; then
-  echo "ERROR: Bash 4+ required. macOS: brew install bash" >&2
+  _error "Bash 4+ required. macOS: brew install bash"
   exit 1
 fi
 
@@ -32,13 +198,13 @@ REGION="${REGION:-}"
 
 _require_devbox_user() {
   if [[ -z "$DEVBOX_USER" ]]; then
-    echo "ERROR: DEVBOX_USER is not set." >&2
+    _error "DEVBOX_USER is not set."
     echo "       Set per-invocation:  DEVBOX_USER=jsmith ./run <command>" >&2
     echo "       Or in your shell:    export DEVBOX_USER=jsmith" >&2
     exit 1
   fi
   if [[ ! "$DEVBOX_USER" =~ ^[a-z0-9][a-z0-9-]{0,30}[a-z0-9]$ ]]; then
-    echo "ERROR: DEVBOX_USER='${DEVBOX_USER}' is invalid." >&2
+    _error "DEVBOX_USER='${DEVBOX_USER}' is invalid."
     echo "       Must be lowercase alphanumeric + dash, 2-32 chars, no leading/trailing dash." >&2
     exit 1
   fi
@@ -52,7 +218,7 @@ _derive_tf_state_bucket() {
   local account_id
   account_id="$(aws sts get-caller-identity --query Account --output text 2>/dev/null || true)"
   if [[ -z "$account_id" ]] || [[ "devimage-tfstate-${account_id}" == "devimage-tfstate-" ]]; then
-    echo "ERROR: could not resolve AWS account ID via 'aws sts get-caller-identity'." >&2
+    _error "could not resolve AWS account ID via 'aws sts get-caller-identity'."
     echo "       Check your AWS credentials/profile, or set TF_STATE_BUCKET=... explicitly." >&2
     exit 1
   fi
@@ -198,7 +364,7 @@ cmd_devbox_ssm() {
 cmd_devbox_port_forward() {
   cmd_tf_ensure_init
   if ! command -v session-manager-plugin >/dev/null 2>&1; then
-    echo "ERROR: session-manager-plugin not installed." >&2
+    _error "session-manager-plugin not installed."
     echo "       macOS:  brew install --cask session-manager-plugin" >&2
     echo "       Linux:  https://docs.aws.amazon.com/systems-manager/latest/userguide/session-manager-working-with-install-plugin.html" >&2
     exit 1
@@ -231,7 +397,7 @@ cmd_secrets_show() {
     --name "/devbox/${DEVBOX_USER}/code-server-password" \
     --with-decryption --query 'Parameter.Value' --output text 2>"$aws_err")" \
     || {
-      echo "ERROR: code-server password not found at /devbox/${DEVBOX_USER}/code-server-password" >&2
+      _error "code-server password not found at /devbox/${DEVBOX_USER}/code-server-password"
       echo "       Run './run build' first to publish secrets to SSM, or check your DEVBOX_USER." >&2
       cat "$aws_err" >&2
       rm -f "$aws_err"
@@ -241,7 +407,7 @@ cmd_secrets_show() {
     --name "/devbox/${DEVBOX_USER}/vnc-password" \
     --with-decryption --query 'Parameter.Value' --output text 2>"$aws_err")" \
     || {
-      echo "ERROR: VNC password not found at /devbox/${DEVBOX_USER}/vnc-password" >&2
+      _error "VNC password not found at /devbox/${DEVBOX_USER}/vnc-password"
       cat "$aws_err" >&2
       rm -f "$aws_err"
       exit 1
@@ -269,16 +435,16 @@ cmd_clean() {
 # --------------------------------------------------------------------------
 
 cmd_help() {
-  cat <<'EOF'
+  cat <<EOF
 Usage: DEVBOX_USER=username ./run <command>
 
-AMI
+${BOLD}AMI${RESET}
   packer-init  Install Packer plugins
   validate     Validate Packer and Terraform configs
   build        Build the devimage AMI with Packer
   fmt          Format Packer and Terraform files
 
-Terraform / OpenTofu (per-operator state at users/$DEVBOX_USER/devbox.tfstate)
+${BOLD}Terraform / OpenTofu${RESET} (per-operator state at users/\$DEVBOX_USER/devbox.tfstate)
   tf-init          Init backend for DEVBOX_USER (first-time / after switching user)
   tf-reinit        Re-init with -reconfigure (after backend changes or stale .terraform)
   tf-ensure-init   Auto-reinit if cached backend key mismatches DEVBOX_USER
@@ -288,19 +454,22 @@ Terraform / OpenTofu (per-operator state at users/$DEVBOX_USER/devbox.tfstate)
   tf-destroy       Destroy with confirmation prompt
   tf-auto-destroy  Destroy without prompt
 
-Instance lifecycle (override resolution: INSTANCE_ID=i-... REGION=us-east-1)
+${BOLD}Instance lifecycle${RESET} (override resolution: INSTANCE_ID=i-... REGION=us-east-1)
   start        Start the devbox EC2 instance
   stop         Stop the devbox EC2 instance
   status       Show instance status and connection info
 
-SSM access (Phase 2 — replaces public :22 ingress)
+${BOLD}SSM access${RESET} (Phase 2 -- replaces public :22 ingress)
   devbox-ssm           Open an SSM Session Manager shell to the devbox
   devbox-port-forward  Forward :8080 from the devbox to localhost over SSM
 
-Secrets
+${BOLD}Secrets${RESET}
   secrets-show   Print the operator's code-server and VNC passwords from SSM
 
-Cleanup
+${BOLD}Diagnostics${RESET}
+  doctor       Check required dependencies and report missing/version issues
+
+${BOLD}Cleanup${RESET}
   clean        Remove Packer cache and Terraform local state
 EOF
 }
@@ -315,6 +484,7 @@ main() {
 
   case "$command" in
     help|--help|-h)      cmd_help ;;
+    doctor)              cmd_doctor ;;
     packer-init)         cmd_packer_init ;;
     validate)            cmd_validate ;;
     build)               cmd_build ;;
@@ -335,7 +505,7 @@ main() {
     secrets-show)        cmd_secrets_show ;;
     clean)               cmd_clean ;;
     *)
-      echo "ERROR: Unknown command '${command}'. Run './run help' for usage." >&2
+      _error "Unknown command '${command}'. Run './run help' for usage."
       exit 1
       ;;
   esac
