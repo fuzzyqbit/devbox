@@ -288,15 +288,23 @@ cmd_tf_ensure_init() {
 cmd_tf_init() {
   _require_devbox_user
   _derive_tf_state_bucket
+  local lockfile_flag=""
+  if [[ "${CI:-}" == "true" ]]; then
+    lockfile_flag="-lockfile=readonly"
+  fi
   # shellcheck disable=SC2046
-  (cd "$REPO_ROOT/terraform" && "$TF_BIN" init $(_tf_backend_args))
+  (cd "$REPO_ROOT/terraform" && "$TF_BIN" init $lockfile_flag $(_tf_backend_args))
 }
 
 cmd_tf_reinit() {
   _require_devbox_user
   _derive_tf_state_bucket
+  local lockfile_flag=""
+  if [[ "${CI:-}" == "true" ]]; then
+    lockfile_flag="-lockfile=readonly"
+  fi
   # shellcheck disable=SC2046
-  (cd "$REPO_ROOT/terraform" && "$TF_BIN" init -reconfigure $(_tf_backend_args))
+  (cd "$REPO_ROOT/terraform" && "$TF_BIN" init -reconfigure $lockfile_flag $(_tf_backend_args))
 }
 
 cmd_tf_plan() {
