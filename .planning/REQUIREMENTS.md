@@ -23,10 +23,10 @@
 
 ### GitLab CI Integration
 
-- [ ] **CI-01**: GitLab CI bake stage calls `./run build` instead of inline packer commands
-- [ ] **CI-02**: GitLab CI deploy stage calls `./run tf-init` and `./run tf-apply` instead of inline tofu commands
-- [ ] **CI-03**: Validate shellcheck job includes `run` file alongside `scripts/*.sh`
-- [ ] **CI-04**: Grep-gate invariant verifies `run` file has executable bit in git
+- [x] **CI-01**: GitLab CI bake stage calls `./run build` instead of inline packer commands
+- [x] **CI-02**: GitLab CI deploy stage calls `./run tf-init` and `./run tf-apply` instead of inline tofu commands
+- [x] **CI-03**: Validate shellcheck job includes `run` file alongside `scripts/*.sh`
+- [x] **CI-04**: Grep-gate invariant verifies `run` file has executable bit in git
 
 ### Documentation + Cleanup
 
@@ -67,10 +67,10 @@
 | RUN-08 | Phase 5 | Complete |
 | POL-01 | Phase 6 | Complete |
 | POL-02 | Phase 6 | Complete |
-| CI-01 | Phase 6 | Pending |
-| CI-02 | Phase 6 | Pending |
-| CI-03 | Phase 6 | Pending |
-| CI-04 | Phase 6 | Pending |
+| CI-01 | Phase 6 | Complete |
+| CI-02 | Phase 6 | Complete |
+| CI-03 | Phase 6 | Complete |
+| CI-04 | Phase 6 | Complete |
 | DOC-01 | Phase 7 | Pending |
 | DOC-02 | Phase 7 | Pending |
 

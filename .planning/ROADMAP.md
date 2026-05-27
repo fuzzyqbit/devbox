@@ -42,7 +42,7 @@ Plans:
 **Plans:** 2 plans
 Plans:
 - [x] 06-01-PLAN.md -- Add colored output helpers and ./run doctor dependency checker
-- [ ] 06-02-PLAN.md -- Wire GitLab CI bake/deploy/shellcheck/grep-gates to use ./run
+- [x] 06-02-PLAN.md -- Wire GitLab CI bake/deploy/shellcheck/grep-gates to use ./run
 
 ### Phase 7: Docs + Cleanup
 **Goal**: All operator documentation references `./run`; the Makefile is deleted from the repository
