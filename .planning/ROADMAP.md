@@ -39,7 +39,10 @@ Plans:
   3. A grep-gate CI job verifies the `run` file has the executable bit set in git
   4. `./run doctor` reports the status of all required dependencies in one pass
   5. Color output is suppressed when `NO_COLOR=1` or `CI=true`
-**Plans**: TBD
+**Plans:** 2 plans
+Plans:
+- [ ] 06-01-PLAN.md -- Add colored output helpers and ./run doctor dependency checker
+- [ ] 06-02-PLAN.md -- Wire GitLab CI bake/deploy/shellcheck/grep-gates to use ./run
 
 ### Phase 7: Docs + Cleanup
 **Goal**: All operator documentation references `./run`; the Makefile is deleted from the repository
@@ -56,7 +59,7 @@ Plans:
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
 | 5. Run Script Core | v2.0 | 0/1 | Planned | - |
-| 6. GitLab CI + Polish | v2.0 | 0/TBD | Not started | - |
+| 6. GitLab CI + Polish | v2.0 | 0/2 | Planned | - |
 | 7. Docs + Cleanup | v2.0 | 0/TBD | Not started | - |
 
 ## Shipped Milestones
