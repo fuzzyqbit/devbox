@@ -23,10 +23,13 @@
 #   (unset)                push and MR pipelines run validate only.
 #
 # Stages
-#   1. validate   8 parallel gates against the source tree:
-#                 tofu-fmt, packer-fmt, tofu-validate (-lockfile=readonly),
-#                 packer-validate, ansible-lint, ansible-syntax,
-#                 shellcheck, checkov, grep-gates.
+#   1. validate   Up to 9 parallel gates against the source tree.
+#                 Push/MR: all 9. Bake: packer-scoped (4) + cross-cutting (2).
+#                 Deploy: terraform-scoped (3) + cross-cutting (2).
+#                 Packer-scoped: packer-fmt, packer-validate, ansible-lint,
+#                   ansible-syntax.
+#                 Terraform-scoped: tofu-fmt, tofu-validate, checkov.
+#                 Cross-cutting (always): shellcheck, grep-gates.
 #   2. bake       packer build (PIPELINE_KIND=bake only).
 #   3. deploy     tofu init -lockfile=readonly + tofu apply
 #                 (PIPELINE_KIND=deploy + when: manual + protected branch).
@@ -140,12 +143,28 @@ workflow:
 
 # -----------------------------------------------------------------------------
 # Validate stage — 9 parallel gates, no `needs:` between them (each runs
-# against the source tree independently). Runs on EVERY pipeline kind
-# (push/MR/web/schedule) so bake and deploy always see a green tree first.
+# against the source tree independently). Push/MR pipelines run ALL gates.
+# bake/deploy pipelines run only the gates relevant to their toolchain.
 # -----------------------------------------------------------------------------
+
+# Scope templates — validate jobs `extends:` these to limit when they run.
+# Push/MR always run; bake/deploy pipelines run only the matching scope.
+.rules-packer:
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "push"
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_PIPELINE_SOURCE == "web" && $PIPELINE_KIND == "bake"
+    - if: $CI_PIPELINE_SOURCE == "schedule" && $PIPELINE_KIND == "bake"
+
+.rules-terraform:
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "push"
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_PIPELINE_SOURCE == "web" && $PIPELINE_KIND == "deploy"
 
 # 1a. tofu fmt -check -recursive
 validate:tofu-fmt:
+  extends: .rules-terraform
   stage: validate
   image: ghcr.io/opentofu/opentofu:1.10.6@sha256:43f73c1e01f21de343ca4428a7e1845a357790235c73758bd7dc3cc4d1324b49
   script:
@@ -155,6 +174,7 @@ validate:tofu-fmt:
 # 1b. packer fmt -check. Split from tofu-fmt to avoid building a custom
 # image that ships both binaries.
 validate:packer-fmt:
+  extends: .rules-packer
   stage: validate
   image: hashicorp/packer:1.15.3@sha256:cb9c526a6351c55f05430423a8b37139a04b0fb5ce541887d476e19860b5ed92
   script:
@@ -165,6 +185,7 @@ validate:packer-fmt:
 # validate does not need state access. The -lockfile=readonly flag is the
 # Phase-3 REP-01 gate: CI must not silently rewrite the committed lockfile.
 validate:tofu-validate:
+  extends: .rules-terraform
   stage: validate
   image: ghcr.io/opentofu/opentofu:1.10.6@sha256:43f73c1e01f21de343ca4428a7e1845a357790235c73758bd7dc3cc4d1324b49
   script:
@@ -175,6 +196,7 @@ validate:tofu-validate:
 # 3. packer init + validate. var.devbox_user defaults to "" since Phase 3
 # fix (commit f156070); no -var flag needed.
 validate:packer-validate:
+  extends: .rules-packer
   stage: validate
   image: hashicorp/packer:1.15.3@sha256:cb9c526a6351c55f05430423a8b37139a04b0fb5ce541887d476e19860b5ed92
   script:
@@ -186,6 +208,7 @@ validate:packer-validate:
 # ansible-lint preinstalled, but collections must be installed before
 # lint resolves fqcn references (RESEARCH Pitfall 5).
 validate:ansible-lint:
+  extends: .rules-packer
   stage: validate
   image: pipelinecomponents/ansible-lint:0.26.0@sha256:e5944beda2dd60f26d71f78e595be41e3c2f2b97d0cb3a0f748943cb70659502
   script:
@@ -196,6 +219,7 @@ validate:ansible-lint:
 # lint and syntax-check catch different classes of bugs and both satisfy
 # CI-04 literally.
 validate:ansible-syntax:
+  extends: .rules-packer
   stage: validate
   image: pipelinecomponents/ansible-lint:0.26.0@sha256:e5944beda2dd60f26d71f78e595be41e3c2f2b97d0cb3a0f748943cb70659502
   script:
@@ -213,6 +237,7 @@ validate:shellcheck:
 # MEDIUM are sourced from .checkov.yaml — do NOT re-specify them on the
 # command line (drift hazard, see .checkov.yaml header).
 validate:checkov:
+  extends: .rules-terraform
   stage: validate
   image: bridgecrew/checkov:3.2.527@sha256:22b308dd96e158b446c6080d19ea41ffb609ebd46962c9ace43b9b6c8aaff5cf
   script:
