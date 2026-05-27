@@ -196,7 +196,7 @@ cmd_devbox_ssm() {
 }
 
 cmd_devbox_port_forward() {
-  _require_devbox_user
+  cmd_tf_ensure_init
   if ! command -v session-manager-plugin >/dev/null 2>&1; then
     echo "ERROR: session-manager-plugin not installed." >&2
     echo "       macOS:  brew install --cask session-manager-plugin" >&2
@@ -225,21 +225,28 @@ cmd_secrets_show() {
   _require_devbox_user
   echo "Resolving secrets for DEVBOX_USER=${DEVBOX_USER}..."
   local cs_pwd vnc_pwd
+  local aws_err
+  aws_err="$(mktemp)"
   cs_pwd="$(aws ssm get-parameter \
     --name "/devbox/${DEVBOX_USER}/code-server-password" \
-    --with-decryption --query 'Parameter.Value' --output text 2>/dev/null)" \
+    --with-decryption --query 'Parameter.Value' --output text 2>"$aws_err")" \
     || {
       echo "ERROR: code-server password not found at /devbox/${DEVBOX_USER}/code-server-password" >&2
       echo "       Run './run build' first to publish secrets to SSM, or check your DEVBOX_USER." >&2
+      cat "$aws_err" >&2
+      rm -f "$aws_err"
       exit 1
     }
   vnc_pwd="$(aws ssm get-parameter \
     --name "/devbox/${DEVBOX_USER}/vnc-password" \
-    --with-decryption --query 'Parameter.Value' --output text 2>/dev/null)" \
+    --with-decryption --query 'Parameter.Value' --output text 2>"$aws_err")" \
     || {
       echo "ERROR: VNC password not found at /devbox/${DEVBOX_USER}/vnc-password" >&2
+      cat "$aws_err" >&2
+      rm -f "$aws_err"
       exit 1
     }
+  rm -f "$aws_err"
   echo ""
   echo "code-server (https://<host>:8080) password:  ${cs_pwd}"
   echo "VNC / noVNC  (https://<host>:6080) password:  ${vnc_pwd}"
@@ -263,7 +270,7 @@ cmd_clean() {
 
 cmd_help() {
   cat <<'EOF'
-Usage: ./run <command> [DEVBOX_USER=username]
+Usage: DEVBOX_USER=username ./run <command>
 
 AMI
   packer-init  Install Packer plugins
