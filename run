@@ -1,0 +1,337 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# --------------------------------------------------------------------------
+# Bash 4+ guard (must be the first executable block — RUN-06, STACK.md)
+# --------------------------------------------------------------------------
+if [[ "${BASH_VERSINFO[0]}" -lt 4 ]]; then
+  echo "ERROR: Bash 4+ required. macOS: brew install bash" >&2
+  exit 1
+fi
+
+# --------------------------------------------------------------------------
+# REPO_ROOT anchor (Pitfall M-3: never use bare cd)
+# --------------------------------------------------------------------------
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# --------------------------------------------------------------------------
+# Variable defaults (mirror Makefile lines 14-52)
+# --------------------------------------------------------------------------
+DEVBOX_USER="${DEVBOX_USER:-}"
+TF_BIN="${TF_BIN:-tofu}"
+TF_STATE_REGION="${TF_STATE_REGION:-us-east-1}"
+TF_STATE_LOCK_TABLE="${TF_STATE_LOCK_TABLE:-devimage-tfstate-locks}"
+INSTANCE_ID="${INSTANCE_ID:-}"
+REGION="${REGION:-}"
+# TF_STATE_BUCKET is NOT derived at startup — computed lazily by
+# _derive_tf_state_bucket (Pitfall C-1, ARCHITECTURE.md anti-pattern).
+
+# --------------------------------------------------------------------------
+# Guard functions
+# --------------------------------------------------------------------------
+
+_require_devbox_user() {
+  if [[ -z "$DEVBOX_USER" ]]; then
+    echo "ERROR: DEVBOX_USER is not set." >&2
+    echo "       Set per-invocation:  DEVBOX_USER=jsmith ./run <command>" >&2
+    echo "       Or in your shell:    export DEVBOX_USER=jsmith" >&2
+    exit 1
+  fi
+  if [[ ! "$DEVBOX_USER" =~ ^[a-z0-9][a-z0-9-]{0,30}[a-z0-9]$ ]]; then
+    echo "ERROR: DEVBOX_USER='${DEVBOX_USER}' is invalid." >&2
+    echo "       Must be lowercase alphanumeric + dash, 2-32 chars, no leading/trailing dash." >&2
+    exit 1
+  fi
+}
+
+_derive_tf_state_bucket() {
+  # Respect operator override (Pitfall C-1).
+  if [[ -n "${TF_STATE_BUCKET:-}" ]]; then
+    return
+  fi
+  local account_id
+  account_id="$(aws sts get-caller-identity --query Account --output text 2>/dev/null || true)"
+  if [[ -z "$account_id" ]] || [[ "devimage-tfstate-${account_id}" == "devimage-tfstate-" ]]; then
+    echo "ERROR: could not resolve AWS account ID via 'aws sts get-caller-identity'." >&2
+    echo "       Check your AWS credentials/profile, or set TF_STATE_BUCKET=... explicitly." >&2
+    exit 1
+  fi
+  TF_STATE_BUCKET="devimage-tfstate-${account_id}"
+}
+
+_tf_state_key() {
+  echo "users/${DEVBOX_USER}/devbox.tfstate"
+}
+
+_tf_backend_args() {
+  _derive_tf_state_bucket
+  local key
+  key="$(_tf_state_key)"
+  echo "-backend-config=bucket=${TF_STATE_BUCKET}" \
+       "-backend-config=key=${key}" \
+       "-backend-config=region=${TF_STATE_REGION}" \
+       "-backend-config=dynamodb_table=${TF_STATE_LOCK_TABLE}"
+}
+
+_tf_var_args() {
+  echo "-var" "devbox_user=${DEVBOX_USER}" "-var" "key_name=${DEVBOX_USER}-devbox"
+}
+
+# --------------------------------------------------------------------------
+# Group A — Packer (no DEVBOX_USER guard needed)
+# --------------------------------------------------------------------------
+
+cmd_packer_init() {
+  (cd "$REPO_ROOT/packer" && packer init .)
+}
+
+cmd_validate() {
+  cmd_packer_init
+  (cd "$REPO_ROOT/packer" && packer validate .)
+  (cd "$REPO_ROOT/terraform" && "$TF_BIN" validate)
+}
+
+cmd_build() {
+  cmd_packer_init
+  (cd "$REPO_ROOT/packer" && packer build .)
+}
+
+cmd_fmt() {
+  (cd "$REPO_ROOT/packer" && packer fmt .)
+  (cd "$REPO_ROOT/terraform" && "$TF_BIN" fmt)
+  echo "Format complete"
+}
+
+# --------------------------------------------------------------------------
+# Group B — Terraform (need DEVBOX_USER + backend guards)
+# --------------------------------------------------------------------------
+
+cmd_tf_ensure_init() {
+  _require_devbox_user
+  local desired_key
+  desired_key="$(_tf_state_key)"
+  local cached_key
+  cached_key="$(jq -r '.backend.config.key // empty' \
+    "$REPO_ROOT/terraform/.terraform/terraform.tfstate" 2>/dev/null || true)"
+  if [[ "$cached_key" != "$desired_key" ]]; then
+    echo "[tf-ensure-init] backend cache mismatch (cached='${cached_key}', want='${desired_key}'); reinitializing..."
+    cmd_tf_reinit
+  fi
+}
+
+cmd_tf_init() {
+  _require_devbox_user
+  _derive_tf_state_bucket
+  # shellcheck disable=SC2046
+  (cd "$REPO_ROOT/terraform" && "$TF_BIN" init $(_tf_backend_args))
+}
+
+cmd_tf_reinit() {
+  _require_devbox_user
+  _derive_tf_state_bucket
+  # shellcheck disable=SC2046
+  (cd "$REPO_ROOT/terraform" && "$TF_BIN" init -reconfigure $(_tf_backend_args))
+}
+
+cmd_tf_plan() {
+  cmd_tf_ensure_init
+  # shellcheck disable=SC2046
+  (cd "$REPO_ROOT/terraform" && "$TF_BIN" plan $(_tf_var_args))
+}
+
+cmd_tf_apply() {
+  cmd_tf_ensure_init
+  # shellcheck disable=SC2046
+  (cd "$REPO_ROOT/terraform" && "$TF_BIN" apply $(_tf_var_args))
+}
+
+cmd_tf_auto_apply() {
+  cmd_tf_ensure_init
+  # shellcheck disable=SC2046
+  (cd "$REPO_ROOT/terraform" && "$TF_BIN" apply -auto-approve $(_tf_var_args))
+}
+
+cmd_tf_destroy() {
+  cmd_tf_ensure_init
+  # shellcheck disable=SC2046
+  (cd "$REPO_ROOT/terraform" && "$TF_BIN" destroy $(_tf_var_args))
+}
+
+cmd_tf_auto_destroy() {
+  cmd_tf_ensure_init
+  # shellcheck disable=SC2046
+  (cd "$REPO_ROOT/terraform" && "$TF_BIN" destroy -auto-approve $(_tf_var_args))
+}
+
+# --------------------------------------------------------------------------
+# Group C — Instance lifecycle (delegate to scripts)
+# --------------------------------------------------------------------------
+
+cmd_start() {
+  cmd_tf_ensure_init
+  DEVBOX_USER="$DEVBOX_USER" INSTANCE_ID="$INSTANCE_ID" REGION="$REGION" \
+    "$REPO_ROOT/scripts/devbox-start.sh" "$@"
+}
+
+cmd_stop() {
+  cmd_tf_ensure_init
+  DEVBOX_USER="$DEVBOX_USER" INSTANCE_ID="$INSTANCE_ID" REGION="$REGION" \
+    "$REPO_ROOT/scripts/devbox-stop.sh" "$@"
+}
+
+cmd_status() {
+  cmd_tf_ensure_init
+  DEVBOX_USER="$DEVBOX_USER" INSTANCE_ID="$INSTANCE_ID" REGION="$REGION" \
+    "$REPO_ROOT/scripts/devbox-status.sh" "$@"
+}
+
+# --------------------------------------------------------------------------
+# Group D — SSM access
+# --------------------------------------------------------------------------
+
+cmd_devbox_ssm() {
+  cmd_tf_ensure_init
+  DEVBOX_USER="$DEVBOX_USER" INSTANCE_ID="$INSTANCE_ID" REGION="$REGION" \
+    "$REPO_ROOT/scripts/devbox-ssm.sh" "$@"
+}
+
+cmd_devbox_port_forward() {
+  _require_devbox_user
+  if ! command -v session-manager-plugin >/dev/null 2>&1; then
+    echo "ERROR: session-manager-plugin not installed." >&2
+    echo "       macOS:  brew install --cask session-manager-plugin" >&2
+    echo "       Linux:  https://docs.aws.amazon.com/systems-manager/latest/userguide/session-manager-working-with-install-plugin.html" >&2
+    exit 1
+  fi
+  local instance_id region
+  instance_id="$(cd "$REPO_ROOT/terraform" && "$TF_BIN" output -raw instance_id)"
+  region="$(cd "$REPO_ROOT/terraform" && "$TF_BIN" output -raw aws_region)"
+  echo "Forwarding :8080 from ${instance_id} to localhost..."
+  echo "Browse to https://localhost:8080 (code-server)."
+  echo "For noVNC :6080, open a second forwarding session manually with portNumber=6080."
+  echo "Ctrl-C to stop forwarding."
+  exec aws ssm start-session \
+    --target "$instance_id" \
+    --region "$region" \
+    --document-name AWS-StartPortForwardingSession \
+    --parameters '{"portNumber":["8080"],"localPortNumber":["8080"]}'
+}
+
+# --------------------------------------------------------------------------
+# Group E — Secrets
+# --------------------------------------------------------------------------
+
+cmd_secrets_show() {
+  _require_devbox_user
+  echo "Resolving secrets for DEVBOX_USER=${DEVBOX_USER}..."
+  local cs_pwd vnc_pwd
+  cs_pwd="$(aws ssm get-parameter \
+    --name "/devbox/${DEVBOX_USER}/code-server-password" \
+    --with-decryption --query 'Parameter.Value' --output text 2>/dev/null)" \
+    || {
+      echo "ERROR: code-server password not found at /devbox/${DEVBOX_USER}/code-server-password" >&2
+      echo "       Run './run build' first to publish secrets to SSM, or check your DEVBOX_USER." >&2
+      exit 1
+    }
+  vnc_pwd="$(aws ssm get-parameter \
+    --name "/devbox/${DEVBOX_USER}/vnc-password" \
+    --with-decryption --query 'Parameter.Value' --output text 2>/dev/null)" \
+    || {
+      echo "ERROR: VNC password not found at /devbox/${DEVBOX_USER}/vnc-password" >&2
+      exit 1
+    }
+  echo ""
+  echo "code-server (https://<host>:8080) password:  ${cs_pwd}"
+  echo "VNC / noVNC  (https://<host>:6080) password:  ${vnc_pwd}"
+  echo ""
+  echo "(Secrets are stored as SSM SecureStrings; rotated on every \`./run build\`.)"
+}
+
+# --------------------------------------------------------------------------
+# Group F — Cleanup
+# --------------------------------------------------------------------------
+
+cmd_clean() {
+  rm -rf "$REPO_ROOT/packer/packer_cache"
+  rm -rf "$REPO_ROOT/terraform/.terraform"
+  rm -f "$REPO_ROOT/users/"*.auto.tfvars
+}
+
+# --------------------------------------------------------------------------
+# Group G — Help (RUN-02)
+# --------------------------------------------------------------------------
+
+cmd_help() {
+  cat <<'EOF'
+Usage: ./run <command> [DEVBOX_USER=username]
+
+AMI
+  packer-init  Install Packer plugins
+  validate     Validate Packer and Terraform configs
+  build        Build the devimage AMI with Packer
+  fmt          Format Packer and Terraform files
+
+Terraform / OpenTofu (per-operator state at users/$DEVBOX_USER/devbox.tfstate)
+  tf-init          Init backend for DEVBOX_USER (first-time / after switching user)
+  tf-reinit        Re-init with -reconfigure (after backend changes or stale .terraform)
+  tf-ensure-init   Auto-reinit if cached backend key mismatches DEVBOX_USER
+  tf-plan          Plan changes for DEVBOX_USER
+  tf-apply         Apply with confirmation prompt
+  tf-auto-apply    Apply without prompt
+  tf-destroy       Destroy with confirmation prompt
+  tf-auto-destroy  Destroy without prompt
+
+Instance lifecycle (override resolution: INSTANCE_ID=i-... REGION=us-east-1)
+  start        Start the devbox EC2 instance
+  stop         Stop the devbox EC2 instance
+  status       Show instance status and connection info
+
+SSM access (Phase 2 — replaces public :22 ingress)
+  devbox-ssm           Open an SSM Session Manager shell to the devbox
+  devbox-port-forward  Forward :8080 from the devbox to localhost over SSM
+
+Secrets
+  secrets-show   Print the operator's code-server and VNC passwords from SSM
+
+Cleanup
+  clean        Remove Packer cache and Terraform local state
+EOF
+}
+
+# --------------------------------------------------------------------------
+# Main dispatcher
+# --------------------------------------------------------------------------
+
+main() {
+  local command="${1:-help}"
+  shift || true
+
+  case "$command" in
+    help|--help|-h)      cmd_help ;;
+    packer-init)         cmd_packer_init ;;
+    validate)            cmd_validate ;;
+    build)               cmd_build ;;
+    fmt)                 cmd_fmt ;;
+    tf-init)             cmd_tf_init ;;
+    tf-reinit)           cmd_tf_reinit ;;
+    tf-ensure-init)      cmd_tf_ensure_init ;;
+    tf-plan)             cmd_tf_plan ;;
+    tf-apply)            cmd_tf_apply ;;
+    tf-auto-apply)       cmd_tf_auto_apply ;;
+    tf-destroy)          cmd_tf_destroy ;;
+    tf-auto-destroy)     cmd_tf_auto_destroy ;;
+    start)               cmd_start "$@" ;;
+    stop)                cmd_stop "$@" ;;
+    status)              cmd_status "$@" ;;
+    devbox-ssm)          cmd_devbox_ssm "$@" ;;
+    devbox-port-forward) cmd_devbox_port_forward "$@" ;;
+    secrets-show)        cmd_secrets_show ;;
+    clean)               cmd_clean ;;
+    *)
+      echo "ERROR: Unknown command '${command}'. Run './run help' for usage." >&2
+      exit 1
+      ;;
+  esac
+}
+
+main "$@"
