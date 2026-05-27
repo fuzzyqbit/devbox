@@ -25,7 +25,9 @@ then wire the GitLab CI pipeline to call `./run` — single source of truth for 
   3. `./run` with an unset or malformed DEVBOX_USER prints an actionable error and exits non-zero
   4. `./run tf-apply` auto-reinitializes the backend when the cached state key mismatches DEVBOX_USER
   5. `shellcheck ./run` passes with no errors
-**Plans**: TBD
+**Plans:** 1 plan
+Plans:
+- [ ] 05-01-PLAN.md -- Create ./run dispatcher with all 20 commands, guards, help, and tf-ensure-init
 
 ### Phase 6: GitLab CI + Polish
 **Goal**: GitLab CI pipeline calls `./run` for bake and deploy; `./run` outputs colored status messages and `./run doctor` validates the local toolchain
@@ -53,7 +55,7 @@ then wire the GitLab CI pipeline to call `./run` — single source of truth for 
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
-| 5. Run Script Core | v2.0 | 0/TBD | Not started | - |
+| 5. Run Script Core | v2.0 | 0/1 | Planned | - |
 | 6. GitLab CI + Polish | v2.0 | 0/TBD | Not started | - |
 | 7. Docs + Cleanup | v2.0 | 0/TBD | Not started | - |
 
