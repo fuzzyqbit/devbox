@@ -27,7 +27,7 @@ then wire the GitLab CI pipeline to call `./run` — single source of truth for 
   5. `shellcheck ./run` passes with no errors
 **Plans:** 1 plan
 Plans:
-- [ ] 05-01-PLAN.md -- Create ./run dispatcher with all 20 commands, guards, help, and tf-ensure-init
+- [x] 05-01-PLAN.md -- Create ./run dispatcher with all 20 commands, guards, help, and tf-ensure-init
 
 ### Phase 6: GitLab CI + Polish
 **Goal**: GitLab CI pipeline calls `./run` for bake and deploy; `./run` outputs colored status messages and `./run doctor` validates the local toolchain

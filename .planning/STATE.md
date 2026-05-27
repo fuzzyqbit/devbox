@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Run Script + GitLab CI Integration
-status: executing
+status: verifying
 stopped_at: ROADMAP.md written (Phases 5-7); REQUIREMENTS.md traceability updated; ready to plan Phase 5
-last_updated: "2026-05-27T13:09:20.842Z"
-last_activity: 2026-05-27 -- Phase 5 planning complete
+last_updated: "2026-05-27T13:22:27.738Z"
+last_activity: 2026-05-27
 progress:
   total_phases: 3
-  completed_phases: 0
+  completed_phases: 1
   total_plans: 1
-  completed_plans: 0
-  percent: 0
+  completed_plans: 1
+  percent: 100
 ---
 
 # Project State
@@ -21,16 +21,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-05-27 after v2.0 milestone start)
 
 **Core value:** A single operator can spin up, hibernate, and tear down a reproducible, hardened cloud workstation with one command — without leaking credentials or exposing a vulnerable host to the public internet.
-**Current focus:** Phase 5 — Run Script Core (`./run` dispatcher + safety guards)
+**Current focus:** Phase 05 — run-script-core
 
 ## Current Position
 
-Phase: 5 — Run Script Core
-Plan: Not started
-Status: Ready to execute
-Last activity: 2026-05-27 -- Phase 5 planning complete
+Phase: 05 (run-script-core) — COMPLETE
+Plan: 1 of 1
+Status: Phase complete — ready for verification
+Last activity: 2026-05-27 -- Phase 05 plan 01 executed (./run script created)
 
-Progress: `[ - - - ]` 0/3 phases complete
+Progress: [██████████] 100%
 
 ## Performance Metrics (v1.0)
 
@@ -63,6 +63,7 @@ See PROJECT.md Key Decisions table. Locked v1.0 decisions:
 - Makefile is deleted as the final step (Phase 7) — not before CI and `./run` are verified working
 - Research build order: dispatcher + guards → CI integration → docs/cleanup
 - Existing `scripts/*.sh` stay as helpers called by `./run` (no consolidation into the script body)
+- Standalone `./run` dispatcher: does not source `_common.sh`; lazy TF_STATE_BUCKET derivation; DEVBOX_USER regex validation added
 
 ## Deferred / Carried Forward
 
@@ -73,6 +74,12 @@ See PROJECT.md Key Decisions table. Locked v1.0 decisions:
 | Image lifecycle | Old AMI deregistration + inventory | v3 backlog | v1.0 init |
 | Reproducibility | SSM `:NN` version suffix on Packer source | v3 follow-up | v1.0 Phase 3 |
 
+### v2.0 Performance Metrics
+
+| Phase | Plan | Duration | Tasks | Files |
+|-------|------|----------|-------|-------|
+| 05 | 01 | 5min | 2 | 1 |
+
 ### Quick Tasks Completed
 
 | # | Description | Date | Commit | Directory |
@@ -81,7 +88,7 @@ See PROJECT.md Key Decisions table. Locked v1.0 decisions:
 
 ## Session Continuity
 
-Last session: 2026-05-27 (v2.0 roadmap created)
-Stopped at: ROADMAP.md written (Phases 5-7); REQUIREMENTS.md traceability updated; ready to plan Phase 5
+Last session: 2026-05-27T13:21:47.125Z
+Stopped at: Completed 05-01-PLAN.md (run-script-core) — all 8 RUN requirements closed
 Resume file: None
-Next: `/gsd:plan-phase 5`
+Next: Phase 06 (CI integration) or verification

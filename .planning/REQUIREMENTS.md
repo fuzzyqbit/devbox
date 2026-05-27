@@ -7,14 +7,14 @@
 
 ### Run Script Core
 
-- [ ] **RUN-01**: `./run` script with case-statement dispatcher handles all 20 commands previously in Makefile
-- [ ] **RUN-02**: `./run help` prints grouped command reference (AMI / Terraform / Lifecycle / SSM / Secrets / Cleanup)
-- [ ] **RUN-03**: `./run` fails fast with actionable error when DEVBOX_USER is unset for commands that require it
-- [ ] **RUN-04**: `./run` fails fast with actionable error when TF_STATE_BUCKET derivation returns empty account ID
-- [ ] **RUN-05**: `./run` auto-reinitializes terraform backend when cached state key mismatches current DEVBOX_USER (tf-ensure-init port)
-- [ ] **RUN-06**: `./run` uses `set -euo pipefail`, anchors REPO_ROOT via script location, wraps `cd` in subshells
-- [ ] **RUN-07**: `./run` executable bit committed to git (`git update-index --chmod=+x`)
-- [ ] **RUN-08**: `./run` validates DEVBOX_USER format (lowercase, alphanumeric + dash, 2-32 chars) with clear error message
+- [x] **RUN-01**: `./run` script with case-statement dispatcher handles all 20 commands previously in Makefile
+- [x] **RUN-02**: `./run help` prints grouped command reference (AMI / Terraform / Lifecycle / SSM / Secrets / Cleanup)
+- [x] **RUN-03**: `./run` fails fast with actionable error when DEVBOX_USER is unset for commands that require it
+- [x] **RUN-04**: `./run` fails fast with actionable error when TF_STATE_BUCKET derivation returns empty account ID
+- [x] **RUN-05**: `./run` auto-reinitializes terraform backend when cached state key mismatches current DEVBOX_USER (tf-ensure-init port)
+- [x] **RUN-06**: `./run` uses `set -euo pipefail`, anchors REPO_ROOT via script location, wraps `cd` in subshells
+- [x] **RUN-07**: `./run` executable bit committed to git (`git update-index --chmod=+x`)
+- [x] **RUN-08**: `./run` validates DEVBOX_USER format (lowercase, alphanumeric + dash, 2-32 chars) with clear error message
 
 ### Run Script Polish
 
@@ -57,14 +57,14 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| RUN-01 | Phase 5 | Pending |
-| RUN-02 | Phase 5 | Pending |
-| RUN-03 | Phase 5 | Pending |
-| RUN-04 | Phase 5 | Pending |
-| RUN-05 | Phase 5 | Pending |
-| RUN-06 | Phase 5 | Pending |
-| RUN-07 | Phase 5 | Pending |
-| RUN-08 | Phase 5 | Pending |
+| RUN-01 | Phase 5 | Complete |
+| RUN-02 | Phase 5 | Complete |
+| RUN-03 | Phase 5 | Complete |
+| RUN-04 | Phase 5 | Complete |
+| RUN-05 | Phase 5 | Complete |
+| RUN-06 | Phase 5 | Complete |
+| RUN-07 | Phase 5 | Complete |
+| RUN-08 | Phase 5 | Complete |
 | POL-01 | Phase 6 | Pending |
 | POL-02 | Phase 6 | Pending |
 | CI-01 | Phase 6 | Pending |
