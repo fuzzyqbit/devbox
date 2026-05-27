@@ -18,8 +18,8 @@
 
 ### Run Script Polish
 
-- [ ] **POL-01**: `./run` outputs colored status/error messages with NO_COLOR and CI environment guards
-- [ ] **POL-02**: `./run doctor` checks all required dependencies (aws, packer, tofu, ansible, jq, shellcheck, gitleaks, pre-commit, session-manager-plugin) and reports missing/version issues
+- [x] **POL-01**: `./run` outputs colored status/error messages with NO_COLOR and CI environment guards
+- [x] **POL-02**: `./run doctor` checks all required dependencies (aws, packer, tofu, ansible, jq, shellcheck, gitleaks, pre-commit, session-manager-plugin) and reports missing/version issues
 
 ### GitLab CI Integration
 
@@ -65,8 +65,8 @@
 | RUN-06 | Phase 5 | Complete |
 | RUN-07 | Phase 5 | Complete |
 | RUN-08 | Phase 5 | Complete |
-| POL-01 | Phase 6 | Pending |
-| POL-02 | Phase 6 | Pending |
+| POL-01 | Phase 6 | Complete |
+| POL-02 | Phase 6 | Complete |
 | CI-01 | Phase 6 | Pending |
 | CI-02 | Phase 6 | Pending |
 | CI-03 | Phase 6 | Pending |

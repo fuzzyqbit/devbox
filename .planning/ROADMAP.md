@@ -41,7 +41,7 @@ Plans:
   5. Color output is suppressed when `NO_COLOR=1` or `CI=true`
 **Plans:** 2 plans
 Plans:
-- [ ] 06-01-PLAN.md -- Add colored output helpers and ./run doctor dependency checker
+- [x] 06-01-PLAN.md -- Add colored output helpers and ./run doctor dependency checker
 - [ ] 06-02-PLAN.md -- Wire GitLab CI bake/deploy/shellcheck/grep-gates to use ./run
 
 ### Phase 7: Docs + Cleanup
