@@ -369,6 +369,12 @@ cmd_devbox_ssm() {
     "$REPO_ROOT/scripts/devbox-ssm.sh" "$@"
 }
 
+cmd_jupyter() {
+  cmd_tf_ensure_init
+  DEVBOX_USER="$DEVBOX_USER" INSTANCE_ID="$INSTANCE_ID" REGION="$REGION" \
+    "$REPO_ROOT/scripts/devbox-jupyter.sh" "$@"
+}
+
 cmd_devbox_port_forward() {
   cmd_tf_ensure_init
   if ! command -v session-manager-plugin >/dev/null 2>&1; then
@@ -471,6 +477,7 @@ ${BOLD}Instance lifecycle${RESET} (override resolution: INSTANCE_ID=i-... REGION
 ${BOLD}SSM access${RESET} (Phase 2 -- replaces public :22 ingress)
   devbox-ssm           Open an SSM Session Manager shell to the devbox
   devbox-port-forward  Forward :8080 from the devbox to localhost over SSM
+  jupyter              Launch JupyterLab on demand (127.0.0.1:8888, loopback-only) over SSM
 
 ${BOLD}Secrets${RESET}
   secrets-show   Print the operator's code-server and VNC passwords from SSM
@@ -511,6 +518,7 @@ main() {
     status)              cmd_status "$@" ;;
     devbox-ssm)          cmd_devbox_ssm "$@" ;;
     devbox-port-forward) cmd_devbox_port_forward "$@" ;;
+    jupyter)             cmd_jupyter "$@" ;;
     secrets-show)        cmd_secrets_show ;;
     clean)               cmd_clean ;;
     *)
