@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v3.0
 milestone_name: Jupyter + mise
-status: ready_to_plan
+status: executing
 stopped_at: Phase 8 context gathered
-last_updated: "2026-06-02T18:43:52.277Z"
-last_activity: 2026-06-02 -- Phase 08 execution started
+last_updated: "2026-06-02T22:59:03.324Z"
+last_activity: 2026-06-02 -- Phase 09 execution started
 progress:
   total_phases: 2
   completed_phases: 1
-  total_plans: 4
-  completed_plans: 0
-  percent: 50
+  total_plans: 5
+  completed_plans: 4
+  percent: 80
 ---
 
 # Project State
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-06-02 after v3.0 milestone start)
 
 **Core value:** A single operator can spin up, hibernate, and tear down a reproducible, hardened cloud workstation with one command — without leaking credentials or exposing a vulnerable host to the public internet.
-**Current focus:** Phase 08 — jupyter-mise-ami-layer
+**Current focus:** Phase 09 — jupyter-operator-surface-docs
 
 ## Current Position
 
-Phase: 9
-Plan: Not started
-Status: Ready to plan
-Last activity: 2026-06-02
+Phase: 09 (jupyter-operator-surface-docs) — EXECUTING
+Plan: 1 of 1
+Status: Executing Phase 09
+Last activity: 2026-06-02 -- Phase 09 execution started
 
 ```
 [Phase 8] ░░░░░░░░░░  0%   Jupyter + mise AMI Layer

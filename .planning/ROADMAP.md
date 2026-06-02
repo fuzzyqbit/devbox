@@ -71,7 +71,7 @@ Full detail: [milestones/v2.0-ROADMAP.md](milestones/v2.0-ROADMAP.md) · [milest
   2. `docs/DEVELOPER-LIFECYCLE.md` (and/or README) documents the `./run jupyter` + manual `:8888` SSM port-forward access flow
   3. No security-group rule is added for `:8888` and no Jupyter password is introduced — the loopback + SSM/IAM model from Phase 8 is preserved
 **Plans**: 1 plan
-- [ ] 09-01-PLAN.md — surface JupyterLab (on-demand/loopback) in `./run status`; document the `./run jupyter` + manual `:8888` SSM port-forward flow in DEVELOPER-LIFECYCLE.md (Wave 1)
+- [x] 09-01-PLAN.md — surface JupyterLab (on-demand/loopback) in `./run status`; document the `./run jupyter` + manual `:8888` SSM port-forward flow in DEVELOPER-LIFECYCLE.md (Wave 1)
 
 > **Re-scope note (2026-06-02):** The original Phase 9 (add `:8888` ingress to
 > `aws_security_group.devbox`, surface the Jupyter password via `./run secrets-show`)
