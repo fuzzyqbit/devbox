@@ -59,9 +59,6 @@
     - role: jupyter
       when: layers.jupyter | default(false)
 
-    - role: mise
-      when: layers.mise | default(false)
-
     - role: hardening  # MUST remain last — invariant (JUP-08 / CLAUDE.md §8)
       when: layers.hardening | default(false)
 

@@ -19,5 +19,4 @@ layers:
   devtools: true
   desktop: true
   jupyter: true
-  mise: true
   hardening: true
