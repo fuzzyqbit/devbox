@@ -62,7 +62,7 @@ Full detail: [milestones/v2.0-ROADMAP.md](milestones/v2.0-ROADMAP.md) · [milest
 
 ---
 
-### Phase 9: Jupyter Operator Surface + Docs (re-scoped 2026-06-02)
+### Phase 9: Jupyter Operator Surface + Docs
 **Goal**: Operators can discover and use the loopback Jupyter flow through `./run` and the docs — no security-group changes, no password (the Phase 8 loopback pivot removed those needs)
 **Depends on**: Phase 8
 **Requirements**: JUP-07 (amended). JUP-05 and JUP-06 are superseded — see REQUIREMENTS.md.
@@ -70,12 +70,13 @@ Full detail: [milestones/v2.0-ROADMAP.md](milestones/v2.0-ROADMAP.md) · [milest
   1. `./run status` output indicates JupyterLab is available on demand via `./run jupyter` (loopback, 127.0.0.1:8888)
   2. `docs/DEVELOPER-LIFECYCLE.md` (and/or README) documents the `./run jupyter` + manual `:8888` SSM port-forward access flow
   3. No security-group rule is added for `:8888` and no Jupyter password is introduced — the loopback + SSM/IAM model from Phase 8 is preserved
-**Plans**: TBD — re-scoped after the Phase 8 loopback pivot; original SG-ingress + secrets-show work dropped.
+**Plans**: 1 plan
+- [ ] 09-01-PLAN.md — surface JupyterLab (on-demand/loopback) in `./run status`; document the `./run jupyter` + manual `:8888` SSM port-forward flow in DEVELOPER-LIFECYCLE.md (Wave 1)
 
 > **Re-scope note (2026-06-02):** The original Phase 9 (add `:8888` ingress to
 > `aws_security_group.devbox`, surface the Jupyter password via `./run secrets-show`)
 > was made obsolete by Phase 8's loopback pivot. Trimmed to operator-surface polish +
-> documentation only. Run `/gsd:discuss-phase 9` then `/gsd:plan-phase 9` to detail it.
+> documentation only — a single code-light plan (status line + docs).
 
 ---
 
@@ -88,7 +89,7 @@ Full detail: [milestones/v2.0-ROADMAP.md](milestones/v2.0-ROADMAP.md) · [milest
 | 6. GitLab CI + Polish | v2.0 | 2/2 | Complete | 2026-05-27 |
 | 7. Docs + Cleanup | v2.0 | 1/1 | Complete | 2026-06-02 |
 | 8. Jupyter + mise AMI Layer | v3.0 | 0/4 | Planned | - |
-| 9. Terraform SG Rule + Operator Surface | v3.0 | 0/? | Not started | - |
+| 9. Jupyter Operator Surface + Docs | v3.0 | 0/1 | Planned | - |
 
 ## Shipped Milestones
 
