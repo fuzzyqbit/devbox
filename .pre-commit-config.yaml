@@ -123,7 +123,13 @@ repos:
             #    Makefile deleted; the operator surface is `./run`). Targets the
             #    former Makefile target names so the genuine `make -j` C++ build in
             #    ansible/roles/devtools and English prose ("make changes") are unaffected.
-            ! git grep -nE "\bmake (build|validate|fmt|packer-init|tf-[a-z-]+|start|stop|status|devbox-[a-z-]+|secrets-show|clean|doctor|help)\b" -- ":!.planning"
+            ! git grep -nE "\bmake (build|validate|fmt|packer-init|tf-[a-z-]+|start|stop|status|devbox-[a-z-]+|secrets-show|clean|doctor|help)\b" -- ":!.planning" && \
+            # 9. hardening must be the last role in ansible/playbook.yml (JUP-08 / CLAUDE.md §8)
+            #    Extract all "- role:" lines (unfiltered — YAML comments not an issue here),
+            #    take the last one, and assert it names hardening.
+            [ "$(grep -E "^[[:space:]]*-[[:space:]]*role:" ansible/playbook.yml | tail -1 | grep -c "role:[[:space:]]*hardening")" -eq 1 ] && \
+            # 10. No committed .mise.toml in the tree (MISE-03 / CLAUDE.md §8 / CONTEXT.md D-07)
+            ! find . -name ".mise.toml" -not -path "./.git/*" | grep -q .
           '
         language: system
         pass_filenames: false

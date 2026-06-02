@@ -12,7 +12,7 @@
 #   curl -sL https://api.github.com/repos/<org>/<repo>/git/refs/tags/<tag> \
 #     | python3 -c "import sys,json;print(json.load(sys.stdin)['object']['sha'])"
 #
-# Phase-3 invariants asserted by the grep-gates job (single fail-fast block):
+# Phase-3 + Phase-8 invariants asserted by the grep-gates job (single fail-fast block):
 #   1. Source AMI not floating          (REP-04 — packer must not use most_recent=true)
 #   2. No hand-copied AMI ID            (REP-05 — terraform/terraform.tfvars must not pin ami-XXXX literals)
 #   3. No <RESOLVED-VERSION> placeholder (REP-06 — template artifact must not ship)
@@ -20,6 +20,9 @@
 #   5. Terraform lockfile is tracked     (REP-01 — terraform/.terraform.lock.hcl in git)
 #   6. Lockfile-exclusion not in .gitignore (REP-01 defense — no terraform/.terraform.lock.hcl ignore)
 #   7. All third-party actions SHA-pinned (CI hardening — no @v4, @main, @master)
+#   8. No retired make <target> invocations (Phase 7 — Makefile deleted; use ./run)
+#   9. hardening is the last role in playbook.yml (JUP-08 / CLAUDE.md §8)
+#  10. No committed .mise.toml (MISE-03 / CLAUDE.md §8 / CONTEXT.md D-07)
 
 name: ci
 
@@ -225,4 +228,18 @@ jobs:
             exit 1
           fi
 
-          echo "All 8 Phase-3 + CI hardening invariants pass."
+          # 9. hardening must be the last role in ansible/playbook.yml (JUP-08 / CLAUDE.md §8)
+          #    Extract all "- role:" lines (comment-safe — YAML role lines are not comments),
+          #    take the last one, and assert it names hardening.
+          if [ "$(grep -E '^[[:space:]]*-[[:space:]]*role:' ansible/playbook.yml | tail -1 | grep -c 'role:[[:space:]]*hardening')" -ne 1 ]; then
+            echo "FAIL: hardening is not the last role in ansible/playbook.yml (JUP-08 / CLAUDE.md §8)" >&2
+            exit 1
+          fi
+
+          # 10. No committed .mise.toml in the tree (MISE-03 / CLAUDE.md §8 / CONTEXT.md D-07)
+          if find . -name '.mise.toml' -not -path './.git/*' | grep -q .; then
+            echo "FAIL: committed .mise.toml found — zero managed tools are pre-installed (MISE-03)" >&2
+            exit 1
+          fi
+
+          echo "All 10 Phase-3 + CI hardening invariants pass."
