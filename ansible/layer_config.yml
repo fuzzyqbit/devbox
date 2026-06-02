@@ -18,5 +18,4 @@ layers:
   git: true
   devtools: true
   desktop: true
-  jupyter: true
   hardening: true

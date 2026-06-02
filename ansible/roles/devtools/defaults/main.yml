@@ -17,5 +17,14 @@ fd_version: "10.2.0"
 ripgrep_version: "14.1.1"
 yq_version: "4.44.3"
 
+# JupyterLab (folded in from the former standalone `jupyter` role).
+# [VERIFIED: pypi.org — 2026-06-02]
+# ipykernel pinned to 6.29.5 (not 7.2.0): 7.2.0 requires Python >=3.10 but the
+# AL2023 system python3 is 3.9. 6.29.5 supports Python >=3.8 and installs cleanly.
+jupyterlab_version: "4.5.7"
+ipykernel_version: "6.29.5"
+jupyter_venv_path: /opt/jupyter
+jupyter_notebook_dir: "{{ dev_home }}"
+
 dev_user: ec2-user
 dev_home: /home/ec2-user

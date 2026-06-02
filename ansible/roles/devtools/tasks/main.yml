@@ -311,3 +311,30 @@
   dnf:
     name: sublime-text
     state: present
+
+# --- JupyterLab (developer tool; Phase 8 JUP-01, folded in from the standalone jupyter role) ---
+# Loopback-only, on-demand JupyterLab venv. Launched via `./run jupyter`
+# (127.0.0.1:8888) and reached over an SSM port-forward — no systemd service,
+# no TLS, no password (SSM/IAM is the auth boundary). Built from the AL2023
+# system python3 (3.9); ipykernel pinned to a 3.9-compatible release.
+- name: Create Jupyter virtualenv
+  command:
+    cmd: "python3 -m venv {{ jupyter_venv_path }}"
+    creates: "{{ jupyter_venv_path }}/bin/python3"
+
+- name: Upgrade pip in Jupyter venv
+  command:
+    cmd: "{{ jupyter_venv_path }}/bin/pip install --upgrade pip"
+
+- name: Install JupyterLab and ipykernel into venv
+  command:
+    cmd: >
+      {{ jupyter_venv_path }}/bin/pip install
+      jupyterlab=={{ jupyterlab_version }}
+      ipykernel=={{ ipykernel_version }}
+    creates: "{{ jupyter_venv_path }}/bin/jupyter"
+
+- name: Register Python kernel into venv prefix
+  command:
+    cmd: "{{ jupyter_venv_path }}/bin/python3 -m ipykernel install --prefix {{ jupyter_venv_path }} --name python3 --display-name 'Python 3'"
+    creates: "{{ jupyter_venv_path }}/share/jupyter/kernels/python3/kernel.json"
