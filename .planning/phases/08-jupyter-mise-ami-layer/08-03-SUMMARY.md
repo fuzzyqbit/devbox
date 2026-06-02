@@ -102,3 +102,21 @@ Files verified:
 Commits verified:
 - FOUND: 4accbc8 (feat(08-03): extend secrets role defaults + generate + publish for jupyter_password)
 - FOUND: 7ac23c4 (feat(08-03): extend boot oneshot to inject hashed Jupyter password at first boot)
+
+---
+
+## Amendment (2026-06-02) — Jupyter password machinery reverted
+
+The loopback on-demand pivot (see 08-02 amendment) removed the need for a Jupyter
+password. This plan's Jupyter-password additions were reverted (commit 988115a):
+
+- **Reverted:** per-build `jupyter_password` generation + assert (generate.yml),
+  the SSM SecureString publish (publish.yml), the `secrets_jupyter_password_length`
+  / `secrets_ssm_jupyter_param` defaults, the boot-time fetch + argon2/sha256 hash
+  + `jupyter_server_config.py` write (bootstrap.sh.j2), and the `jupyter.service`
+  `Before=` ordering (bootstrap.service.j2).
+- **Unchanged:** all code-server and VNC secret generation, publishing, and boot
+  injection — those remain fully intact (CONTEXT D-05 stands for code-server/VNC).
+
+Supersedes CONTEXT D-05 for Jupyter only. JupyterLab now binds to 127.0.0.1 with
+no auth (SSM/IAM gates access).

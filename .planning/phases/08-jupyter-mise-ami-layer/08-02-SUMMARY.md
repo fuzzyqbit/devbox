@@ -114,3 +114,22 @@ None. No new network endpoints, auth paths, or trust boundaries beyond what the 
 | .planning/phases/08-jupyter-mise-ami-layer/08-02-SUMMARY.md | FOUND |
 | commit fea261e (Task 1) | FOUND |
 | commit 58f34cd (Task 2) | FOUND |
+
+---
+
+## Amendment (2026-06-02) — loopback on-demand pivot
+
+Operator decision after code review superseded part of this plan. JupyterLab is
+now **loopback-only and on-demand**, not a network-exposed systemd service:
+
+- **Removed:** the `jupyter.service` systemd unit + `jupyter.service.j2` template,
+  the `handlers/main.yml` reload handler, the self-signed TLS cert generation, and
+  the `0.0.0.0` HTTPS bind (CONTEXT D-04).
+- **Kept:** the isolated `/opt/jupyter` venv with pinned `jupyterlab==4.5.7` +
+  `ipykernel==6.29.5` and the registered `python3` kernel.
+- **New access path:** `./run jupyter` launches `jupyter lab --ip=127.0.0.1`
+  on demand over SSM; the operator forwards `:8888` to reach it. Loopback + SSM/IAM
+  is the auth boundary, so there is no password and no TLS.
+
+Rationale: removes code-review finding CR-01 (auth-floor bypass) by eliminating
+the network-exposed listener. See commits e671856, 93a9af6.
