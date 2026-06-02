@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Run Script + GitLab CI Integration
-status: verifying
+status: Awaiting next milestone
 stopped_at: Completed 05-01-PLAN.md (run-script-core) — all 8 RUN requirements closed
-last_updated: "2026-05-27T19:38:44.116Z"
-last_activity: 2026-05-27
+last_updated: "2026-06-02T16:45:54.088Z"
+last_activity: 2026-06-02 — Milestone v2.0 completed and archived
 progress:
   total_phases: 3
   completed_phases: 2
   total_plans: 3
-  completed_plans: 3
+  completed_plans: 4
   percent: 100
 ---
 
@@ -25,12 +25,10 @@ See: .planning/PROJECT.md (updated 2026-05-27 after v2.0 milestone start)
 
 ## Current Position
 
-Phase: 06 (gitlab-ci-polish) — EXECUTING
-Plan: 2 of 2
-Status: Phase complete — ready for verification
-Last activity: 2026-05-27
-
-Progress: [██████████] 100%
+Phase: Milestone v2.0 complete
+Plan: —
+Status: Awaiting next milestone
+Last activity: 2026-06-02 — Milestone v2.0 completed and archived
 
 ## Performance Metrics (v1.0)
 
@@ -88,9 +86,29 @@ See PROJECT.md Key Decisions table. Locked v1.0 decisions:
 |---|-------------|------|--------|-----------|
 | 260520-be1 | create gitlab CI pipeline: packer build AMI then tofu apply EC2 from that AMI | 2026-05-20 | 72f3157 | [260520-be1-create-gitlab-ci-pipeline-packer-build-a](./quick/260520-be1-create-gitlab-ci-pipeline-packer-build-a/) |
 
+## Deferred Items
+
+Items acknowledged and deferred at v2.0 milestone close on 2026-06-02:
+
+| Category | Item | Status |
+|----------|------|--------|
+| uat_gap | 05-HUMAN-UAT.md (3 scenarios) | partial — needs live AWS/devbox |
+| uat_gap | 06-HUMAN-UAT.md (3 scenarios) | partial — needs live AWS/devbox |
+| verification_gap | 05-VERIFICATION.md | human_needed |
+| verification_gap | 06-VERIFICATION.md | human_needed |
+| quick_task | 260520-be1-create-gitlab-ci-pipeline-packer-build-a | summary missing |
+
+These are human-run verification scenarios requiring live AWS infrastructure; they
+carry forward and can be closed by running the documented UAT scenarios against a
+provisioned devbox.
+
 ## Session Continuity
 
 Last session: 2026-05-27T19:38:38.549Z
 Stopped at: Completed 05-01-PLAN.md (run-script-core) — all 8 RUN requirements closed
 Resume file: None
 Next: Phase 06 (CI integration) or verification
+
+## Operator Next Steps
+
+- Start the next milestone with /gsd-new-milestone

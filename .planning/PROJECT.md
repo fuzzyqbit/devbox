@@ -2,32 +2,25 @@
 
 ## Current State
 
-**Shipped:** v1.0 (2026-05-14) — Security hardening + CI baseline
+**Shipped:** v2.0 (2026-06-02) — Run script + GitLab CI integration · v1.0 (2026-05-14) — Security hardening + CI baseline
 
-Personal cloud workstation that bakes an AL2023 AMI and provisions per-user EC2 from it. End-to-end secure-by-default: per-build secrets via SSM Parameter Store + IAM instance profile + IMDSv2; SSM Session Manager for shell (no port 22); CIDR-allowlisted code-server (:8080) + noVNC (:6080); reproducible builds via committed `.terraform.lock.hcl` + pinned Galaxy collections + Packer source via SSM Parameter Store + manifest-driven AMI handoff; CI + tiered pre-commit gates against every Phase 1-3 invariant. Phase 5 added `./run` shell dispatcher replacing the Makefile as the operator surface.
+Personal cloud workstation that bakes an AL2023 AMI and provisions per-user EC2 from it. End-to-end secure-by-default: per-build secrets via SSM Parameter Store + IAM instance profile + IMDSv2; SSM Session Manager for shell (no port 22); CIDR-allowlisted code-server (:8080) + noVNC (:6080); reproducible builds via committed `.terraform.lock.hcl` + pinned Galaxy collections + Packer source via SSM Parameter Store + manifest-driven AMI handoff; CI + tiered pre-commit gates against every invariant. The operator surface is a single `./run` shell dispatcher (the Makefile was retired in v2.0); the GitLab CI pipeline calls `./run` for bake + deploy.
 
-**Active milestone:** v2.0 — Run script + GitLab CI integration (Phase 5 complete, Phase 6-7 remaining)
+**Active milestone:** none — v2.0 shipped. Next: v3.0 (jupyter notebook + mise) via `/gsd:new-milestone`.
 
 **Deferred to v3:** observability (CloudWatch metrics + login events), lifecycle automation (idle auto-stop, scheduled stop), image lifecycle (old AMI deregistration + inventory), Packer SSM `:NN` version pin (requires AWS creds).
 
-## Current Milestone: v2.0 Run Script + GitLab CI Integration
+## Shipped Milestone: v2.0 Run Script + GitLab CI Integration
 
-**Goal:** Replace the Makefile with a single `./run` shell script that works both locally and in CI runners, then update the GitLab CI pipeline to call `./run` instead of inline shell — single source of truth for all operator commands.
-
-**Target features:**
-- Single `./run <command>` entrypoint replacing all Makefile targets
-- Delete Makefile entirely (breaking change — v2.0)
-- GitLab CI pipeline calls `./run` instead of inline shell scripts
-- Update CLAUDE.md and all docs from `make` to `./run`
-- Existing `scripts/*.sh` stay as helpers called by `./run`
+**Delivered:** A single `./run` shell dispatcher replaces the Makefile entirely (locally + in CI); the GitLab CI pipeline calls `./run` for bake and deploy; all operator docs reference `./run`. 5 items deferred at close (human-UAT + verification needing live AWS — see STATE.md).
 
 ## What This Is
 
-Personal infrastructure-as-code project that builds a hardened Amazon Linux 2023 AMI (Packer + Ansible) and provisions per-user EC2 dev environments from it (Terragrunt + Terraform/OpenTofu). The resulting EC2 instance runs code-server (browser VS Code) on :8080, noVNC on :6080, and SSH on :22, with a Make-based operator surface and lifecycle scripts for start/stop/status. No application source code lives here — purely declarative IaC + bash glue.
+Personal infrastructure-as-code project that builds a hardened Amazon Linux 2023 AMI (Packer + Ansible) and provisions per-user EC2 dev environments from it (OpenTofu; Terragrunt was dropped post-v1.0). The resulting EC2 instance runs code-server (browser VS Code) on :8080 and noVNC on :6080, reached via AWS SSM Session Manager (no public :22). The operator surface is a single `./run` shell dispatcher (retired the Makefile in v2.0) wrapping lifecycle scripts for build/provision/start/stop/status/connect. No application source code lives here — purely declarative IaC + bash glue.
 
 ## Core Value
 
-A single operator can spin up, hibernate, and tear down a reproducible, hardened cloud workstation with one `make` target — without leaking credentials or exposing a vulnerable host to the public internet.
+A single operator can spin up, hibernate, and tear down a reproducible, hardened cloud workstation with one `./run` command — without leaking credentials or exposing a vulnerable host to the public internet.
 
 ## Requirements
 
@@ -57,14 +50,16 @@ A single operator can spin up, hibernate, and tear down a reproducible, hardened
 - ✓ Tiered pre-commit hooks: fast (gitleaks, no-changeme, tofu_fmt, terragrunt_fmt, shellcheck, packer fmt, grep-gates, hygiene) at `pre-commit`; slow (tofu_validate, ansible-lint, packer validate, Checkov) at `pre-push` — Phase 4 (CI-07) — `.pre-commit-config.yaml`
 - ✓ Top-level `CLAUDE.md` operator quickstart (205 lines, 9 sections): prereqs, env vars, one-shot setup, daily flow, rotation procedures, troubleshooting — Phase 4 (DOC-01)
 - ✓ `ansible/firewalld-docker-fix.yml` header expanded: what (firewalld + Docker bridge conflict), why (CIS role enables firewalld), 3 OR-joined retirement criteria + `firewall-cmd --get-default-zone` verification — Phase 4 (DOC-02)
+- ✓ Standalone `./run` shell dispatcher (337 lines, shellcheck-clean) replaces all 20 Makefile targets; DEVBOX_USER regex validation, lazy `TF_STATE_BUCKET` derivation, `tf-ensure-init` auto-reinit — v2.0 Phase 5 (RUN-01…RUN-08) — `run`
+- ✓ `NO_COLOR`/`CI`-aware colored output + `./run doctor` toolchain checker (bash 3.2-compatible dispatch) — v2.0 Phase 6 (POL-01, POL-02) — `run`
+- ✓ GitLab CI bake + deploy stages delegate to `./run` (no inline shell); shellcheck + grep-gates extended to cover `run` — v2.0 Phase 6 (CI-01…CI-04) — `.gitlab-ci.yml`
+- ✓ Makefile deleted; `./run` is the sole operator surface; all operator docs/scripts/TF strings reference `./run`; grep-gate invariant rejects retired `make <target>` invocations across pre-commit + GitLab + GitHub CI — v2.0 Phase 7 (DOC-01, DOC-02) — `.pre-commit-config.yaml`, `.gitlab-ci.yml`, `.github/workflows/ci.yml`
 
 ### Active
 
-<!-- Milestone 1 complete 2026-05-14. All 23 v1 requirements closed. -->
+<!-- v1.0 complete 2026-05-14 (23 reqs). v2.0 complete 2026-06-02 (RUN/CI/POL/DOC). No active requirements — v3.0 defines its own via /gsd:new-milestone. -->
 
-- [x] Replace Makefile with `./run` shell script — Phase 5 (2026-05-27)
-- [ ] GitLab CI pipeline uses `./run` commands
-- [ ] All documentation updated to reference `./run`
+(none — awaiting v3.0 requirements)
 
 ### Out of Scope
 
@@ -87,7 +82,7 @@ A single operator can spin up, hibernate, and tear down a reproducible, hardened
 - **Tech stack**: Packer + Ansible + Terragrunt/Terraform-or-OpenTofu + AWS — established and not up for replacement in this milestone
 - **Cloud**: AWS only (EC2, S3, DynamoDB, IAM)
 - **Base image**: Amazon Linux 2023 minimal x86_64 (CIS hardening role is AL2023-specific)
-- **Operator surface**: Must remain `make <target>` — no GUI, no extra CLI tools beyond what's already required (aws, jq, packer, tofu/terraform, terragrunt, ansible)
+- **Operator surface**: Single `./run <command>` dispatcher (Makefile retired in v2.0) — no GUI, no extra CLI tools beyond what's already required (aws, jq, packer, tofu/terraform, ansible; bash 4+ for `./run`)
 - **State**: Remote tfstate in S3 with DynamoDB lock is mandatory; never commit tfstate
 - **Reproducibility**: After Milestone 1, builds must be byte-deterministic given a pinned base AMI + locked dependency versions
 - **Secrets**: Must never appear in HCL, YAML, bash, or git history — use AWS Secrets Manager / SSM Parameter Store or per-build generation with operator delivery via AWS CLI
@@ -102,7 +97,9 @@ A single operator can spin up, hibernate, and tear down a reproducible, hardened
 | Per-build randomized secrets for code-server / VNC, delivered via AWS SSM Parameter Store SecureString | Eliminates `changeme` default; SSM SecureString chosen over Secrets Manager — $0/month at this scale vs $0.40/secret/month, identical KMS encryption, sufficient IAM granularity via path-prefix scoping. Per-build rotation happens at AMI bake; no rotation Lambda needed. | ✓ Phase 1 |
 | Per-operator SSH key name `${devbox_user}-devbox` (replaces hardcoded `key_name = "me"`) | Per-operator isolation: no shared keypair authorized across all devboxes. Keys live outside the repo (`aws ec2 import-key-pair`), keeping public-key material out of tfstate. Rotation = `delete-key-pair` + `import-key-pair` + `terraform destroy/apply` to push the new public key. | ✓ Phase 1 |
 | AWS SSM Session Manager vs SSH ingress CIDR list (NET-04) | **Hybrid posture chosen:** SSM Session Manager for shell access (eliminates :22 ingress entirely) + operator-supplied CIDR allowlist for code-server (:8080) and noVNC (:6080). Rationale: Phase 1 already laid the IAM groundwork (`aws_iam_role.devbox` + IMDSv2-enforced instance), so attaching `arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore` is a 3-line Terraform change; web ports cannot run "through SSM" the same way as SSH without imposing a daily port-forwarding tax, so CIDR-restricted public ingress is retained for them. NET-01 satisfied by **deletion** of the :22 ingress rule (strictly more restrictive than narrowing to a CIDR). Rollback: revert the Phase 2 commits — operator surface reverts to `ssh -i ~/.ssh/${USER}-devbox.pem ec2-user@<ip>` with the old SG (would need a one-shot manual CIDR add). | ✓ Phase 2 |
-| CI on GitHub Actions vs alternative | Default to GH Actions (free for personal use, matches repo host) | — Pending (Milestone 1) |
+| CI on GitHub Actions vs alternative | Default to GH Actions (free for personal use, matches repo host) | ✓ Good — GH Actions + GitLab CI both maintained |
+| Single `./run` bash dispatcher replaces the Makefile (v2.0) | One source of truth for operator + CI commands; `make` semantics (var=val args) gave way to env-prefix form (`DEVBOX_USER=x ./run tf-apply`). Standalone script (does not source `_common.sh`); bash 4+ required (guarded). | ✓ v2.0 |
+| grep-gate scoped to former Makefile target names, not blanket `make ` (v2.0 Phase 7) | A blanket match false-positives on the genuine `make -j` C++/thrift build in `ansible/roles/devtools` and English prose. Target-name scoping enforces "no retired operator invocation" without those false hits. | ✓ v2.0 |
 
 ## Evolution
 
@@ -122,4 +119,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-05-27 after Phase 5 completion.*
+*Last updated: 2026-06-02 after v2.0 milestone completion.*

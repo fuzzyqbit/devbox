@@ -1,72 +1,53 @@
 # Roadmap: devbox
 
-## Active Milestone
+## Milestones
 
-**v2.0 — Run Script + GitLab CI Integration**
-
-Replace the Makefile with a single `./run` shell script that works both locally and in CI,
-then wire the GitLab CI pipeline to call `./run` — single source of truth for all operator commands.
+- ✅ **v1.0 — Security hardening + CI baseline** — Phases 1-4 (shipped 2026-05-14)
+- ✅ **v2.0 — Run Script + GitLab CI Integration** — Phases 5-7 (shipped 2026-06-02)
+- 📋 **v3.0 — next** (planning)
 
 ## Phases
 
-- [ ] **Phase 5: Run Script Core** - `./run` dispatcher with all 20 commands and safety guards
-- [ ] **Phase 6: GitLab CI + Polish** - GitLab CI pipeline calls `./run`; colored output and doctor command
-- [ ] **Phase 7: Docs + Cleanup** - CLAUDE.md updated to `./run`; Makefile deleted
+<details>
+<summary>✅ v1.0 — Security hardening + CI baseline (Phases 1-4) — SHIPPED 2026-05-14</summary>
 
-## Phase Details
+Full detail: [milestones/v1-ROADMAP.md](milestones/v1-ROADMAP.md) · [milestones/v1-REQUIREMENTS.md](milestones/v1-REQUIREMENTS.md)
 
-### Phase 5: Run Script Core
-**Goal**: Operators can use `./run <command>` for all operations, with safety guards that fail fast on bad input
-**Depends on**: Phase 4 (v1.0 complete)
-**Requirements**: RUN-01, RUN-02, RUN-03, RUN-04, RUN-05, RUN-06, RUN-07, RUN-08
-**Success Criteria** (what must be TRUE):
-  1. `./run help` prints a grouped command reference covering all 20 commands
-  2. `./run build` (and all other commands) executes the correct operation end-to-end
-  3. `./run` with an unset or malformed DEVBOX_USER prints an actionable error and exits non-zero
-  4. `./run tf-apply` auto-reinitializes the backend when the cached state key mismatches DEVBOX_USER
-  5. `shellcheck ./run` passes with no errors
-**Plans:** 1 plan
-Plans:
-- [x] 05-01-PLAN.md -- Create ./run dispatcher with all 20 commands, guards, help, and tf-ensure-init
+</details>
 
-### Phase 6: GitLab CI + Polish
-**Goal**: GitLab CI pipeline calls `./run` for bake and deploy; `./run` outputs colored status messages and `./run doctor` validates the local toolchain
-**Depends on**: Phase 5
-**Requirements**: CI-01, CI-02, CI-03, CI-04, POL-01, POL-02
-**Success Criteria** (what must be TRUE):
-  1. GitLab CI bake and deploy stages invoke `./run build` and `./run tf-init` / `./run tf-apply` (no inline shell commands)
-  2. GitLab CI shellcheck job lints the `run` file alongside `scripts/*.sh`
-  3. A grep-gate CI job verifies the `run` file has the executable bit set in git
-  4. `./run doctor` reports the status of all required dependencies in one pass
-  5. Color output is suppressed when `NO_COLOR=1` or `CI=true`
-**Plans:** 2 plans
-Plans:
-- [x] 06-01-PLAN.md -- Add colored output helpers and ./run doctor dependency checker
-- [x] 06-02-PLAN.md -- Wire GitLab CI bake/deploy/shellcheck/grep-gates to use ./run
+<details>
+<summary>✅ v2.0 — Run Script + GitLab CI Integration (Phases 5-7) — SHIPPED 2026-06-02</summary>
 
-### Phase 7: Docs + Cleanup
-**Goal**: All operator documentation references `./run`; the Makefile is deleted from the repository
-**Depends on**: Phase 6
-**Requirements**: DOC-01, DOC-02
-**Success Criteria** (what must be TRUE):
-  1. CLAUDE.md contains no `make` command references — every operator action shown as `./run <command>`
-  2. The Makefile no longer exists in the repository and `git log --diff-filter=D` confirms its deletion
-  3. A grep-gate confirms no `make ` invocations remain in documentation or CI config
-**Plans**: TBD
+Replaced the Makefile with a single `./run` shell dispatcher that works locally and in CI,
+wired the GitLab CI pipeline to call `./run`, and retired the Makefile entirely.
+
+- [x] Phase 5: Run Script Core (1/1 plan) — `./run` dispatcher with all 20 commands + safety guards. Requirements: RUN-01…RUN-08
+- [x] Phase 6: GitLab CI + Polish (2/2 plans) — CI delegates to `./run`; colored output + `./run doctor`. Requirements: CI-01…CI-04, POL-01, POL-02
+- [x] Phase 7: Docs + Cleanup (1/1 plan) — CLAUDE.md → `./run`; Makefile deleted; grep-gate invariant. Requirements: DOC-01, DOC-02
+
+Full detail: [milestones/v2.0-ROADMAP.md](milestones/v2.0-ROADMAP.md) · [milestones/v2.0-REQUIREMENTS.md](milestones/v2.0-REQUIREMENTS.md)
+
+</details>
+
+### 📋 v3.0 — next (planning)
+
+Phases TBD — `/gsd:new-milestone` defines requirements + roadmap. Continues phase numbering from 8.
 
 ## Progress
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
-| 5. Run Script Core | v2.0 | 0/1 | Planned | - |
-| 6. GitLab CI + Polish | v2.0 | 0/2 | Planned | - |
-| 7. Docs + Cleanup | v2.0 | 0/TBD | Not started | - |
+| 1-4 | v1.0 | 10/10 | Complete | 2026-05-14 |
+| 5. Run Script Core | v2.0 | 1/1 | Complete | 2026-05-27 |
+| 6. GitLab CI + Polish | v2.0 | 2/2 | Complete | 2026-05-27 |
+| 7. Docs + Cleanup | v2.0 | 1/1 | Complete | 2026-06-02 |
 
 ## Shipped Milestones
 
 | Version | Shipped | Phases | Plans | Requirements | Archive |
 |---------|---------|-------:|------:|-------------:|---------|
 | v1.0 — Security hardening + CI baseline | 2026-05-14 | 4 | 10 | 23/23 | [v1-ROADMAP.md](milestones/v1-ROADMAP.md) · [v1-REQUIREMENTS.md](milestones/v1-REQUIREMENTS.md) |
+| v2.0 — Run Script + GitLab CI Integration | 2026-06-02 | 3 | 4 | DOC/RUN/CI/POL | [v2.0-ROADMAP.md](milestones/v2.0-ROADMAP.md) · [v2.0-REQUIREMENTS.md](milestones/v2.0-REQUIREMENTS.md) |
 
 ## Pending (Deferred)
 
