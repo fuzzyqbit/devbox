@@ -91,6 +91,44 @@ No public SSH port (`:22`) is open. Access is over **AWS SSM Session Manager**.
   noVNC (`:6080`) is not auto-forwarded — open a second port-forward session
   manually with `portNumber=6080` if you need the desktop.
 
+### JupyterLab (on demand, loopback-only)
+
+JupyterLab is not a systemd service — it starts on demand and binds to
+`127.0.0.1:8888` only, never to a public interface. There is **no Jupyter
+password**; the loopback binding plus SSM/IAM is the auth boundary (the token
+in the printed URL is sufficient).
+
+Access flow:
+
+1. **Start JupyterLab** — run this in a shell session on the devbox (via `./run
+   devbox-ssm` or any SSM interactive session) and leave it running. Note the
+   `http://127.0.0.1:8888/lab?token=...` URL it prints.
+
+   ```bash
+   ./run jupyter
+   ```
+
+2. **Forward `:8888` over SSM** — in a **second terminal** on your workstation,
+   open an SSM port-forward session:
+
+   ```bash
+   aws ssm start-session --target <instance-id> --region <region> \
+     --document-name AWS-StartPortForwardingSession \
+     --parameters '{"portNumber":["8888"],"localPortNumber":["8888"]}'
+   ```
+
+   (`./run devbox-port-forward` forwards only `:8080` for code-server; the
+   `:8888` forward is run manually, the same pattern as the noVNC `:6080` note
+   above.)
+
+3. **Open the token URL** in your browser:
+
+   ```
+   http://127.0.0.1:8888/lab?token=<token>
+   ```
+
+Press `Ctrl-C` in the first shell to stop JupyterLab when you are done.
+
 ### Passwords
 
 code-server and noVNC each have a per-operator password stored in SSM Parameter
@@ -133,6 +171,7 @@ remain. To also wipe local Packer/Terraform caches:
 | Shell in                  | `./run devbox-ssm`         |
 | Browser IDE off-VPC       | `./run devbox-port-forward`|
 | Get passwords             | `./run secrets-show`       |
+| JupyterLab (on demand)    | `./run jupyter`            |
 | Tear down                 | `./run tf-destroy`         |
 
 Override target instance without state lookup:
