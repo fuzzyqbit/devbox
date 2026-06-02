@@ -46,7 +46,11 @@ Full detail: [milestones/v2.0-ROADMAP.md](milestones/v2.0-ROADMAP.md) · [milest
   3. `/devbox/${devbox_user}/jupyter-password` exists in SSM Parameter Store as a SecureString after a bake; cleartext does not appear in the AMI filesystem or git history
   4. Running `mise --version` as ec2-user in a new login shell succeeds; no `.mise.toml` is committed; Python/Go/Rust/Java/Node Ansible layers are unmodified
   5. `hardening` remains the last role in `ansible/playbook.yml` (grep-gate passes; CI green)
-**Plans**: TBD
+**Plans**: 4 plans
+- [ ] 08-01-PLAN.md — mise role: checksum-pinned binary + /etc/profile.d activation (Wave 1)
+- [ ] 08-02-PLAN.md — jupyter role: /opt/jupyter venv, kernel, TLS, systemd unit, no baked password (Wave 1)
+- [ ] 08-03-PLAN.md — secrets role: jupyter-password gen/publish + boot-time hash-and-inject (Wave 2)
+- [ ] 08-04-PLAN.md — playbook/layer_config wiring + hardening-last & no-.mise.toml grep gates (Wave 3)
 
 ---
 
@@ -71,7 +75,7 @@ Full detail: [milestones/v2.0-ROADMAP.md](milestones/v2.0-ROADMAP.md) · [milest
 | 5. Run Script Core | v2.0 | 1/1 | Complete | 2026-05-27 |
 | 6. GitLab CI + Polish | v2.0 | 2/2 | Complete | 2026-05-27 |
 | 7. Docs + Cleanup | v2.0 | 1/1 | Complete | 2026-06-02 |
-| 8. Jupyter + mise AMI Layer | v3.0 | 0/? | Not started | - |
+| 8. Jupyter + mise AMI Layer | v3.0 | 0/4 | Planned | - |
 | 9. Terraform SG Rule + Operator Surface | v3.0 | 0/? | Not started | - |
 
 ## Shipped Milestones
