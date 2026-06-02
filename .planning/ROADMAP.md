@@ -31,8 +31,8 @@ Full detail: [milestones/v2.0-ROADMAP.md](milestones/v2.0-ROADMAP.md) · [milest
 
 ### 📋 v3.0 — Jupyter + mise (Phases 8-9)
 
-- [ ] **Phase 8: Jupyter + mise AMI Layer** — Bake JupyterLab as a hardened systemd service with per-build SSM password, and install the mise binary with ec2-user shell activation
-- [ ] **Phase 9: Terraform SG Rule + Operator Surface** — Add :8888 ingress to the existing security group and wire ./run secrets-show, status, and port-forward for Jupyter
+- [x] **Phase 8: Jupyter + mise AMI Layer** — Ship JupyterLab in a loopback `/opt/jupyter` venv launchable on demand via `./run jupyter` (no systemd/TLS/password), and install the mise binary with ec2-user shell activation (completed 2026-06-02)
+- [ ] **Phase 9: Jupyter Operator Surface + Docs** — Surface the on-demand Jupyter flow in `./run status` and document the `./run jupyter` + manual `:8888` SSM port-forward access path
 
 ## Phase Details
 
@@ -88,7 +88,7 @@ Full detail: [milestones/v2.0-ROADMAP.md](milestones/v2.0-ROADMAP.md) · [milest
 | 5. Run Script Core | v2.0 | 1/1 | Complete | 2026-05-27 |
 | 6. GitLab CI + Polish | v2.0 | 2/2 | Complete | 2026-05-27 |
 | 7. Docs + Cleanup | v2.0 | 1/1 | Complete | 2026-06-02 |
-| 8. Jupyter + mise AMI Layer | v3.0 | 0/4 | Planned | - |
+| 8. Jupyter + mise AMI Layer | v3.0 | 4/4 | Complete | 2026-06-02 |
 | 9. Jupyter Operator Surface + Docs | v3.0 | 0/1 | Planned | - |
 
 ## Shipped Milestones
