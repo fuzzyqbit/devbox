@@ -49,7 +49,7 @@ Full detail: [milestones/v2.0-ROADMAP.md](milestones/v2.0-ROADMAP.md) · [milest
 **Plans**: 4 plans
 - [x] 08-01-PLAN.md — mise role: checksum-pinned binary + /etc/profile.d activation (Wave 1)
 - [x] 08-02-PLAN.md — jupyter role: /opt/jupyter venv, kernel, TLS, systemd unit, no baked password (Wave 1)
-- [ ] 08-03-PLAN.md — secrets role: jupyter-password gen/publish + boot-time hash-and-inject (Wave 2)
+- [x] 08-03-PLAN.md — secrets role: jupyter-password gen/publish + boot-time hash-and-inject (Wave 2)
 - [ ] 08-04-PLAN.md — playbook/layer_config wiring + hardening-last & no-.mise.toml grep gates (Wave 3)
 
 ---
