@@ -46,7 +46,10 @@
       when: layers.devtools | default(false)
 
     - role: secrets
-      when: (layers.vscode | default(false)) or (layers.desktop | default(false))
+      when: >-
+        (layers.vscode | default(false)) or
+        (layers.desktop | default(false)) or
+        (layers.jupyter | default(false))
 
     - role: vscode
       when: layers.vscode | default(false)
@@ -54,7 +57,13 @@
     - role: desktop
       when: layers.desktop | default(false)
 
-    - role: hardening
+    - role: jupyter
+      when: layers.jupyter | default(false)
+
+    - role: mise
+      when: layers.mise | default(false)
+
+    - role: hardening  # MUST remain last — invariant (JUP-08 / CLAUDE.md §8)
       when: layers.hardening | default(false)
 
   post_tasks:
