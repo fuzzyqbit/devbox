@@ -1,17 +1,16 @@
 ---
 gsd_state_version: 1.0
-milestone: v2.0
-milestone_name: Run Script + GitLab CI Integration
-status: Awaiting next milestone
-stopped_at: Completed 05-01-PLAN.md (run-script-core) — all 8 RUN requirements closed
-last_updated: "2026-06-02T16:45:54.088Z"
-last_activity: 2026-06-02 — Milestone v2.0 completed and archived
+milestone: v3.0
+milestone_name: Jupyter + mise
+status: planning
+last_updated: "2026-06-02T17:04:59.809Z"
+last_activity: 2026-06-02
 progress:
-  total_phases: 3
-  completed_phases: 2
-  total_plans: 3
-  completed_plans: 4
-  percent: 100
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # Project State
@@ -25,10 +24,10 @@ See: .planning/PROJECT.md (updated 2026-05-27 after v2.0 milestone start)
 
 ## Current Position
 
-Phase: Milestone v2.0 complete
+Phase: Not started (defining requirements)
 Plan: —
-Status: Awaiting next milestone
-Last activity: 2026-06-02 — Milestone v2.0 completed and archived
+Status: Defining requirements
+Last activity: 2026-06-02 — Milestone v3.0 started
 
 ## Performance Metrics (v1.0)
 
