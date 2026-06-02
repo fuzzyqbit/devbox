@@ -4,8 +4,8 @@ milestone: v3.0
 milestone_name: Jupyter + mise
 status: executing
 stopped_at: Phase 8 context gathered
-last_updated: "2026-06-02T18:22:10.986Z"
-last_activity: 2026-06-02 -- Phase 08 planning complete
+last_updated: "2026-06-02T18:43:52.277Z"
+last_activity: 2026-06-02 -- Phase 08 execution started
 progress:
   total_phases: 2
   completed_phases: 0
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-06-02 after v3.0 milestone start)
 
 **Core value:** A single operator can spin up, hibernate, and tear down a reproducible, hardened cloud workstation with one command — without leaking credentials or exposing a vulnerable host to the public internet.
-**Current focus:** Phase 8 — Jupyter + mise AMI Layer (not started)
+**Current focus:** Phase 08 — jupyter-mise-ami-layer
 
 ## Current Position
 
-Phase: 8 — Jupyter + mise AMI Layer
-Plan: —
-Status: Ready to execute
-Last activity: 2026-06-02 -- Phase 08 planning complete
+Phase: 08 (jupyter-mise-ami-layer) — EXECUTING
+Plan: 1 of 4
+Status: Executing Phase 08
+Last activity: 2026-06-02 -- Phase 08 execution started
 
 ```
 [Phase 8] ░░░░░░░░░░  0%   Jupyter + mise AMI Layer

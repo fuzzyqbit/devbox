@@ -47,8 +47,8 @@ Full detail: [milestones/v2.0-ROADMAP.md](milestones/v2.0-ROADMAP.md) · [milest
   4. Running `mise --version` as ec2-user in a new login shell succeeds; no `.mise.toml` is committed; Python/Go/Rust/Java/Node Ansible layers are unmodified
   5. `hardening` remains the last role in `ansible/playbook.yml` (grep-gate passes; CI green)
 **Plans**: 4 plans
-- [ ] 08-01-PLAN.md — mise role: checksum-pinned binary + /etc/profile.d activation (Wave 1)
-- [ ] 08-02-PLAN.md — jupyter role: /opt/jupyter venv, kernel, TLS, systemd unit, no baked password (Wave 1)
+- [x] 08-01-PLAN.md — mise role: checksum-pinned binary + /etc/profile.d activation (Wave 1)
+- [x] 08-02-PLAN.md — jupyter role: /opt/jupyter venv, kernel, TLS, systemd unit, no baked password (Wave 1)
 - [ ] 08-03-PLAN.md — secrets role: jupyter-password gen/publish + boot-time hash-and-inject (Wave 2)
 - [ ] 08-04-PLAN.md — playbook/layer_config wiring + hardening-last & no-.mise.toml grep gates (Wave 3)
 
