@@ -49,3 +49,23 @@
   file:
     path: /tmp/go.tar.gz
     state: absent
+
+# --- Go developer tools (pinned via `go install pkg@version`) ---
+# Installed as the dev user into $GOPATH/bin (already on PATH via the bashrc block
+# above). Idempotent via `creates:` on the produced binary. go install pkg@version
+# runs in module-aware mode independent of any working-directory go.mod.
+- name: Install pinned Go developer tools
+  become: true
+  become_user: "{{ dev_user }}"
+  command:
+    cmd: "{{ go_bin }}/go install {{ item.path }}"
+    creates: "{{ dev_home }}/go/bin/{{ item.bin }}"
+  loop: "{{ go_tools }}"
+  loop_control:
+    label: "{{ item.bin }}"
+  environment:
+    HOME: "{{ dev_home }}"
+    GOPATH: "{{ dev_home }}/go"
+    GOBIN: "{{ dev_home }}/go/bin"
+    GOCACHE: "{{ dev_home }}/.cache/go-build"
+    PATH: "{{ go_bin }}:{{ dev_home }}/go/bin:/usr/local/bin:/usr/bin:/bin"

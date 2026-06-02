@@ -6,3 +6,20 @@ go_bin: /usr/local/go/bin
 
 dev_user: ec2-user
 dev_home: /home/ec2-user
+
+# Go developer tools — installed via pinned `go install pkg@version` into the
+# dev user's $GOPATH/bin. Versions resolved from the Go module proxy 2026-06-02;
+# no floating refs (project version-pinning invariant). `bin` is the produced
+# binary name (used for idempotent `creates:`).
+go_tools:
+  - { path: "golang.org/x/tools/gopls@v0.22.0", bin: "gopls" }
+  - { path: "golang.org/x/tools/cmd/goimports@v0.45.0", bin: "goimports" }
+  - { path: "github.com/go-delve/delve/cmd/dlv@v1.26.3", bin: "dlv" }
+  - { path: "github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.12.2", bin: "golangci-lint" }
+  - { path: "honnef.co/go/tools/cmd/staticcheck@v0.7.0", bin: "staticcheck" }
+  - { path: "golang.org/x/vuln/cmd/govulncheck@v1.3.0", bin: "govulncheck" }
+  - { path: "mvdan.cc/gofumpt@v0.10.0", bin: "gofumpt" }
+  - { path: "gotest.tools/gotestsum@v1.13.0", bin: "gotestsum" }
+  - { path: "github.com/cweill/gotests/gotests@v1.9.0", bin: "gotests" }
+  - { path: "go.uber.org/mock/mockgen@v0.6.0", bin: "mockgen" }
+  - { path: "github.com/air-verse/air@v1.65.3", bin: "air" }
