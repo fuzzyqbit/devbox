@@ -1,0 +1,25 @@
+# Auth is enforced via c.PasswordIdentityProvider.hashed_password written at boot
+# by devbox-secrets-bootstrap. This unit alone never starts an open server —
+# jupyter.service is ordered After=devbox-secrets-bootstrap.service so the
+# password config always exists before JupyterLab accepts connections.
+[Unit]
+Description=JupyterLab
+After=network.target devbox-secrets-bootstrap.service
+
+[Service]
+Type=simple
+User={{ dev_user }}
+Group={{ dev_user }}
+ExecStart={{ jupyter_venv_path }}/bin/jupyter lab \
+  --ip={{ jupyter_bind_ip }} \
+  --port={{ jupyter_port }} \
+  --no-browser \
+  --certfile={{ jupyter_cert_dir }}/jupyter-cert.pem \
+  --keyfile={{ jupyter_cert_dir }}/jupyter-key.pem \
+  --notebook-dir={{ jupyter_notebook_dir }}
+Restart=on-failure
+RestartSec=5
+Environment=HOME={{ dev_home }}
+
+[Install]
+WantedBy=multi-user.target
