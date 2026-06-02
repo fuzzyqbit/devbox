@@ -37,20 +37,28 @@ Full detail: [milestones/v2.0-ROADMAP.md](milestones/v2.0-ROADMAP.md) · [milest
 ## Phase Details
 
 ### Phase 8: Jupyter + mise AMI Layer
-**Goal**: The baked AMI runs JupyterLab as a password-protected systemd service at boot, publishes its password to SSM, and ships the mise binary ready for ec2-user
+**Goal**: The baked AMI ships JupyterLab in an isolated `/opt/jupyter` venv, launchable on demand bound to loopback (`127.0.0.1:8888`) via `./run jupyter` over SSM — no systemd service, no password, no TLS (SSM/IAM is the auth boundary) — and ships the mise binary ready for ec2-user
 **Depends on**: Phase 7 (v2.0 complete; `./run` is the operator surface; `secrets` role and `hardening` role patterns established)
-**Requirements**: JUP-01, JUP-02, JUP-03, JUP-04, JUP-08, MISE-01, MISE-02, MISE-03
+**Requirements**: JUP-01, JUP-02, JUP-08, MISE-01, MISE-02, MISE-03  (JUP-03/JUP-04 superseded — see note below)
 **Success Criteria** (what must be TRUE):
-  1. A freshly baked AMI boots and `systemctl status jupyter` reports active (running)
-  2. An unauthenticated HTTP request to :8888 is rejected (no token or password = no notebook access)
-  3. `/devbox/${devbox_user}/jupyter-password` exists in SSM Parameter Store as a SecureString after a bake; cleartext does not appear in the AMI filesystem or git history
+  1. A freshly baked AMI has an isolated `/opt/jupyter` venv with pinned JupyterLab + a registered `python3` kernel; `/opt/jupyter/bin/jupyter --version` succeeds
+  2. JupyterLab is launched on demand via `./run jupyter` and binds `127.0.0.1` only — it is NOT a systemd service and is NOT reachable on any non-loopback interface
+  3. No Jupyter password is generated or published, and no TLS cert is baked: there is no `/devbox/${devbox_user}/jupyter-password` SSM param and no jupyter listener on `0.0.0.0` (loopback + SSM/IAM gates access)
   4. Running `mise --version` as ec2-user in a new login shell succeeds; no `.mise.toml` is committed; Python/Go/Rust/Java/Node Ansible layers are unmodified
   5. `hardening` remains the last role in `ansible/playbook.yml` (grep-gate passes; CI green)
 **Plans**: 4 plans
 - [x] 08-01-PLAN.md — mise role: checksum-pinned binary + /etc/profile.d activation (Wave 1)
-- [x] 08-02-PLAN.md — jupyter role: /opt/jupyter venv, kernel, TLS, systemd unit, no baked password (Wave 1)
-- [x] 08-03-PLAN.md — secrets role: jupyter-password gen/publish + boot-time hash-and-inject (Wave 2)
+- [x] 08-02-PLAN.md — jupyter role: /opt/jupyter venv + kernel (loopback on-demand; systemd/TLS/password removed by amendment) (Wave 1)
+- [x] 08-03-PLAN.md — secrets role: jupyter-password gen/publish reverted by amendment (code-server/VNC unchanged) (Wave 2)
 - [x] 08-04-PLAN.md — playbook/layer_config wiring + hardening-last & no-.mise.toml grep gates (Wave 3)
+
+> **Design amendment (2026-06-02):** Jupyter pivoted from a password-protected `0.0.0.0`
+> HTTPS systemd service to loopback-only on-demand (`./run jupyter`). This **supersedes
+> JUP-03** (Jupyter password in SSM) and **JUP-04** (boot-time password injection) — both
+> intentionally dropped because a loopback listener reached only via SSM/IAM needs no
+> app-layer password. **Knock-on to Phase 9:** JUP-05 (SG `:8888` ingress) is now
+> unnecessary (nothing is network-exposed), and the JUP-06/07 `secrets-show`/`status`
+> Jupyter wiring no longer applies as written. Phase 9 should be re-scoped or dropped.
 
 ---
 
