@@ -181,7 +181,7 @@ fi
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # --------------------------------------------------------------------------
-# Variable defaults (mirror Makefile lines 14-52)
+# Variable defaults (formerly mirrored the Makefile; now the sole source)
 # --------------------------------------------------------------------------
 DEVBOX_USER="${DEVBOX_USER:-}"
 TF_BIN="${TF_BIN:-tofu}"

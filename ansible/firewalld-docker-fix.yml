@@ -42,7 +42,7 @@
 #       firewalld_port: list iterated over with the firewalld module. Once those
 #       are in place, this workaround is redundant; delete it.
 #
-# Verification of retirement: after removing this play, `make build` must
+# Verification of retirement: after removing this play, `./run build` must
 # succeed and the resulting AMI's `firewall-cmd --get-default-zone` must be
 # either `public` (option a) or the firewalld package must be absent (option b).
 # Either is acceptable; the workaround state (default zone = docker) is NOT.

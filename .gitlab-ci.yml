@@ -108,8 +108,8 @@ variables:
   # OpenTofu-flavoured per Phase 3 REP-01.
   TF_BIN: tofu
 
-  # Backend coordinates threaded into deploy:tofu-apply. Mirrors Makefile
-  # lines 37-52 exactly (Phase 5: Terragrunt removed, backend driven by
+  # Backend coordinates threaded into deploy:tofu-apply. Mirrors the `./run`
+  # tf-init backend logic (Phase 5: Terragrunt removed, backend driven by
   # tofu -backend-config flags).
   TF_STATE_REGION: us-east-1
   TF_STATE_LOCK_TABLE: devimage-tfstate-locks
@@ -296,7 +296,16 @@ validate:grep-gates:
         exit 1
       }
 
-      echo "All 8 invariants pass."
+      # 9. No retired `make <target>` invocations in tracked files (Phase 7 —
+      #    Makefile deleted; operator surface is `./run`). Scoped to the former
+      #    Makefile target names so the genuine `make -j` C++ build in
+      #    ansible/roles/devtools and English prose are not flagged.
+      if git grep -nE '\bmake (build|validate|fmt|packer-init|tf-[a-z-]+|start|stop|status|devbox-[a-z-]+|secrets-show|clean|doctor|help)\b' -- ':!.planning' ; then
+        echo "FAIL: retired 'make <target>' invocation found (Makefile deleted in Phase 7 — use ./run)" >&2
+        exit 1
+      fi
+
+      echo "All 9 invariants pass."
 
 # -----------------------------------------------------------------------------
 # .aws-auth template — hidden job (leading dot prefix → GitLab never runs it

@@ -48,16 +48,16 @@ if [[ "$STATE" == "running" ]]; then
   echo "=== Connection Info ==="
   # Shell access is brokered by SSM.
   echo "Shell (SSM):          aws ssm start-session --target ${INSTANCE_ID} --region ${REGION}"
-  echo "                      (or: make devbox-ssm DEVBOX_USER=${DEVBOX_USER})"
+  echo "                      (or: DEVBOX_USER=${DEVBOX_USER} ./run devbox-ssm)"
   if [[ "$PRIVATE_IP" != "N/A" ]]; then
     echo "code-server (browser): https://${PRIVATE_IP}:8080  (reachable from VPC; requires your CIDR in allowed_web_cidrs)"
     echo "noVNC (browser):       https://${PRIVATE_IP}:6080  (reachable from VPC; requires your CIDR in allowed_web_cidrs)"
     echo ""
     echo "Off-VPC operator? Use SSM port forwarding:"
-    echo "  make devbox-port-forward DEVBOX_USER=${DEVBOX_USER}"
+    echo "  DEVBOX_USER=${DEVBOX_USER} ./run devbox-port-forward"
     echo "  Then browse to https://localhost:8080 (and a second session for :6080)"
   fi
   echo ""
   echo "If browser access fails: check var.allowed_web_cidrs in your tfvars."
-  echo "  Update it externally (per-operator tfvars / -var / TF_VAR_allowed_web_cidrs) then re-run: make tf-apply"
+  echo "  Update it externally (per-operator tfvars / -var / TF_VAR_allowed_web_cidrs) then re-run: ./run tf-apply"
 fi

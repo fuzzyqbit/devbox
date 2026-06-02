@@ -216,4 +216,13 @@ jobs:
             exit 1
           fi
 
-          echo "All 7 Phase-3 + CI hardening invariants pass."
+          # 8. No retired `make <target>` invocations in tracked files (Phase 7 —
+          #    Makefile deleted; operator surface is `./run`). Scoped to the former
+          #    Makefile target names so the genuine `make -j` C++ build in
+          #    ansible/roles/devtools and English prose are not flagged.
+          if git grep -nE '\bmake (build|validate|fmt|packer-init|tf-[a-z-]+|start|stop|status|devbox-[a-z-]+|secrets-show|clean|doctor|help)\b' -- ':!.planning' ; then
+            echo "FAIL: retired 'make <target>' invocation found (Makefile deleted in Phase 7 — use ./run)" >&2
+            exit 1
+          fi
+
+          echo "All 8 Phase-3 + CI hardening invariants pass."

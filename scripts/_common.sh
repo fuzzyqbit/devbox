@@ -33,10 +33,10 @@ resolve_user() {
 }
 
 # Resolve instance ID and region from Terraform state.
-# Requires `make tf-init DEVBOX_USER=...` to have run first (operator-scoped
-# backend key — see Makefile TF_STATE_KEY).
+# Requires `DEVBOX_USER=... ./run tf-init` to have run first (operator-scoped
+# backend key — see the TF_STATE_KEY logic in ./run).
 resolve_instance() {
-  # TF_BIN: operator override (terraform vs tofu). Default matches Makefile.
+  # TF_BIN: operator override (terraform vs tofu). Default matches ./run.
   local tfbin="${TF_BIN:-tofu}"
 
   if [[ -z "$INSTANCE_ID" ]]; then
@@ -53,9 +53,9 @@ resolve_instance() {
       printf '    %s\n' "${tf_combined//$'\n'/$'\n'    }" >&2
       echo "" >&2
       echo "Common fixes:" >&2
-      echo "  - First apply for this user:    make tf-apply  DEVBOX_USER=$DEVBOX_USER" >&2
-      echo "  - Backend stale / wrong key:    make tf-reinit DEVBOX_USER=$DEVBOX_USER" >&2
-      echo "  - Bypass resolution from make:  make status INSTANCE_ID=i-... REGION=us-east-1" >&2
+      echo "  - First apply for this user:    DEVBOX_USER=$DEVBOX_USER ./run tf-apply" >&2
+      echo "  - Backend stale / wrong key:    DEVBOX_USER=$DEVBOX_USER ./run tf-reinit" >&2
+      echo "  - Bypass resolution from ./run: INSTANCE_ID=i-... REGION=us-east-1 ./run status" >&2
       echo "  - Direct script invocation:     $(basename "$0") --instance-id i-... --region us-east-1" >&2
       exit 1
     fi

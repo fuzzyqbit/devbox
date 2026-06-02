@@ -9,12 +9,12 @@ output "private_ip" {
 }
 
 output "ssm_start_session_command" {
-  description = "Operator shell access via SSM Session Manager. Run `make devbox-ssm` for the same effect (it also pre-flights session-manager-plugin)."
+  description = "Operator shell access via SSM Session Manager. Run `./run devbox-ssm` for the same effect (it also pre-flights session-manager-plugin)."
   value       = "aws ssm start-session --target ${aws_instance.devbox.id} --region ${data.aws_region.current.region}"
 }
 
 output "code_server_url" {
-  description = "code-server URL (private IP — reach over VPC peering / Direct Connect / VPN, or use `make devbox-port-forward`)"
+  description = "code-server URL (private IP — reach over VPC peering / Direct Connect / VPN, or use `./run devbox-port-forward`)"
   value       = "https://${aws_instance.devbox.private_ip}:8080"
 }
 

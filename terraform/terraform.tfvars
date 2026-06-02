@@ -1,7 +1,7 @@
 # Phase 5: shared per-environment defaults previously held in `terragrunt.hcl`
 # `inputs`. Terraform auto-loads `terraform.tfvars` from the module directory.
 # `ami_id` is resolved via a `data "aws_ami"` filter (or per-operator tfvars).
-# `key_name` flows via `-var` from the Makefile.
+# `key_name` flows via `-var` from `./run`.
 # `allowed_web_cidrs` is operator-managed externally — supply via your own
 # tfvars / `-var` / `TF_VAR_allowed_web_cidrs`.
 

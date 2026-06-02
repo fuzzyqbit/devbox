@@ -23,7 +23,7 @@ Options:
   -h, --help          Show this help
 
 Requirements (operator workstation):
-  aws CLI >= 1.16.12 (you already have this if 'make build' works)
+  aws CLI >= 1.16.12 (you already have this if './run build' works)
   session-manager-plugin (brew install --cask session-manager-plugin on macOS)
 EOF
   exit 0

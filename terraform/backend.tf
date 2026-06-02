@@ -1,6 +1,6 @@
 # Phase 5 (post-v1.0): Terragrunt removed. Backend wired directly with a partial
 # S3 config — bucket + key supplied at init time via `-backend-config` flags.
-# See Makefile `tf-init` target for the canonical invocation.
+# See the `tf-init` command in `./run` for the canonical invocation.
 #
 # Why partial: bucket name varies per AWS account (derived from
 # `aws sts get-caller-identity`); key varies per operator
