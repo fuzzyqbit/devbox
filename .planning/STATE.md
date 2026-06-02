@@ -2,11 +2,11 @@
 gsd_state_version: 1.0
 milestone: v3.0
 milestone_name: Jupyter + mise
-status: planning
-last_updated: "2026-06-02T17:04:59.809Z"
+status: roadmapped
+last_updated: "2026-06-02"
 last_activity: 2026-06-02
 progress:
-  total_phases: 0
+  total_phases: 2
   completed_phases: 0
   total_plans: 0
   completed_plans: 0
@@ -17,17 +17,22 @@ progress:
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-05-27 after v2.0 milestone start)
+See: .planning/PROJECT.md (updated 2026-06-02 after v3.0 milestone start)
 
 **Core value:** A single operator can spin up, hibernate, and tear down a reproducible, hardened cloud workstation with one command — without leaking credentials or exposing a vulnerable host to the public internet.
-**Current focus:** Phase 06 — gitlab-ci-polish
+**Current focus:** Phase 8 — Jupyter + mise AMI Layer (not started)
 
 ## Current Position
 
-Phase: Not started (defining requirements)
+Phase: 8 — Jupyter + mise AMI Layer
 Plan: —
-Status: Defining requirements
-Last activity: 2026-06-02 — Milestone v3.0 started
+Status: Roadmap written; awaiting plan-phase
+Last activity: 2026-06-02 — v3.0 roadmap created (Phases 8-9)
+
+```
+[Phase 8] ░░░░░░░░░░  0%   Jupyter + mise AMI Layer
+[Phase 9] ░░░░░░░░░░  0%   Terraform SG Rule + Operator Surface
+```
 
 ## Performance Metrics (v1.0)
 
@@ -44,6 +49,14 @@ Commits: 66 in `b0bd004..7e63829`. Files changed: 75 (+14488 / −69 LOC).
 
 **Trend:** Parallel-safe phases (3 + 4) demonstrably faster wall-clock than serial (1 + 2).
 
+### v2.0 Performance Metrics
+
+| Phase | Plan | Duration | Tasks | Files |
+|-------|------|----------|-------|-------|
+| 05 | 01 | 5min | 2 | 1 |
+| 06 P01 | 5min | 1 tasks | 1 files |
+| 06 P02 | 4min | 2 tasks | 3 files |
+
 ## Accumulated Context
 
 See PROJECT.md Key Decisions table. Locked v1.0 decisions:
@@ -53,7 +66,7 @@ See PROJECT.md Key Decisions table. Locked v1.0 decisions:
 - Packer manifest → auto.tfvars AMI handoff
 - Checkov (NOT tfsec / Trivy / KICS — supply-chain incidents March 2026)
 - Parallel CI jobs; tiered pre-commit (fast at commit, slow at push)
-- Terragrunt dropped post-v1.0; Makefile now drives `tofu` directly with `-backend-config` flags
+- Terragrunt dropped post-v1.0; `./run` drives `tofu` directly with `-backend-config` flags
 
 **v2.0 decisions:**
 
@@ -61,6 +74,14 @@ See PROJECT.md Key Decisions table. Locked v1.0 decisions:
 - Research build order: dispatcher + guards → CI integration → docs/cleanup
 - Existing `scripts/*.sh` stay as helpers called by `./run` (no consolidation into the script body)
 - Standalone `./run` dispatcher: does not source `_common.sh`; lazy TF_STATE_BUCKET derivation; DEVBOX_USER regex validation added
+
+**v3.0 decisions (at roadmap time):**
+
+- Jupyter reuses the existing `secrets` role pattern (per-build random password → SSM SecureString `/devbox/${devbox_user}/jupyter-password`) — same as code-server / VNC
+- Jupyter uses the existing `aws_security_group.devbox` with an added ingress rule for :8888 (no new SG) — governed by `var.allowed_web_cidrs`
+- mise is binary-only: no committed `.mise.toml`, no migration of existing Ansible language layers
+- Phase split: Phase 8 = Ansible/AMI work (Jupyter service + secrets + mise); Phase 9 = Terraform + `./run` operator surface
+- `hardening` invariant enforced: Jupyter Ansible role inserted before `hardening` (JUP-08)
 
 ## Deferred / Carried Forward
 
@@ -70,14 +91,11 @@ See PROJECT.md Key Decisions table. Locked v1.0 decisions:
 | Lifecycle | Idle auto-stop + scheduled nightly stop | v3 backlog | v1.0 init |
 | Image lifecycle | Old AMI deregistration + inventory | v3 backlog | v1.0 init |
 | Reproducibility | SSM `:NN` version suffix on Packer source | v3 follow-up | v1.0 Phase 3 |
-| Phase 06 P01 | 5min | 1 tasks | 1 files |
-| Phase 06 P02 | 4min | 2 tasks | 3 files |
-
-### v2.0 Performance Metrics
-
-| Phase | Plan | Duration | Tasks | Files |
-|-------|------|----------|-------|-------|
-| 05 | 01 | 5min | 2 | 1 |
+| uat_gap | 05-HUMAN-UAT.md (3 scenarios) | partial — needs live AWS/devbox | v2.0 close |
+| uat_gap | 06-HUMAN-UAT.md (3 scenarios) | partial — needs live AWS/devbox | v2.0 close |
+| verification_gap | 05-VERIFICATION.md | human_needed | v2.0 close |
+| verification_gap | 06-VERIFICATION.md | human_needed | v2.0 close |
+| quick_task | 260520-be1-create-gitlab-ci-pipeline-packer-build-a | summary missing | v2.0 close |
 
 ### Quick Tasks Completed
 
@@ -85,29 +103,13 @@ See PROJECT.md Key Decisions table. Locked v1.0 decisions:
 |---|-------------|------|--------|-----------|
 | 260520-be1 | create gitlab CI pipeline: packer build AMI then tofu apply EC2 from that AMI | 2026-05-20 | 72f3157 | [260520-be1-create-gitlab-ci-pipeline-packer-build-a](./quick/260520-be1-create-gitlab-ci-pipeline-packer-build-a/) |
 
-## Deferred Items
-
-Items acknowledged and deferred at v2.0 milestone close on 2026-06-02:
-
-| Category | Item | Status |
-|----------|------|--------|
-| uat_gap | 05-HUMAN-UAT.md (3 scenarios) | partial — needs live AWS/devbox |
-| uat_gap | 06-HUMAN-UAT.md (3 scenarios) | partial — needs live AWS/devbox |
-| verification_gap | 05-VERIFICATION.md | human_needed |
-| verification_gap | 06-VERIFICATION.md | human_needed |
-| quick_task | 260520-be1-create-gitlab-ci-pipeline-packer-build-a | summary missing |
-
-These are human-run verification scenarios requiring live AWS infrastructure; they
-carry forward and can be closed by running the documented UAT scenarios against a
-provisioned devbox.
-
 ## Session Continuity
 
-Last session: 2026-05-27T19:38:38.549Z
-Stopped at: Completed 05-01-PLAN.md (run-script-core) — all 8 RUN requirements closed
+Last session: 2026-06-02
+Stopped at: v3.0 roadmap written (Phases 8-9, 11 requirements mapped)
 Resume file: None
-Next: Phase 06 (CI integration) or verification
+Next: `/gsd:plan-phase 8` — plan the Jupyter + mise AMI layer
 
 ## Operator Next Steps
 
-- Start the next milestone with /gsd-new-milestone
+- Plan Phase 8 with `/gsd:plan-phase 8`

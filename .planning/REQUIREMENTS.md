@@ -41,4 +41,14 @@ Deferred to a later milestone:
 
 | REQ-ID | Phase | Status |
 |--------|-------|--------|
-| _(filled in by the roadmapper)_ | | |
+| JUP-01 | Phase 8 | Pending |
+| JUP-02 | Phase 8 | Pending |
+| JUP-03 | Phase 8 | Pending |
+| JUP-04 | Phase 8 | Pending |
+| JUP-05 | Phase 9 | Pending |
+| JUP-06 | Phase 9 | Pending |
+| JUP-07 | Phase 9 | Pending |
+| JUP-08 | Phase 8 | Pending |
+| MISE-01 | Phase 8 | Pending |
+| MISE-02 | Phase 8 | Pending |
+| MISE-03 | Phase 8 | Pending |
