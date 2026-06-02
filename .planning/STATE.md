@@ -105,6 +105,7 @@ See PROJECT.md Key Decisions table. Locked v1.0 decisions:
 | # | Description | Date | Commit | Directory |
 |---|-------------|------|--------|-----------|
 | 260520-be1 | create gitlab CI pipeline: packer build AMI then tofu apply EC2 from that AMI | 2026-05-20 | 72f3157 | [260520-be1-create-gitlab-ci-pipeline-packer-build-a](./quick/260520-be1-create-gitlab-ci-pipeline-packer-build-a/) |
+| 260602-add-golang-dev-tools | add 11 pinned Go developer tools (gopls, dlv, golangci-lint, govulncheck, …) to the golang role | 2026-06-02 | 88541f0 | [260602-add-golang-dev-tools](./quick/260602-add-golang-dev-tools/) |
 
 ## Session Continuity
 
