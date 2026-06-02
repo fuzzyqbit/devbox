@@ -62,16 +62,20 @@ Full detail: [milestones/v2.0-ROADMAP.md](milestones/v2.0-ROADMAP.md) · [milest
 
 ---
 
-### Phase 9: Terraform SG Rule + Operator Surface
-**Goal**: Operators can reach Jupyter through the CIDR-gated security group and interact with it via the existing ./run commands (secrets-show, status, port-forward)
+### Phase 9: Jupyter Operator Surface + Docs (re-scoped 2026-06-02)
+**Goal**: Operators can discover and use the loopback Jupyter flow through `./run` and the docs — no security-group changes, no password (the Phase 8 loopback pivot removed those needs)
 **Depends on**: Phase 8
-**Requirements**: JUP-05, JUP-06, JUP-07
+**Requirements**: JUP-07 (amended). JUP-05 and JUP-06 are superseded — see REQUIREMENTS.md.
 **Success Criteria** (what must be TRUE):
-  1. `tofu plan` shows an ingress rule for port 8888 added to `aws_security_group.devbox` (no new SG created); the rule is governed by `var.allowed_web_cidrs` consistent with the :8080 and :6080 rules
-  2. `./run secrets-show` prints the Jupyter password alongside the code-server and VNC passwords
-  3. `./run status` output includes the Jupyter URL (e.g. `http://<host>:8888`)
-  4. `./run devbox-port-forward` establishes a tunnel that reaches Jupyter at the forwarded local port
-**Plans**: TBD
+  1. `./run status` output indicates JupyterLab is available on demand via `./run jupyter` (loopback, 127.0.0.1:8888)
+  2. `docs/DEVELOPER-LIFECYCLE.md` (and/or README) documents the `./run jupyter` + manual `:8888` SSM port-forward access flow
+  3. No security-group rule is added for `:8888` and no Jupyter password is introduced — the loopback + SSM/IAM model from Phase 8 is preserved
+**Plans**: TBD — re-scoped after the Phase 8 loopback pivot; original SG-ingress + secrets-show work dropped.
+
+> **Re-scope note (2026-06-02):** The original Phase 9 (add `:8888` ingress to
+> `aws_security_group.devbox`, surface the Jupyter password via `./run secrets-show`)
+> was made obsolete by Phase 8's loopback pivot. Trimmed to operator-surface polish +
+> documentation only. Run `/gsd:discuss-phase 9` then `/gsd:plan-phase 9` to detail it.
 
 ---
 
