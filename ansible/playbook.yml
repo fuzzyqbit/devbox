@@ -48,8 +48,7 @@
     - role: secrets
       when: >-
         (layers.vscode | default(false)) or
-        (layers.desktop | default(false)) or
-        (layers.jupyter | default(false))
+        (layers.desktop | default(false))
 
     - role: vscode
       when: layers.vscode | default(false)
