@@ -1,4 +1,9 @@
 ---
+# JupyterLab is installed into an isolated /opt/jupyter venv but NOT run as a
+# service. It is launched on demand, bound to loopback (127.0.0.1), and reached
+# over an SSM port-forward — see `./run jupyter` (scripts/devbox-jupyter.sh).
+# Loopback-only + SSM/IAM gating is the auth boundary, so there is no Jupyter
+# password, no TLS, and no systemd unit. (Supersedes Phase 8 CONTEXT D-04/D-05.)
 - name: Create Jupyter virtualenv
   ansible.builtin.command:
     cmd: "python3 -m venv {{ jupyter_venv_path }}"
@@ -20,41 +25,3 @@
   ansible.builtin.command:
     cmd: "{{ jupyter_venv_path }}/bin/python3 -m ipykernel install --prefix {{ jupyter_venv_path }} --name python3 --display-name 'Python 3'"
     creates: "{{ jupyter_venv_path }}/share/jupyter/kernels/python3/kernel.json"
-
-- name: Create Jupyter TLS cert directory
-  ansible.builtin.file:
-    path: "{{ jupyter_cert_dir }}"
-    state: directory
-    mode: "0755"
-
-- name: Generate self-signed TLS cert for Jupyter
-  ansible.builtin.command:
-    cmd: >
-      openssl req -x509 -nodes -newkey rsa:2048
-      -keyout {{ jupyter_cert_dir }}/jupyter-key.pem
-      -out {{ jupyter_cert_dir }}/jupyter-cert.pem
-      -days 3650 -subj '/CN=devbox'
-    creates: "{{ jupyter_cert_dir }}/jupyter-cert.pem"
-
-- name: Set Jupyter cert and key permissions
-  ansible.builtin.file:
-    path: "{{ item.path }}"
-    owner: root
-    group: "{{ dev_user }}"
-    mode: "{{ item.mode }}"
-  loop:
-    - { path: "{{ jupyter_cert_dir }}/jupyter-cert.pem", mode: "0644" }
-    - { path: "{{ jupyter_cert_dir }}/jupyter-key.pem", mode: "0640" }
-
-- name: Install Jupyter systemd service
-  ansible.builtin.template:
-    src: jupyter.service.j2
-    dest: /etc/systemd/system/jupyter.service
-    mode: "0644"
-  notify: reload systemd
-
-- name: Enable Jupyter service
-  ansible.builtin.systemd:
-    name: jupyter
-    enabled: true
-    daemon_reload: true
