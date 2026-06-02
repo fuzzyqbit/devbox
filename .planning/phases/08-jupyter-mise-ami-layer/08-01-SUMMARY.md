@@ -95,3 +95,14 @@ None — no new network endpoints, auth paths, or trust-boundary surface introdu
 - No `.mise.toml` in tree
 - No `latest` in mise role files
 - Per-language roles (python, golang, rust, java) untouched
+
+---
+
+## Amendment (2026-06-02) — mise folded into the devops role
+
+The standalone `mise` role created by this plan was later folded into the existing
+`devops` role (commit ce777a3), alongside kubectl/helm/k9s/eksctl/istioctl (same
+binary-to-`/usr/local/bin` install pattern). `ansible/roles/mise/` was deleted and the
+`mise` playbook entry + layer toggle removed; mise now rides the `devops` layer.
+MISE-01/02/03 remain satisfied (same get_url + checksum + `/etc/profile.d/mise.sh`
+activation), `hardening` stays last, and no `.mise.toml` is committed.
