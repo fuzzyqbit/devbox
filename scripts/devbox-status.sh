@@ -52,6 +52,9 @@ if [[ "$STATE" == "running" ]]; then
   if [[ "$PRIVATE_IP" != "N/A" ]]; then
     echo "code-server (browser): https://${PRIVATE_IP}:8080  (reachable from VPC; requires your CIDR in allowed_web_cidrs)"
     echo "noVNC (browser):       https://${PRIVATE_IP}:6080  (reachable from VPC; requires your CIDR in allowed_web_cidrs)"
+    echo "JupyterLab (on-demand):  DEVBOX_USER=${DEVBOX_USER} ./run jupyter"
+    echo "                         then forward :8888 over SSM in a second shell"
+    echo "                         (127.0.0.1:8888 loopback-only; no password)"
     echo ""
     echo "Off-VPC operator? Use SSM port forwarding:"
     echo "  DEVBOX_USER=${DEVBOX_USER} ./run devbox-port-forward"
