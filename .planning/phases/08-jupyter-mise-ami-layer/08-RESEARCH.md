@@ -538,22 +538,25 @@ dev_home: /home/ec2-user
 
 ---
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **FIPS + argon2 runtime behavior (A1)**
    - What we know: argon2-cffi vendors its own C code; FIPS mode restricts OpenSSL-backed operations; the boot script can fall back to `algorithm='sha256'`
    - What's unclear: Whether AL2023's Python FIPS hooks (Python 3.9+ honors `usedforsecurity=False`) affect cffi-invoked C code at all
    - Recommendation: Include the argon2 → sha256 fallback in the boot script unconditionally; it costs nothing and handles both FIPS and non-FIPS environments
+   - **RESOLVED:** Plan 08-03 Task 2 implements the unconditional argon2→sha256 fallback in the boot oneshot; no live FIPS test needed since the fallback covers both paths.
 
 2. **mise SHA-256 checksum for v2026.5.18 linux-x64 (A5)**
    - What we know: `SHASUMS256.txt` exists at the release URL (HTTP 302 confirmed)
    - What's unclear: The planner must fetch the actual hex value from `SHASUMS256.txt` and hard-code it into `defaults/main.yml`
    - Recommendation: Wave 0 task — `curl -L https://github.com/jdx/mise/releases/download/v2026.5.18/SHASUMS256.txt | grep linux-x64$` and record in defaults
+   - **RESOLVED:** Deferred to Plan 08-01 Task 0 (`checkpoint:human-verify`) — the operator fetches and records the real 64-hex checksum before any download task runs; no placeholder reaches `get_url`.
 
 3. **`c.PasswordIdentityProvider.hashed_password` vs `c.ServerApp.password` in jupyter-server 2.19.0**
    - What we know: Search result states "ServerApp.password is deprecated in 2.0; use PasswordIdentityProvider.hashed_password instead" [CITED: search result cross-referencing jupyter-server docs]
    - What's unclear: Whether the old key still works as an alias in 2.19.0 for resilience
    - Recommendation: Use the new key; add a comment in the boot script noting the deprecation
+   - **RESOLVED:** Plans use `c.PasswordIdentityProvider.hashed_password` throughout (08-02 unit comment + 08-03 boot injection); old key avoided.
 
 ---
 
