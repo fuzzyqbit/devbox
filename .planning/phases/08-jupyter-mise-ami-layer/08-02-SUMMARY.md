@@ -133,3 +133,14 @@ now **loopback-only and on-demand**, not a network-exposed systemd service:
 
 Rationale: removes code-review finding CR-01 (auth-floor bypass) by eliminating
 the network-exposed listener. See commits e671856, 93a9af6.
+
+---
+
+## Amendment (2026-06-02) — jupyter folded into the devtools role
+
+The standalone `jupyter` role created by this plan was later folded into the existing
+`devtools` role (commit 12d8dc5), alongside the other developer tooling. `ansible/roles/jupyter/`
+was deleted and the `jupyter` playbook entry + layer toggle removed; JupyterLab now rides
+the `devtools` layer (which runs after the `python` role, so system python3 is available).
+The install is unchanged (`/opt/jupyter` venv + pinned jupyterlab/ipykernel + python3 kernel),
+the loopback on-demand model is unchanged, `hardening` stays last, and JUP-01 remains satisfied.

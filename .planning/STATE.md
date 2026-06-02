@@ -3,9 +3,9 @@ gsd_state_version: 1.0
 milestone: v3.0
 milestone_name: Jupyter + mise
 status: milestone_complete
-stopped_at: Phase 8 context gathered
-last_updated: "2026-06-02T22:59:03.324Z"
-last_activity: 2026-06-02 -- Phase 09 execution started
+stopped_at: v3.0 milestone closed and archived
+last_updated: "2026-06-02T23:30:00.000Z"
+last_activity: 2026-06-02 -- v3.0 (Jupyter + mise) shipped, archived, tagged
 progress:
   total_phases: 2
   completed_phases: 2
@@ -21,18 +21,17 @@ progress:
 See: .planning/PROJECT.md (updated 2026-06-02 after v3.0 milestone start)
 
 **Core value:** A single operator can spin up, hibernate, and tear down a reproducible, hardened cloud workstation with one command — without leaking credentials or exposing a vulnerable host to the public internet.
-**Current focus:** Phase 09 — jupyter-operator-surface-docs
+**Current focus:** v3.0 shipped (2026-06-02). No active milestone — start the next with `/gsd:new-milestone`.
 
 ## Current Position
 
-Phase: 09
-Plan: Not started
-Status: Milestone complete
-Last activity: 2026-06-02
+Milestone: v3.0 — Jupyter + mise — **SHIPPED 2026-06-02** (tag `v3.0`)
+Status: Milestone complete; no active milestone
+Last activity: 2026-06-02 — v3.0 milestone closed and archived
 
 ```
-[Phase 8] ░░░░░░░░░░  0%   Jupyter + mise AMI Layer
-[Phase 9] ░░░░░░░░░░  0%   Terraform SG Rule + Operator Surface
+[v3.0 Phase 8] ██████████ 100%  Jupyter + mise AMI Layer (4/4)
+[v3.0 Phase 9] ██████████ 100%  Jupyter Operator Surface + Docs (1/1)
 ```
 
 ## Performance Metrics (v1.0)
@@ -96,7 +95,10 @@ See PROJECT.md Key Decisions table. Locked v1.0 decisions:
 | uat_gap | 06-HUMAN-UAT.md (3 scenarios) | partial — needs live AWS/devbox | v2.0 close |
 | verification_gap | 05-VERIFICATION.md | human_needed | v2.0 close |
 | verification_gap | 06-VERIFICATION.md | human_needed | v2.0 close |
-| quick_task | 260520-be1-create-gitlab-ci-pipeline-packer-build-a | summary missing | v2.0 close |
+| quick_task | 260520-be1-create-gitlab-ci-pipeline-packer-build-a | completed (has SUMMARY); unarchived orphan | v2.0 close (re-deferred v3.0) |
+| uat_gap | 08-HUMAN-UAT.md (2 scenarios: Jupyter venv + mise --version) | partial — needs live AMI bake | v3.0 close |
+| verification_gap | 08-VERIFICATION.md | human_needed — bake-time runtime checks | v3.0 close |
+| tech_debt | WR-05: bootstrap .sh.j2 outside CI shellcheck glob | open follow-up | v3.0 close |
 
 ### Quick Tasks Completed
 
@@ -106,11 +108,11 @@ See PROJECT.md Key Decisions table. Locked v1.0 decisions:
 
 ## Session Continuity
 
-Last session: 2026-06-02T17:40:49.228Z
-Stopped at: Phase 8 context gathered
-Resume file: .planning/phases/08-jupyter-mise-ami-layer/08-CONTEXT.md
-Next: `/gsd:plan-phase 8` — plan the Jupyter + mise AMI layer
+Last session: 2026-06-02 — v3.0 (Jupyter + mise) closed and archived; tag `v3.0`.
+Stopped at: milestone v3.0 complete
+Next: `/gsd:new-milestone` — start the next milestone (or bake an AMI to clear the 2 deferred Phase-8 UAT checks first)
 
 ## Operator Next Steps
 
-- Plan Phase 8 with `/gsd:plan-phase 8`
+- (Optional) `DEVBOX_USER=$(whoami) ./run build` then confirm `08-HUMAN-UAT.md` (Jupyter venv + `mise --version`)
+- `/gsd:new-milestone` — define the next milestone (Observability / Lifecycle / Image-lifecycle are queued in Pending)
