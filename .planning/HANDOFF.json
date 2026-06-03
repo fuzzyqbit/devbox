@@ -1,0 +1,41 @@
+{
+  "version": "1.0",
+  "timestamp": "2026-06-03T00:43:48.530Z",
+  "phase": null,
+  "phase_name": "between milestones — v3.0 shipped",
+  "phase_dir": null,
+  "plan": null,
+  "task": null,
+  "total_tasks": null,
+  "status": "paused",
+  "completed_tasks": [
+    {"id": 1, "name": "Phase 8 (Jupyter + mise AMI layer) executed + verified", "status": "done", "commit": "37237ad"},
+    {"id": 2, "name": "Phase 9 (Jupyter operator surface + docs) executed + verified", "status": "done", "commit": "e944e45"},
+    {"id": 3, "name": "Milestone v3.0 archived + tagged + pushed", "status": "done", "commit": "bfdecef"},
+    {"id": 4, "name": "Refactor: mise role -> devops role", "status": "done", "commit": "ce777a3"},
+    {"id": 5, "name": "Refactor: jupyter role -> devtools role", "status": "done", "commit": "12d8dc5"},
+    {"id": 6, "name": "Quick task: 11 pinned Go dev tools added to golang role", "status": "done", "commit": "88541f0"}
+  ],
+  "remaining_tasks": [
+    {"id": 7, "name": "Bake AMI (./run build) to clear deferred runtime checks", "status": "not_started"},
+    {"id": 8, "name": "08-HUMAN-UAT: /opt/jupyter/bin/jupyter --version + kernel list on baked instance", "status": "not_started"},
+    {"id": 9, "name": "08-HUMAN-UAT: bash -l -c 'mise --version' on baked instance (now installed via devops role)", "status": "not_started"},
+    {"id": 10, "name": "Verify Go dev tools installed into ~/go/bin on baked instance (go install reached proxy)", "status": "not_started"},
+    {"id": 11, "name": "Start next milestone via /gsd:new-milestone (Observability / Lifecycle / Image-lifecycle queued)", "status": "not_started"}
+  ],
+  "blockers": [
+    {"description": "Bake-time runtime checks require AWS creds + ./run build; cannot be confirmed in-session", "type": "human_action", "workaround": "deferred + tracked in 08-HUMAN-UAT.md and STATE.md Deferred Items"}
+  ],
+  "human_actions_pending": [
+    {"action": "DEVBOX_USER=$(whoami) ./run build && ./run tf-apply && ./run start", "context": "bake an AMI to confirm the 3 deferred runtime checks (Jupyter venv, mise, Go tools)", "blocking": false}
+  ],
+  "decisions": [
+    {"decision": "Jupyter pivoted to loopback-only on-demand (./run jupyter, 127.0.0.1:8888); no systemd/TLS/password", "rationale": "SSM/IAM is the auth boundary; eliminated code-review Critical CR-01 (auth-floor bypass). Superseded JUP-02/03/04/05/06.", "phase": "08"},
+    {"decision": "ipykernel pinned to 6.29.5 (not 7.2.0)", "rationale": "7.2.0 needs Python >=3.10 but AL2023 system python3 is 3.9", "phase": "08"},
+    {"decision": "mise -> devops role, jupyter -> devtools role (post-execution refactors)", "rationale": "user request; fold the two standalone Phase-8 roles into existing tooling roles", "phase": "post-v3.0"},
+    {"decision": "Go dev tools live in the golang role, installed via pinned 'go install pkg@version'", "rationale": "they require Go + GOPATH which the golang role sets up; project version-pinning invariant", "phase": "quick-260602"}
+  ],
+  "uncommitted_files": [],
+  "next_action": "Either bake an AMI (./run build) to clear the 3 deferred runtime UAT checks, or run /gsd:new-milestone to start the next cycle.",
+  "context_notes": "v3.0 (Jupyter + mise) is fully shipped, archived, tagged (git tag v3.0), and pushed to origin (github.com/fuzzyqbit/devbox). Working tree clean, no active phase. All structural verification passed; only live-bake confirmations remain. No active milestone — REQUIREMENTS.md was archived/removed at close; the next milestone defines fresh requirements via /gsd:new-milestone. Two harness quirks hit this session (advisory, not blocking): (1) the block-no-verify hook false-positives when git commit is chained with other commands in one Bash call — commit standalone; (2) gsd-sdk phase.complete leaves the ROADMAP progress table + v3.0 phase-list checkboxes stale — fix manually after."
+}
