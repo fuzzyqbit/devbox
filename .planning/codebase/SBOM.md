@@ -155,7 +155,7 @@ No packages installed. Generates per-build random secrets:
 | Secret | Length | Charset | Destination |
 |--------|--------|---------|-------------|
 | `code_server_password` | 32 | ASCII letters + digits | SSM Parameter Store `/devbox/${devbox_user}/code-server-password` (SecureString) |
-| `desktop_vnc_password` | 8 | ASCII letters + digits | SSM Parameter Store `/devbox/${devbox_user}/vnc-password` (SecureString); VNC wire protocol truncates to 8 chars regardless |
+| `desktop_vnc_password` | 20 | ASCII letters + digits | SSM Parameter Store `/devbox/${devbox_user}/vnc-password` (SecureString); applied as the dev-user PAM password — TigerVNC `SecurityTypes=Plain`, so no 8-char DES truncation |
 
 Per-build randomization happens at AMI bake; no rotation Lambda. Fetched at boot by systemd oneshot (Phase 1 SEC-03).
 

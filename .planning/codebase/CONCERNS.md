@@ -265,7 +265,8 @@ The following are correctly guarded and listed for reference:
     auth is `password` with literal `changeme`.
   - `6080/tcp` (noVNC) — TLS termination uses a self-signed cert
     (`ansible/roles/desktop/tasks/main.yml:142-150`,
-    `-subj '/CN=devbox'`, 10-year validity). VNC auth uses `changeme`.
+    `-subj '/CN=devbox'`, 10-year validity). VNC auth is PAM-backed
+    (TigerVNC `SecurityTypes=Plain`) against a per-build SSM credential.
 - **Why CRITICAL:** Each user's devbox is a publicly addressable RCE
   target until passwords are rotated. The `iam_instance_profile`
   variable is `null` by default (`terraform/variables.tf:51-55`), but
