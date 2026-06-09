@@ -1,17 +1,16 @@
 ---
 gsd_state_version: 1.0
-milestone: v3.0
-milestone_name: Jupyter + mise
-status: milestone_complete
-stopped_at: v3.0 milestone closed and archived
-last_updated: "2026-06-02T23:30:00.000Z"
-last_activity: 2026-06-02 -- v3.0 (Jupyter + mise) shipped, archived, tagged
+milestone: v3.1
+milestone_name: noVNC HTTPS-Only
+status: planning
+last_updated: "2026-06-09T12:18:22.237Z"
+last_activity: 2026-06-09
 progress:
-  total_phases: 2
-  completed_phases: 2
-  total_plans: 5
-  completed_plans: 4
-  percent: 100
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # Project State
@@ -25,14 +24,10 @@ See: .planning/PROJECT.md (updated 2026-06-02 after v3.0 milestone start)
 
 ## Current Position
 
-Milestone: v3.0 — Jupyter + mise — **SHIPPED 2026-06-02** (tag `v3.0`)
-Status: Milestone complete; no active milestone
-Last activity: 2026-06-02 — v3.0 milestone closed and archived
-
-```
-[v3.0 Phase 8] ██████████ 100%  Jupyter + mise AMI Layer (4/4)
-[v3.0 Phase 9] ██████████ 100%  Jupyter Operator Surface + Docs (1/1)
-```
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-06-09 — Milestone v3.1 started
 
 ## Performance Metrics (v1.0)
 

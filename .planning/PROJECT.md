@@ -6,9 +6,26 @@
 
 Personal cloud workstation that bakes an AL2023 AMI and provisions per-user EC2 from it. End-to-end secure-by-default: per-build secrets via SSM Parameter Store + IAM instance profile + IMDSv2; SSM Session Manager for shell (no port 22); CIDR-allowlisted code-server (:8080) + noVNC (:6080); loopback-only on-demand JupyterLab (`./run jupyter`); reproducible builds via committed `.terraform.lock.hcl` + pinned Galaxy collections + Packer source via SSM Parameter Store + manifest-driven AMI handoff; CI + tiered pre-commit gates against every invariant. The operator surface is a single `./run` shell dispatcher (the Makefile was retired in v2.0); the GitLab CI pipeline calls `./run` for bake + deploy.
 
-**Active milestone:** none — v3.0 shipped 2026-06-02. Start the next with `/gsd:new-milestone`.
+**Active milestone:** v3.1 noVNC HTTPS-Only — started 2026-06-09.
 
 **Deferred to a later cycle:** observability (CloudWatch metrics + login events), lifecycle automation (idle auto-stop, scheduled stop), image lifecycle (old AMI deregistration + inventory), Packer SSM `:NN` version pin (requires AWS creds).
+
+## Current Milestone: v3.1 noVNC HTTPS-Only
+
+**Goal:** Force noVNC web access (:6080) to TLS-only — reject plaintext connections, redirect plain HTTP to HTTPS, add HSTS/security headers — and audit code-server (:8080) for TLS parity.
+
+**Target work:**
+- noVNC listener refuses plaintext connections (TLS-only)
+- Plain HTTP on the noVNC port redirects to HTTPS
+- HSTS / security headers on noVNC responses
+- code-server TLS posture audited for parity
+- Self-signed cert retained (access is CIDR-allowlisted + inside a private VPC — no trusted-cert provisioning this milestone)
+
+**Key context:**
+- noVNC already serves TLS via `novnc_proxy --cert/--key` (self-signed `/CN=devbox`); the gap is that websockify also accepts plaintext (no `--ssl-only`).
+- Redirect + HSTS cannot be produced by websockify/novnc_proxy alone, so this milestone introduces a **reverse proxy (nginx/caddy)** terminating TLS in front of noVNC — a new component baked into the AMI via the `desktop` role (or a new role inserted before `hardening`).
+- code-server (:8080) is already HTTPS-only via `cert: true`; the audit confirms parity and decides whether it sits behind the same proxy.
+- Invariant: `hardening` stays the last Ansible role — any new reverse-proxy role inserts before it.
 
 ## Shipped Milestone: v3.0 Jupyter + mise
 
@@ -69,9 +86,9 @@ A single operator can spin up, hibernate, and tear down a reproducible, hardened
 
 ### Active
 
-<!-- v1.0 complete 2026-05-14 (23 reqs). v2.0 complete 2026-06-02 (RUN/CI/POL/DOC). No active requirements — v3.0 defines its own via /gsd:new-milestone. -->
+<!-- v1.0 complete 2026-05-14 (23 reqs). v2.0/v3.0 complete 2026-06-02. v3.1 requirements defined below. -->
 
-(none — awaiting v3.0 requirements)
+(see Milestone v3.1 requirements in `.planning/REQUIREMENTS.md`)
 
 ### Out of Scope
 
@@ -131,4 +148,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-06-02 after v3.0 milestone completion.*
+*Last updated: 2026-06-09 — v3.1 noVNC HTTPS-Only milestone started.*
