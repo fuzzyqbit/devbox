@@ -1,9 +1,9 @@
 ---
 gsd_state_version: 1.0
-milestone: v3.1
-milestone_name: noVNC HTTPS-Only
-status: planning
-last_updated: "2026-06-09T12:18:22.237Z"
+milestone: null
+milestone_name: null
+status: between-milestones
+last_updated: "2026-06-09T13:43:42.048Z"
 last_activity: 2026-06-09
 progress:
   total_phases: 0
@@ -20,14 +20,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-06-02 after v3.0 milestone start)
 
 **Core value:** A single operator can spin up, hibernate, and tear down a reproducible, hardened cloud workstation with one command — without leaking credentials or exposing a vulnerable host to the public internet.
-**Current focus:** v3.0 shipped (2026-06-02). No active milestone — start the next with `/gsd:new-milestone`.
+**Current focus:** No active milestone. noVNC HTTPS-only shipped as quick task `260609-dif` (`novnc_proxy --ssl-only`); the planned v3.1 nginx milestone was abandoned. Start the next with `/gsd:new-milestone`.
 
 ## Current Position
 
-Phase: Not started (defining requirements)
+Phase: Not started (between milestones)
 Plan: —
-Status: Defining requirements
-Last activity: 2026-06-09 — Milestone v3.1 started
+Status: Between milestones
+Last activity: 2026-06-09 — Quick task 260609-dif (noVNC --ssl-only); v3.1 nginx milestone abandoned
 
 ## Performance Metrics (v1.0)
 
@@ -101,14 +101,16 @@ See PROJECT.md Key Decisions table. Locked v1.0 decisions:
 |---|-------------|------|--------|-----------|
 | 260520-be1 | create gitlab CI pipeline: packer build AMI then tofu apply EC2 from that AMI | 2026-05-20 | 72f3157 | [260520-be1-create-gitlab-ci-pipeline-packer-build-a](./quick/260520-be1-create-gitlab-ci-pipeline-packer-build-a/) |
 | 260602-add-golang-dev-tools | add 11 pinned Go developer tools (gopls, dlv, golangci-lint, govulncheck, …) to the golang role | 2026-06-02 | 88541f0 | [260602-add-golang-dev-tools](./quick/260602-add-golang-dev-tools/) |
+| 260609-dif | enforce noVNC HTTPS-only via `novnc_proxy --ssl-only` (dropped the planned v3.1 nginx milestone) | 2026-06-09 | PENDING | [260609-dif-enforce-https-only-on-novnc-via-novnc-pr](./quick/260609-dif-enforce-https-only-on-novnc-via-novnc-pr/) |
 
 ## Session Continuity
 
-Last session: 2026-06-02 — v3.0 (Jupyter + mise) closed and archived; tag `v3.0`.
-Stopped at: milestone v3.0 complete
-Next: `/gsd:new-milestone` — start the next milestone (or bake an AMI to clear the 2 deferred Phase-8 UAT checks first)
+Last session: 2026-06-09 — quick task `260609-dif` (noVNC `--ssl-only`); started v3.1 noVNC HTTPS-Only as a full nginx milestone, then collapsed it to the one-line flag and abandoned the phased scaffold.
+Stopped at: between milestones (no active milestone)
+Next: `/gsd:new-milestone` — start the next milestone (Observability / Lifecycle / Image-lifecycle queued)
 
 ## Operator Next Steps
 
-- (Optional) `DEVBOX_USER=$(whoami) ./run build` then confirm `08-HUMAN-UAT.md` (Jupyter venv + `mise --version`)
+- (Optional) `DEVBOX_USER=$(whoami) ./run build` then confirm noVNC: `novnc.service` starts with `--ssl-only`, `wss://<host>:6080` connects, plain `http://<host>:6080` refused (quick task `260609-dif` bake-time UAT)
+- (Optional) same bake clears the carried Phase-8 checks (Jupyter venv, `mise --version`, Go tools)
 - `/gsd:new-milestone` — define the next milestone (Observability / Lifecycle / Image-lifecycle are queued in Pending)

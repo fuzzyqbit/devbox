@@ -13,7 +13,8 @@ ExecStart=/usr/local/share/noVNC/utils/novnc_proxy \
   --listen {{ desktop_novnc_port }} \
   --vnc localhost:{{ desktop_vnc_port }} \
   --cert /etc/novnc/novnc-cert.pem \
-  --key /etc/novnc/novnc-key.pem
+  --key /etc/novnc/novnc-key.pem \
+  --ssl-only
 
 Restart=on-failure
 RestartSec=5

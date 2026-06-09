@@ -6,26 +6,19 @@
 
 Personal cloud workstation that bakes an AL2023 AMI and provisions per-user EC2 from it. End-to-end secure-by-default: per-build secrets via SSM Parameter Store + IAM instance profile + IMDSv2; SSM Session Manager for shell (no port 22); CIDR-allowlisted code-server (:8080) + noVNC (:6080); loopback-only on-demand JupyterLab (`./run jupyter`); reproducible builds via committed `.terraform.lock.hcl` + pinned Galaxy collections + Packer source via SSM Parameter Store + manifest-driven AMI handoff; CI + tiered pre-commit gates against every invariant. The operator surface is a single `./run` shell dispatcher (the Makefile was retired in v2.0); the GitLab CI pipeline calls `./run` for bake + deploy.
 
-**Active milestone:** v3.1 noVNC HTTPS-Only — started 2026-06-09.
+**No active milestone.** noVNC HTTPS-only enforcement shipped as quick task `260609-dif` (2026-06-09) — `novnc_proxy --ssl-only` rejects plaintext on `:6080`. The originally-planned v3.1 nginx-reverse-proxy milestone (redirect + HSTS + headers) was abandoned in favour of the one-line flag; nginx research archived to `milestones/v3.1-abandoned-research/`.
 
 **Deferred to a later cycle:** observability (CloudWatch metrics + login events), lifecycle automation (idle auto-stop, scheduled stop), image lifecycle (old AMI deregistration + inventory), Packer SSM `:NN` version pin (requires AWS creds).
 
-## Current Milestone: v3.1 noVNC HTTPS-Only
+## Abandoned: v3.1 noVNC HTTPS-Only (nginx milestone)
 
-**Goal:** Force noVNC web access (:6080) to TLS-only — reject plaintext connections, redirect plain HTTP to HTTPS, add HSTS/security headers — and audit code-server (:8080) for TLS parity.
-
-**Target work:**
-- noVNC listener refuses plaintext connections (TLS-only)
-- Plain HTTP on the noVNC port redirects to HTTPS
-- HSTS / security headers on noVNC responses
-- code-server TLS posture audited for parity
-- Self-signed cert retained (access is CIDR-allowlisted + inside a private VPC — no trusted-cert provisioning this milestone)
-
-**Key context:**
-- noVNC already serves TLS via `novnc_proxy --cert/--key` (self-signed `/CN=devbox`); the gap is that websockify also accepts plaintext (no `--ssl-only`).
-- Redirect + HSTS cannot be produced by websockify/novnc_proxy alone, so this milestone introduces a **reverse proxy (nginx/caddy)** terminating TLS in front of noVNC — a new component baked into the AMI via the `desktop` role (or a new role inserted before `hardening`).
-- code-server (:8080) is already HTTPS-only via `cert: true`; the audit confirms parity and decides whether it sits behind the same proxy.
-- Invariant: `hardening` stays the last Ansible role — any new reverse-proxy role inserts before it.
+Scoped 2026-06-09 around a TLS-terminating nginx reverse proxy in a new `novnc-proxy` role
+(redirect + HSTS + security headers). Replaced by quick task `260609-dif`: `novnc_proxy`
+already supports `--ssl-only`, which satisfies the core "reject plaintext" requirement with
+one line and no new component. Tradeoff accepted: no HTTP→HTTPS redirect and no security
+headers (HSTS) — websockify cannot emit them without a proxy. code-server (`:8080`) was
+already HTTPS-only via `cert: true`. Research retained at
+`milestones/v3.1-abandoned-research/` if redirect/headers are ever revisited.
 
 ## Shipped Milestone: v3.0 Jupyter + mise
 
