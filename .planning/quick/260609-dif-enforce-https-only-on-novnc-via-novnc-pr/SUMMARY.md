@@ -4,7 +4,7 @@ slug: enforce-https-only-on-novnc-via-novnc-pr
 created: 2026-06-09
 completed: 2026-06-09
 status: complete
-commit: PENDING
+commit: fb59449
 ---
 
 # Summary: Enforce HTTPS-only on noVNC (`--ssl-only`)
