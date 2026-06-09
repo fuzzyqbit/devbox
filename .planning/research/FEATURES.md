@@ -1,114 +1,162 @@
-# Feature Landscape: ./run Task Runner Script
+# Feature Landscape: noVNC HTTPS-Only Enforcement
 
-**Domain:** Shell-based task runner replacing a Makefile in a personal IaC project
-**Researched:** 2026-05-27
-**Scope:** Features for `./run <command>` that works identically locally and in GitLab CI runners
+**Domain:** TLS-only enforcement for a browser-reached internal service (noVNC) behind a reverse proxy
+**Researched:** 2026-06-09
+**Confidence:** HIGH — behaviors verified against MDN, OWASP, nginx docs, websockify source docs, and noVNC wiki
 
 ---
 
 ## Context: What Already Exists
 
-The Makefile being replaced has these established behaviors that the `./run` script must preserve:
+| Component | Current State | Gap |
+|-----------|--------------|-----|
+| `novnc_proxy` on :6080 | TLS via `--cert/--key` (self-signed `/CN=devbox`) | `--ssl-only` flag absent; websockify accepts plaintext connections on the same port |
+| code-server on :8080 | HTTPS-only via `cert: true` in config.yaml | Already correct; audit needed to confirm no plaintext fallback |
+| Reverse proxy | None — websockify serves directly | Required to produce HTTP→HTTPS redirect and add security headers |
+| Firewalld | Running (CIS role enablement); :6080 open to CIDR allowlist | No change needed |
 
-- 20 named commands across 5 groups: AMI/Packer, Terraform/OpenTofu, instance lifecycle, SSM access, secrets
-- `DEVBOX_USER` guard that refuses to run state-touching commands without it
-- `tf-ensure-init` auto-reinit guard (checks backend cache key vs current user, reinits if stale)
-- `TF_BIN` override for tofu vs terraform
-- `TF_STATE_BUCKET` derivation via `aws sts get-caller-identity`
-- Per-operator backend config threading (`-backend-config` flags)
-- A `help` target with grouped command listing
-
-The scripts in `scripts/` already have: `parse_args` with `--user/--instance-id/--region` flags, `resolve_user`, `resolve_instance`, `init_devbox`, and individual `usage()` functions. The `_common.sh` pattern is solid infrastructure that `./run` should delegate to rather than replace.
+The milestone introduces nginx as a TLS-terminating reverse proxy in front of websockify, which then runs in plaintext-only mode on a loopback port.
 
 ---
 
 ## Table Stakes
 
-Features that must exist or the `./run` script will frustrate operators more than the Makefile it replaces.
+Features users/browsers expect for a service advertised as HTTPS-only. Missing these = the enforcement is incomplete or broken.
 
 | Feature | Why Expected | Complexity | Notes |
 |---------|--------------|------------|-------|
-| **Subcommand dispatch** | Every modern CLI uses `tool <command>` not `tool-command` | Low | `case "$1" in` pattern; delegates to scripts or inline logic |
-| **Help output — grouped** | Makefile already has this; regression if lost | Low | Must mirror Makefile's 5-group structure. `./run` or `./run help` both work |
-| **DEVBOX_USER guard** | Already enforced by Makefile; removing it causes silent state corruption | Low | Port the existing `_require-devbox-user` guard exactly |
-| **DEVBOX_USER env + arg** | Operators export it or pass per-invocation | Low | Accept via env var and via `--user` / positional (keep parity with scripts) |
-| **tf-ensure-init guard** | The auto-backend-reinit is a genuine UX win; scripts that omit it break after user switching | Medium | Port the jq-based backend cache check from the Makefile |
-| **Unrecognized command error** | Typos should produce `unknown command: foo` not silent no-op | Low | Default case in the dispatch with exit 1 |
-| **Pass-through to scripts** | `scripts/*.sh` already exist and work; `./run` should delegate, not duplicate | Low | Exec or source with env vars threaded through |
-| **CI-safe (no TTY requirement)** | GitLab CI runners have no TTY; the script must not hang on prompts | Low | `set -euo pipefail`; no `read` without `-t 0` guard; no interactive prompts |
-| **Makefile target name parity** | All 20 existing command names must work as-is | Low | Operators will muscle-memory the names; a rename breaks CLAUDE.md and CI scripts |
+| **TLS-only listener — reject plaintext** | An HTTPS-only service that silently accepts plaintext is not HTTPS-only | Low | Two mechanisms: (a) websockify `--ssl-only` flag rejects at the websockify layer, OR (b) nginx terminates TLS and websockify runs in plaintext-only on loopback (no `--cert/--key` needed). Prefer (b) — nginx is the proxy anyway. |
+| **HTTP→HTTPS redirect on the same port (:6080)** | Browsers and users will type the base URL without `https://`; a silent reject produces a confusing blank page | Medium | nginx `error_page 497` handles the case where HTTP plaintext is sent to an SSL-listening port: `error_page 497 =301 https://$host:$server_port$request_uri;`. This is nginx-specific and correct for the shared-port case. A separate :80 listener is NOT appropriate here — :6080 is the only open web port for noVNC. |
+| **WebSocket-over-TLS (wss://) working through the proxy** | noVNC's core connection is a WebSocket; breaking it renders the tool non-functional | Medium | Three nginx directives are mandatory: `proxy_http_version 1.1`, `proxy_set_header Upgrade $http_upgrade`, `proxy_set_header Connection "upgrade"`. Without these, nginx strips the Upgrade header and the WebSocket handshake returns 400 or silently drops. Additionally: `proxy_read_timeout` must be extended well beyond 60s (use 3600s or 86400s) to prevent idle session disconnection. `proxy_buffering off` to avoid stream buffering. |
+| **Self-signed cert served consistently** | The cert is already baked into the AMI; nginx must use the same cert/key pair that websockify was using | Low | Use existing `/etc/novnc/novnc-cert.pem` and `/etc/novnc/novnc-key.pem`. No new cert generation needed. |
+| **X-Content-Type-Options: nosniff** | Prevents MIME-type sniffing attacks; lowest-cost header with no false positives | Low | `add_header X-Content-Type-Options "nosniff" always;` |
+
+---
 
 ## Differentiators
 
-Features that improve operator experience meaningfully without adding accidental complexity.
+Features that add meaningful security or quality beyond the bare minimum. Appropriate for an internal CIDR-allowlisted tool.
 
 | Feature | Value Proposition | Complexity | Notes |
 |---------|-------------------|------------|-------|
-| **Dependency preflight check** | Single `./run doctor` (or preflight on every run) that checks aws, jq, packer, tofu, ansible, session-manager-plugin, shellcheck are on PATH — surfaces clear "missing: session-manager-plugin, install: brew install --cask session-manager-plugin" before any command fails mid-way | Medium | `command -v` loop with per-tool install hints. Optionally triggered as `./run doctor` rather than blocking every invocation — fast commands (help, fmt) do not need AWS tools present |
-| **Colored output — CI-aware** | `[OK]`, `[WARN]`, `[ERROR]` prefixes in color locally, plain text in CI | Low | Check `[[ -t 1 ]]` (stdout is a tty) AND respect `NO_COLOR` env var (no-color.org standard) AND detect `CI=true`. Three-condition guard: `color_enabled = tty AND NOT NO_COLOR AND NOT CI` |
-| **Dry-run flag for destructive commands** | `./run tf-destroy --dry-run` prints what would happen without doing it; maps to `tofu plan -destroy` | Low | Only meaningful for: tf-destroy, tf-auto-destroy, tf-apply, tf-auto-apply. Other commands are already read-only or idempotent |
-| **`./run` with no arguments shows help** | Common CLI convention; `./run` alone should not error | Low | If `$1` is empty, call help handler. Zero effort, high polish |
-| **Version/env info command** | `./run env` prints: DEVBOX_USER, TF_BIN version, aws-cli version, tofu version, resolved TF_STATE_BUCKET — useful for debugging CI failures | Low | Pure read-only reporting; helps when CI fails with version mismatch |
-| **Consistent error message format** | All errors follow: `ERROR: <what went wrong>. <how to fix it>.` — currently the Makefile mixes formats | Low | Adopt the pattern already used in `scripts/_common.sh` throughout `./run` itself |
-| **Exit code discipline** | `./run` exits non-zero on any command failure; CI pipelines depend on this | Low | `set -euo pipefail` at top of script; any subshell failure propagates |
-| **GitLab CI single-source alignment** | CI pipeline `script:` blocks call `./run <command>` instead of inline shell — the script IS the runbook | Low | This is the primary v2.0 goal; not a feature of the script per se but the design constraint that shapes everything |
+| **HSTS with a short max-age (no preload, no includeSubDomains)** | Forces the browser to remember HTTPS for subsequent visits without HTTP round-trip exposure. Scoped correctly for an internal tool with a self-signed cert. **See HSTS tradeoff section below.** | Low | `Strict-Transport-Security: max-age=300` — 5 minutes is sufficient for a personal tool. Do NOT use `includeSubDomains` (no subdomains exist). Do NOT use `preload` (requires a public domain). Short max-age limits the "I've locked myself out" blast radius if the cert expires or changes. |
+| **X-Frame-Options: DENY (or CSP frame-ancestors)** | Prevents the VNC session from being embedded in a hostile iframe (clickjacking vector even on internal tools) | Low | `add_header X-Frame-Options "DENY" always;` or the modern equivalent `Content-Security-Policy: frame-ancestors 'none';`. For an internal tool CSP is overkill — use X-Frame-Options. |
+| **Referrer-Policy: no-referrer** | Prevents the URL of the noVNC session from leaking in referer headers to any embedded resources | Low | `add_header Referrer-Policy "no-referrer" always;` |
+| **code-server TLS audit** | Confirms :8080 has no plaintext fallback and is already at parity with the noVNC enforcement | Low | Audit `cert: true` behavior in code-server: this flag uses a self-signed cert but code-server itself DOES refuse plaintext (unlike websockify). Document the confirmed parity; no change expected. |
+
+---
 
 ## Anti-Features
 
-Things to explicitly NOT build. Keeping `./run` a plain bash script is a feature.
+Things that appear useful but are wrong or counterproductive for this specific use case.
 
-| Anti-Feature | Why Avoid | What to Do Instead |
-|--------------|-----------|-------------------|
-| **Plugin/extension system** | One operator, one project, zero extensibility need | Hard-code the 20 commands; add new ones as case branches |
-| **Configuration file (`run.toml`, `.runrc`)** | The Makefile already has all config as env vars; a new config file format adds a new mental model | Keep env vars + CLI args as the only configuration surface |
-| **Tab completion script** | Low ROI for a single-operator project; adds a maintenance burden (completions must be sourced, vary by shell) | The 20 command names are short and memorable; `./run help` is the discovery mechanism |
-| **Parallel task execution** | No current targets need to run in parallel; CI handles parallelism via separate jobs | Sequential execution is simpler, easier to debug, and matches the Makefile's behavior |
-| **Dependency graph / task ordering engine** | The `tf-ensure-init` guard is already the only real dependency; generalizing it adds complexity | Keep the guard as an explicit check inside the commands that need it |
-| **Built-in retry logic** | AWS CLI calls that fail should fail loudly so the operator understands the problem | Let failures propagate; add retry manually only if a specific command shows a real transient failure pattern |
-| **Progress bars / spinners** | These require cursor control and break in CI logs | Print timestamped status lines instead (`echo "[$(date +%H:%M:%S)] Waiting for instance to reach running state..."`) |
-| **Interactive menus / prompts** | CI runners have no TTY; interactive prompts break the CI use case entirely | All inputs via args or env vars only |
-| **Automatic shell detection** | `#!/usr/bin/env bash` is sufficient; detecting zsh vs fish vs bash is complexity for zero gain | Bash only; document it |
-| **Rewriting scripts/_common.sh** | The existing helper library is already solid and tested; `./run` should source and call it | Delegate lifecycle commands to the existing scripts; keep `./run` as a thin dispatcher |
+| Anti-Feature | Why Problematic | What to Do Instead |
+|--------------|-----------------|-------------------|
+| **HSTS with `preload`** | `preload` submits the domain to a browser-embedded list. Requires a real public domain, min `max-age=31536000`, and `includeSubDomains`. For an EC2 IP address or private hostname with a self-signed cert this is impossible and meaningless — the domain is not publicly resolvable. | Use `max-age=<short>` only, no `preload`, no `includeSubDomains`. |
+| **HSTS with a long max-age and a self-signed cert** | This combination makes the cert warning un-bypassable AND persists for months. If the self-signed cert changes (rebake, key rotation) or the operator reaches the host from a new browser, the browser shows a hard error with no "Proceed anyway" escape hatch for the max-age duration. The operator can clear it manually via `chrome://net-internals/#hsts` but this is a surprise footgun. | Use a short max-age (300–3600s). HSTS still prevents protocol downgrade attacks on repeat visits; short max-age limits lockout exposure. |
+| **HSTS with `includeSubDomains`** | There are no subdomains. The directive would apply to any subdomain of the EC2 hostname, which does not exist and cannot serve HTTPS. It is inert but misleading. | Omit entirely. |
+| **Full Content-Security-Policy for noVNC** | noVNC loads resources from multiple paths (JS, CSS, PNG icons, websocket connections). A CSP that is too tight will break the UI. Getting CSP right requires auditing every resource URL in the noVNC HTML output. For an internal CIDR-allowlisted tool the XSS attack surface is already minimal. | Skip CSP. Use X-Frame-Options to cover the meaningful clickjacking vector instead. |
+| **Separate :80 listener for HTTP→HTTPS redirect** | Port :80 is not in the security group allowlist. Opening it for redirects adds an ingress rule to collect requests only to immediately redirect them — an unnecessary attack surface expansion. The nginx `error_page 497` mechanism handles the same-port redirect without needing a second listener. | Use `error_page 497` redirect only. |
+| **Terminating TLS at both nginx and websockify** | Running websockify with `--cert/--key` while nginx also terminates TLS means double-TLS on loopback. It adds cert management complexity with zero security benefit — loopback traffic does not traverse a network. | Remove `--cert/--key` from the websockify `ExecStart` once nginx is the TLS terminator. Let websockify run as a plaintext-over-loopback backend. |
+| **Permissions-Policy header** | Lists browser capabilities to deny (camera, microphone, geolocation). noVNC is a VNC client — it uses none of these. The header adds noise without meaning for this use case. | Omit. |
+| **OCSP stapling** | Requires a CA that participates in OCSP (self-signed certs have no OCSP endpoint). Nginx will fail to fetch OCSP responses, log errors, and potentially delay handshakes. | Omit `ssl_stapling on` for self-signed certs. |
+
+---
+
+## HSTS With a Self-Signed Cert: Explicit Tradeoff Analysis
+
+This is the most nuanced feature decision in this milestone.
+
+**What HSTS does:** After the browser receives the `Strict-Transport-Security` header on a successful HTTPS response, it will refuse to connect over plain HTTP to the same host for the duration of `max-age`. It upgrades future requests to HTTPS internally before they leave the browser.
+
+**Why it is normally useful:** Prevents SSL-stripping attacks where a MITM downgrades the first request from HTTPS to HTTP. Prevents accidental plain-HTTP bookmarks or links from working.
+
+**The self-signed cert interaction (confirmed from MDN):**
+> "If a TLS warning or error, such as an invalid certificate, occurs when connecting to an HSTS host, the browser does not offer the user a way to proceed or 'click through' the error message."
+
+This means: once the browser has stored the HSTS entry for the EC2 hostname, and then the self-signed cert changes (rebake, new AMI, key rotation), the operator sees a hard error page with NO bypass option. The only escape is manually deleting the HSTS entry from `chrome://net-internals/#hsts` (Chrome) or `about:preferences#privacy` (Firefox). This is a support burden on a personal tool.
+
+**The verdict: HSTS is differentiator-level (not table stakes) with a short max-age.**
+
+- A `max-age` of 300–3600 seconds still prevents protocol downgrade on the current browser session and any repeat visits within the window.
+- After the window expires (e.g., after a rebake), the browser will accept a new cert exception normally again.
+- This gives meaningful MITM protection for the working session without creating a hard lockout footgun on every AMI rebuild.
+- `preload` and `includeSubDomains` are explicitly anti-features for this case (see above).
+
+**Contrast with code-server:** code-server's `cert: true` makes it HTTPS-only without HSTS — the browser still shows a cert warning but allows bypass. noVNC with nginx can match this posture. Adding HSTS then raises the bar by removing the bypass, which is the desired direction — but only if max-age is short enough to self-heal.
+
+---
+
+## WebSocket-over-TLS Through nginx: Required Behavior
+
+When nginx terminates TLS in front of websockify, the client connects over `wss://` (TLS WebSocket) to nginx. nginx then speaks plain `ws://` to websockify on loopback. This is correct and standard — the loopback path does not need encryption.
+
+**What must hold for the WebSocket connection to work:**
+
+1. nginx forwards `Upgrade: websocket` and `Connection: upgrade` headers to websockify. These are hop-by-hop headers that nginx strips by default. Explicit `proxy_set_header` directives are required.
+2. nginx uses `proxy_http_version 1.1` — the HTTP/1.0 default does not support the `Upgrade` mechanism; WebSocket upgrade will silently fail.
+3. `proxy_read_timeout` must exceed the expected idle time. Default is 60 seconds; an idle VNC session will be disconnected. Use 3600s (1 hour) minimum.
+4. `proxy_buffering off` — nginx must not buffer the binary VNC stream; buffering causes visible lag and can corrupt the protocol.
+5. websockify must no longer run with `--cert/--key` (remove from `novnc.service.j2`) once nginx owns TLS termination. Leaving both causes double-TLS on loopback and confuses the handshake.
+
+**The noVNC websocket path:** By default, noVNC connects its websocket to the same host+port that served the HTML, at path `/websockify` (or `/`). The nginx location block for websocket proxying must match this path. The static noVNC HTML/JS assets are also served by websockify (via `--web`); nginx proxies these over the same upstream, so a single `location /` block is sufficient rather than splitting `/websockify` and `/` across two blocks.
 
 ---
 
 ## Feature Dependencies
 
 ```
-Colored output → CI detection (must disable color in CI)
-Colored output → NO_COLOR check (must honor the standard)
-Dry-run flag  → tf-ensure-init guard (dry-run still needs backend initialized to plan)
-./run doctor  → per-tool install hints (each missing tool needs a specific hint, not a generic "install it")
-DEVBOX_USER guard → all tf-* and lifecycle commands (guard must be checked before any AWS call)
-tf-ensure-init → tf-plan, tf-apply, tf-auto-apply, tf-destroy, tf-auto-destroy, start, stop, status, devbox-ssm
+nginx TLS termination
+    └──requires──> websockify runs without --cert/--key (loopback plaintext backend)
+    └──requires──> proxy_set_header Upgrade + Connection (WebSocket headers)
+    └──requires──> proxy_http_version 1.1 (HTTP/1.1 for upgrade)
+    └──requires──> proxy_read_timeout > 60s (idle session survival)
+    └──enables──>  error_page 497 redirect (HTTP→HTTPS same port)
+    └──enables──>  add_header HSTS / security headers (response from nginx, not websockify)
+
+HSTS header
+    └──requires──> short max-age (self-signed cert rebake protection)
+    └──conflicts──> preload (needs public domain + 1yr max-age)
+    └──conflicts──> includeSubDomains (no subdomains exist)
+    └──conflicts──> long max-age (hard lockout footgun post-rebake)
 ```
 
 ---
 
-## MVP Recommendation
+## Prioritization Summary
 
-The v2.0 MVP `./run` script needs exactly:
-
-1. **Subcommand dispatch** with all 20 existing Makefile command names
-2. **Help grouped by category** (matches existing `make help` output, updated to `./run` syntax)
-3. **DEVBOX_USER guard** (identical to Makefile's `_require-devbox-user`)
-4. **tf-ensure-init guard** (identical logic, invoked by the same commands that invoke it today)
-5. **`./run` with no args shows help** (convention; zero cost)
-6. **CI-safe execution** (`set -euo pipefail`, no TTY requirements, no interactive prompts)
-7. **Colored output with NO_COLOR + CI + tty guards** (low complexity, high polish, correct behavior in CI)
-
-Defer to post-MVP:
-- `./run doctor` preflight command — useful but not blocking; existing scripts already have per-tool hints on failure
-- `./run env` info command — useful for debugging but not on the critical path
-- Dry-run flag — only 4 commands benefit; tofu already has `tf-plan` as the dry-run equivalent for apply
+| Feature | Category | Priority | Implementation Note |
+|---------|----------|----------|---------------------|
+| nginx TLS termination on :6080 | Table Stakes | P1 | Core of the milestone |
+| WebSocket proxy with Upgrade headers | Table Stakes | P1 | noVNC non-functional without it |
+| Remove `--cert/--key` from websockify | Table Stakes | P1 | Follows from nginx TLS ownership |
+| `error_page 497` HTTP→HTTPS redirect | Table Stakes | P1 | Single-port redirect mechanism |
+| `proxy_read_timeout` extension | Table Stakes | P1 | Prevents idle disconnection |
+| `proxy_buffering off` | Table Stakes | P1 | Prevents VNC stream corruption |
+| `X-Content-Type-Options: nosniff` | Table Stakes | P1 | Zero-cost, no false positives |
+| HSTS with short max-age | Differentiator | P2 | Useful with short max-age; footgun with long |
+| `X-Frame-Options: DENY` | Differentiator | P2 | Clickjacking prevention |
+| `Referrer-Policy: no-referrer` | Differentiator | P3 | Low risk for internal tool; low cost |
+| code-server TLS audit | Differentiator | P2 | Confirms parity; expected no-change |
+| HSTS preload / includeSubDomains | Anti-Feature | N/A | Do not implement |
+| Full CSP | Anti-Feature | N/A | Skip for this use case |
+| Separate :80 listener | Anti-Feature | N/A | Unnecessary ingress surface |
+| Double TLS (nginx + websockify) | Anti-Feature | N/A | Remove cert flags from websockify |
+| OCSP stapling | Anti-Feature | N/A | Incompatible with self-signed certs |
 
 ---
 
 ## Sources
 
-- NO_COLOR convention: https://no-color.org/
-- FORCE_COLOR convention: https://force-color.org/
-- Taskfile vs Just vs Make feature comparison: https://mylinux.work/guides/taskfile-vs-just-vs-make/
-- Bash dependency checking patterns: https://gist.github.com/montanaflynn/e1e754784749fd2aaca7
-- Bash colored output with tty detection: https://iifx.dev/en/articles/457712064/bash-scripting-how-to-reliably-use-color-output
-- Preflight check patterns: https://samanpavel.medium.com/bash-fail-fast-on-missing-dependencies-b7560bf143e8
+- websockify `--ssl-only` flag: https://github.com/novnc/websockify/blob/master/docs/websockify.1
+- nginx noVNC proxying: https://github.com/novnc/noVNC/wiki/Proxying-with-nginx
+- nginx WebSocket proxy headers: https://nginx.org/en/docs/http/websocket.html
+- nginx `error_page 497` for same-port HTTP→HTTPS redirect: https://davidwesterfield.net/2021/03/redirecting-http-requests-to-https-on-same-port-in-nginx/
+- HSTS semantics and self-signed cert behavior (MDN): https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Strict-Transport-Security
+- HSTS un-bypassable warning behavior: https://support.mozilla.org/en-US/questions/1175070
+- OWASP security headers cheat sheet: https://cheatsheetseries.owasp.org/cheatsheets/HTTP_Headers_Cheat_Sheet.html
+- nginx WSS + proxy_pass configuration: https://websocket.org/guides/infrastructure/nginx/
+
+---
+*Feature research for: noVNC HTTPS-only enforcement (v3.1 milestone)*
+*Researched: 2026-06-09*

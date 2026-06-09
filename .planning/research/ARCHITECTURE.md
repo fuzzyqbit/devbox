@@ -1,385 +1,502 @@
-# Architecture Patterns: ./run Script + GitLab CI Integration
+# Architecture Research: v3.1 noVNC HTTPS-Only — TLS Reverse Proxy Integration
 
-**Domain:** IaC operator script replacing a Makefile
-**Researched:** 2026-05-27
-**Confidence:** HIGH — based on direct codebase analysis, not web search
+**Domain:** Packer+Ansible-baked AL2023 AMI cloud workstation
+**Researched:** 2026-06-09
+**Confidence:** HIGH — grounded in direct codebase inspection + verified official sources
 
 ---
 
-## Recommended Architecture
+## Summary of Findings
 
-### Script structure: single monolith with sourced helpers
+The cleanest integration puts nginx on the existing public-facing port (:6080), moves
+websockify to loopback plaintext (:6081), and does NOT move code-server behind the proxy.
+The proxy lives in a new dedicated `novnc-proxy` Ansible role inserted immediately before
+`hardening`. No Terraform SG changes are needed. One firewalld rule is needed for the
+`public` zone. code-server stays as-is — its TLS posture already satisfies the parity
+requirement.
 
-Use a single `./run` entry-point script that dispatches via a `case` statement to
-command functions defined inline. The existing `scripts/_common.sh` is promoted to
-`scripts/lib.sh` (or kept as `_common.sh`) and sourced by `./run` at startup.
+---
 
-Do NOT split `./run` into multiple sourced modules (e.g., `run-tf.sh`, `run-packer.sh`).
-The full command set (about 20 targets) fits comfortably in one file at roughly
-300-400 lines with the current command volume. Splitting introduces sourcing order
-complexity, makes `shellcheck` harder to enforce across the boundary, and creates
-friction for CI job authors who now need to know which module owns which command.
-
-**Structure layout:**
+## Existing Architecture (Baseline)
 
 ```
-./run               # single dispatcher — 300-400 lines
-scripts/
-  _common.sh        # shared helpers (already exists); sourced by ./run
-  devbox-start.sh   # keep as-is; called by ./run cmd_start
-  devbox-stop.sh    # keep as-is; called by ./run cmd_stop
-  devbox-status.sh  # keep as-is; called by ./run cmd_status
-  devbox-ssm.sh     # keep as-is; called by ./run cmd_devbox_ssm
+Browser
+  |
+  |  HTTPS :6080  (websockify --cert/--key, self-signed /CN=devbox)
+  |  -- also accepts plaintext (no --ssl-only; cannot produce redirect or HSTS)
+  v
+EC2 :6080  novnc.service  (websockify on 0.0.0.0:6080 with TLS)
+  |
+  v
+localhost:5901  vncserver.service (TigerVNC)
+
+
+Browser
+  |
+  |  HTTPS :8080  (code-server cert: true; self-generated cert)
+  |  -- refuses plaintext at the process level; already HTTPS-only
+  v
+EC2 :8080  code-server.service (0.0.0.0:8080)
 ```
 
-The `scripts/*.sh` files stay as they are — they are already written as small,
-focused helpers. `./run` simply becomes the new Makefile-equivalent dispatcher that
-sets up environment variables and delegates to them, the same way Makefile recipes
-currently do.
+Key gap for noVNC: websockify/novnc_proxy cannot produce an HTTP-to-HTTPS redirect or
+emit HSTS response headers. `--ssl-only` only rejects plaintext connections; it does not
+issue a 301 or set `Strict-Transport-Security`. A real HTTP server must sit in front.
 
-### Internal layout of ./run
+---
 
-```bash
-#!/usr/bin/env bash
-set -euo pipefail
+## Recommended Architecture (v3.1 Target)
 
-# 1. SCRIPT_DIR + PROJECT_DIR (same idiom as scripts/_common.sh)
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+```
+Browser
+  |
+  |-- HTTP  :6080 ----> nginx (return 301 https://$host:6080$request_uri)
+  |
+  +-- HTTPS :6080 ----> nginx (TLS termination: /etc/novnc/novnc-{cert,key}.pem)
+                          |  Strict-Transport-Security header
+                          |  X-Frame-Options, X-Content-Type-Options headers
+                          |  proxy_pass http://127.0.0.1:6081 (WS upgrade)
+                          v
+                      localhost:6081  novnc.service (websockify, plaintext, no TLS)
+                          |
+                          v
+                      localhost:5901  vncserver.service (TigerVNC, unchanged)
 
-# 2. Defaults (mirrors Makefile variable block)
-DEVBOX_USER="${DEVBOX_USER:-}"
-TF_BIN="${TF_BIN:-tofu}"
-TF_STATE_REGION="${TF_STATE_REGION:-us-east-1}"
-TF_STATE_LOCK_TABLE="${TF_STATE_LOCK_TABLE:-devimage-tfstate-locks}"
-INSTANCE_ID="${INSTANCE_ID:-}"
-REGION="${REGION:-}"
 
-# 3. Derived variables (computed lazily or at startup)
-# TF_STATE_BUCKET and TF_STATE_KEY are computed at the point of use,
-# not at startup — avoids an aws sts call on every ./run invocation
-# (e.g., `./run help` should never hit AWS).
-
-# 4. Command functions — one function per command
-cmd_help()        { ... }
-cmd_build()       { ... }
-cmd_tf_init()     { ... }
-cmd_tf_ensure_init() { ... }   # prerequisite helper
-cmd_tf_plan()     { ... }
-cmd_tf_apply()    { ... }
-# ... etc.
-
-# 5. Main dispatcher
-COMMAND="${1:-help}"
-shift || true   # consume the command name; remaining args are forwarded
-
-case "$COMMAND" in
-  help)              cmd_help ;;
-  build)             cmd_build "$@" ;;
-  tf-init)           cmd_tf_init "$@" ;;
-  tf-plan)           cmd_tf_plan "$@" ;;
-  tf-apply)          cmd_tf_apply "$@" ;;
-  tf-auto-apply)     cmd_tf_auto_apply "$@" ;;
-  tf-destroy)        cmd_tf_destroy "$@" ;;
-  tf-auto-destroy)   cmd_tf_auto_destroy "$@" ;;
-  start)             cmd_start "$@" ;;
-  stop)              cmd_stop "$@" ;;
-  status)            cmd_status "$@" ;;
-  devbox-ssm)        cmd_devbox_ssm "$@" ;;
-  devbox-port-forward) cmd_devbox_port_forward "$@" ;;
-  secrets-show)      cmd_secrets_show "$@" ;;
-  validate)          cmd_validate "$@" ;;
-  fmt)               cmd_fmt "$@" ;;
-  packer-init)       cmd_packer_init "$@" ;;
-  clean)             cmd_clean "$@" ;;
-  *)
-    echo "ERROR: Unknown command '${COMMAND}'. Run './run help' for usage." >&2
-    exit 1
-    ;;
-esac
+Browser
+  |
+  +-- HTTPS :8080 ----> code-server.service (unchanged, cert: true, HTTPS-only)
 ```
 
 ---
 
-## Component Boundaries
+## Decision 1: Port Topology
 
-| Component | Responsibility | Communicates With |
-|-----------|---------------|-------------------|
-| `./run` | Dispatcher; variable setup; guard assertions; calls scripts or tool binaries directly | `scripts/_common.sh`, `scripts/devbox-*.sh`, `packer`, `tofu`, `aws` |
-| `scripts/_common.sh` | `parse_args`, `resolve_user`, `resolve_instance`, `init_devbox`; sourced by `./run` and `scripts/*.sh` | `tofu` (reads outputs) |
-| `scripts/devbox-*.sh` | Single-purpose EC2 lifecycle actions; keep existing interface unchanged | `aws` CLI, `scripts/_common.sh` |
-| `.gitlab-ci.yml` | CI pipeline; calls `./run <command>` in script blocks | `./run` only |
+**Recommendation: nginx takes over :6080 publicly; websockify moves to 127.0.0.1:6081
+(loopback only, plaintext). This is option (a) from the research question.**
+
+Rationale:
+
+- The existing Terraform SG already exposes :6080 with `var.allowed_web_cidrs`. Changing
+  to a new external port would require SG edits, a new firewalld rule, CLAUDE.md updates,
+  and `./run devbox-port-forward` script changes. Option (a) avoids all of this — the
+  public port is unchanged; only the internal socket moves.
+- The operator's port-forward muscle memory (`./run devbox-port-forward`) stays intact.
+- Option (b) (proxy on a new port) would leave the existing :6080 websockify listener
+  alive unless novnc.service is also changed — creating a gap where both ports accept
+  connections or requiring careful coordination.
+- Loopback port :6081 is invisible to the SG and firewalld (loopback traffic bypasses
+  the INPUT chain on AL2023/firewalld). No additional rule needed for :6081 itself.
+
+**websockify listen address change:**
+`--listen {{ desktop_novnc_port }}` (currently resolves to `6080`, all interfaces)
+becomes `--listen 127.0.0.1:{{ desktop_novnc_loopback_port }}` (loopback only, :6081).
+
+The `127.0.0.1` binding is essential. Binding `0.0.0.0:6081` would mean port :6081
+bypasses the proxy; port :6081 is not in the SG today, but defense-in-depth requires
+an explicit loopback binding rather than relying on the SG omission.
 
 ---
 
-## How CI Jobs Call the Script
+## Decision 2: websockify TLS
 
-CI jobs call `./run` the same way an operator would:
+**Recommendation: websockify runs plaintext on loopback. Remove `--cert` and `--key`
+from the novnc.service ExecStart line.**
+
+Rationale:
+
+- Double TLS (nginx terminates TLS externally, websockify re-encrypts on loopback) has
+  zero security value. Loopback traffic never leaves the kernel; it is not subject to
+  interception by any network-layer attacker. Re-encrypting loopback is pure CPU
+  overhead.
+- The industry-standard reverse proxy pattern: proxy terminates TLS at the edge,
+  backends receive plaintext on loopback. This is the documented pattern in the official
+  noVNC wiki ("Proxying with nginx") and in every nginx-fronted noVNC deployment in the
+  community literature.
+- The cert/key files at `/etc/novnc/novnc-cert.pem` and `/etc/novnc/novnc-key.pem` are
+  reused by nginx. The OpenSSL generation task and permission tasks in the `desktop`
+  role remain intact — they just serve nginx instead of websockify.
+
+Updated `novnc.service.j2` ExecStart (no --cert, no --key, loopback binding):
+
+```
+ExecStart=/usr/local/share/noVNC/utils/novnc_proxy \
+  --listen 127.0.0.1:{{ desktop_novnc_loopback_port }} \
+  --vnc localhost:{{ desktop_vnc_port }}
+```
+
+---
+
+## Decision 3: code-server
+
+**Recommendation: code-server stays on :8080 at `0.0.0.0:8080` with `cert: true`.
+Do NOT move it behind the proxy.**
+
+Rationale:
+
+- `cert: true` in `~/.config/code-server/config.yaml` makes code-server itself refuse
+  plaintext — the binary generates a self-signed cert and enforces HTTPS at the process
+  level. This already satisfies the parity requirement: no plaintext accepted.
+- The noVNC gap was that websockify accepts plaintext AND cannot produce a redirect.
+  code-server has neither problem: it rejects plaintext at the process level. The audit
+  conclusion is: parity confirmed, no change required.
+- Moving code-server behind the proxy would require either (a) nginx-to-code-server over
+  TLS (double TLS overhead) or (b) rebinding code-server to loopback plaintext (disabling
+  `cert: true` — a regression from current security posture). Neither option improves
+  security; both add complexity.
+- HSTS on :8080 is a future nice-to-have. If it becomes a requirement, a lightweight
+  nginx block on :8080 can be added in a later phase without disrupting this milestone.
+
+---
+
+## Decision 4: Ansible Role Ownership
+
+**Recommendation: New dedicated role `ansible/roles/novnc-proxy/`, inserted immediately
+before `hardening` in `ansible/playbook.yml`.**
+
+Rationale:
+
+- Project convention (MEMORY.md, CLAUDE.md §8 precedent from firewalld-docker-fix.yml):
+  new components get their own role; workarounds get their own named playbook. A reverse
+  proxy is a new functional component, not a kludge.
+- The `desktop` role is already substantive (GNOME, TigerVNC, noVNC, dconf, ffmpeg, VLC).
+  Adding nginx configuration, service management, and firewalld rules would erode its
+  cohesion and prevent independent layer-gating.
+- A dedicated role can be disabled (`layers.novnc_proxy: false`) without disabling the
+  desktop, which is useful for local builds or lightweight AMI variants.
+- nginx is a separate package with its own systemd service and config tree. Separation is
+  natural here.
+
+The `desktop` role requires one targeted modification: update `novnc.service.j2` to move
+websockify off port 6080 to loopback 6081. This is a modification to an existing role's
+template, not a new responsibility being added to it.
+
+**playbook.yml insertion (updated role sequence):**
 
 ```yaml
-# validate stage — no DEVBOX_USER needed
-validate:tofu-fmt:
-  script:
-    - ./run fmt --check   # or keep inline tofu/packer calls for validate; see below
-
-# bake stage
-bake:packer-build:
-  script:
-    - ./run build
-
-# deploy stage
-deploy:tofu-apply:
-  script:
-    - ./run tf-apply
+roles:
+  - role: base
+  - role: certs
+  # ... language/toolchain roles ...
+  - role: secrets
+  - role: vscode
+  - role: desktop        # MODIFIED: novnc.service moves to 127.0.0.1:6081
+  - role: novnc-proxy    # NEW: nginx on :6080, TLS proxy, HSTS, redirect
+  - role: hardening      # MUST remain last -- invariant unchanged
 ```
 
-**Key design constraint:** The validate jobs currently use specific tool images
-(one for `tofu`, one for `packer`, one for `ansible-lint`) and invoke tools directly
-because mixing binaries in one image is expensive. These jobs do NOT need to call
-`./run` — they can continue calling `tofu fmt -check`, `packer fmt -check`, etc.
-directly. The value of `./run` is for commands that share complex variable setup
-(DEVBOX_USER, TF_STATE_BUCKET derivation, tf-ensure-init) — that is the bake and
-deploy stages.
+`novnc-proxy` must come after `desktop` because it depends on:
+1. `/etc/novnc/novnc-cert.pem` and `/etc/novnc/novnc-key.pem` (created by `desktop`).
+2. `/usr/local/share/noVNC/` as the nginx document root (installed by `desktop`).
 
-Validate jobs are better left as direct tool invocations rather than being forced
-through `./run`, because:
-1. The validate image has a single binary; `./run` would add a sourcing overhead
-   with no benefit.
-2. `./run` would need to handle "am I in a tofu image or a packer image?" — that
-   is complexity that belongs in CI, not in the operator script.
+`novnc-proxy` must come before `hardening` to satisfy the enforced invariant.
 
-**Recommendation for CI:**
-- Validate jobs: keep direct tool invocations as today.
-- Bake job: replace inline `packer init . && packer build ...` with `./run build`.
-- Deploy job: replace inline `tofu init ... && tofu plan ... && tofu apply ...` with
-  `./run tf-init && ./run tf-apply` (or a single `./run deploy` compound command).
+**Layer gating:** Add `novnc_proxy: true` to `ansible/layer_config.yml`. Gate in
+`playbook.yml` as `when: layers.novnc_proxy | default(false)`. Because `novnc-proxy`
+is meaningless without `desktop`, either document this dependency explicitly in the
+role's README, or add a guard assertion in `novnc-proxy/tasks/main.yml` that checks for
+the cert file presence before proceeding.
 
 ---
 
-## Prerequisite Chain Migration: tf-ensure-init
+## Component Inventory: New vs Modified
 
-The `tf-ensure-init` Make prerequisite is the most complex piece to carry over. Its
-logic is:
-
-1. Read the cached backend key from `terraform/.terraform/terraform.tfstate`.
-2. Compare it to the desired key (`users/$DEVBOX_USER/devbox.tfstate`).
-3. If they differ (or the cache is absent), call `tf-reinit`.
-
-In `./run`, this becomes a plain shell function called explicitly by commands that
-need it, rather than via Make's prerequisite mechanism:
-
-```bash
-_tf_state_key() {
-  echo "users/${DEVBOX_USER}/devbox.tfstate"
-}
-
-_tf_state_bucket() {
-  # Lazy — only called when a tf command needs it.
-  # Fail-fast if aws sts returns nothing (same guard as Makefile lines 121-124).
-  local bucket
-  bucket="devimage-tfstate-$(aws sts get-caller-identity \
-    --query Account --output text 2>/dev/null)"
-  if [[ -z "$bucket" || "$bucket" == "devimage-tfstate-" ]]; then
-    echo "ERROR: could not resolve AWS account ID via 'aws sts get-caller-identity'." >&2
-    echo "       Check your AWS credentials/profile, or set TF_STATE_BUCKET= explicitly." >&2
-    exit 1
-  fi
-  echo "$bucket"
-}
-
-cmd_tf_ensure_init() {
-  _require_devbox_user
-  local desired_key
-  desired_key="$(_tf_state_key)"
-  local cached_key
-  cached_key="$(jq -r '.backend.config.key // empty' \
-    "${SCRIPT_DIR}/terraform/.terraform/terraform.tfstate" 2>/dev/null || true)"
-
-  if [[ "$cached_key" != "$desired_key" ]]; then
-    echo "[tf-ensure-init] backend cache mismatch (cached='$cached_key', want='$desired_key'); reinitializing..."
-    cmd_tf_reinit
-  fi
-}
-
-cmd_tf_apply() {
-  cmd_tf_ensure_init   # explicit call, not Make prerequisite
-  local bucket
-  bucket="$(_tf_state_bucket)"
-  cd "${SCRIPT_DIR}/terraform"
-  "$TF_BIN" apply \
-    -var "devbox_user=${DEVBOX_USER}" \
-    -var "key_name=${DEVBOX_USER}-devbox"
-}
-```
-
-The key insight: Make prerequisites are pulled automatically; in a shell script,
-callers must call `cmd_tf_ensure_init` explicitly at the start of each command
-that needs an initialized backend. This is more verbose but equally correct, and
-it makes the dependency visible in the source rather than implicit in the target
-graph.
-
-**Commands that must call `cmd_tf_ensure_init` first:**
-`tf-plan`, `tf-apply`, `tf-auto-apply`, `tf-destroy`, `tf-auto-destroy`,
-`start`, `stop`, `status`, `devbox-ssm`
-
-**Commands that must call `_require_devbox_user` but NOT `tf-ensure-init`:**
-`tf-init`, `tf-reinit`, `secrets-show`, `devbox-port-forward`
-
-**Commands that need neither guard:**
-`help`, `build`, `validate`, `fmt`, `packer-init`, `clean`
+| Component | Change Type | What Changes |
+|-----------|-------------|--------------|
+| `ansible/roles/novnc-proxy/` | NEW | Full new role: nginx package, config template, systemd service, firewalld rule |
+| `ansible/roles/novnc-proxy/tasks/main.yml` | NEW | `dnf install nginx`; deploy config template; `systemd enable+start nginx`; `ansible.posix.firewalld` port :6080/tcp |
+| `ansible/roles/novnc-proxy/templates/novnc.nginx.conf.j2` | NEW | Two server blocks on :6080 (HTTP redirect + HTTPS proxy with WS upgrade + security headers) |
+| `ansible/roles/novnc-proxy/defaults/main.yml` | NEW | `novnc_proxy_novnc_loopback_port: 6081`; cert/key paths |
+| `ansible/roles/novnc-proxy/handlers/main.yml` | NEW | `systemctl reload nginx` handler |
+| `ansible/roles/desktop/templates/novnc.service.j2` | MODIFIED | Remove `--cert/--key`; rebind `--listen` to `127.0.0.1:{{ desktop_novnc_loopback_port }}` |
+| `ansible/roles/desktop/defaults/main.yml` | MODIFIED | Add `desktop_novnc_loopback_port: 6081` |
+| `ansible/playbook.yml` | MODIFIED | Insert `novnc-proxy` role before `hardening` |
+| `ansible/layer_config.yml` | MODIFIED | Add `novnc_proxy: true` |
+| `terraform/main.tf` | UNCHANGED | :6080 SG ingress rule already present and correct |
 
 ---
 
-## Guard Function Pattern
+## Terraform / Security Group Impact
 
-```bash
-_require_devbox_user() {
-  if [[ -z "${DEVBOX_USER:-}" ]]; then
-    echo "ERROR: DEVBOX_USER is not set." >&2
-    echo "       Set per-invocation: DEVBOX_USER=jsmith ./run <command>" >&2
-    echo "       Or export it:       export DEVBOX_USER=jsmith" >&2
-    exit 1
-  fi
+**No changes required to `terraform/main.tf`.**
+
+The existing ingress rule:
+
+```hcl
+ingress {
+  description = "noVNC (HTTPS) restricted to operator CIDR allowlist"
+  from_port   = 6080
+  to_port     = 6080
+  protocol    = "tcp"
+  cidr_blocks = var.allowed_web_cidrs
 }
 ```
 
-The DEVBOX_USER validation in the deploy CI job should remain in `.gitlab-ci.yml`'s
-`before_script` (as it is today) and also be enforced inside `./run _require_devbox_user`.
-Defence in depth: CI catches it before wasting an STS call; `./run` catches it for
-local operators who forget.
+Already covers nginx binding to :6080. The only behavioral change is that the socket
+owner is nginx instead of websockify — transparent to the SG.
+
+The new websockify loopback port (:6081) requires no SG rule. It is bound to
+`127.0.0.1` and unreachable from outside the instance by design.
 
 ---
 
-## Variable Resolution Order
+## firewalld Impact
 
-Mirrors Makefile lines 14-52. In `./run`:
+**One new rule required, added by the `novnc-proxy` role.**
 
-| Variable | Source priority |
-|----------|----------------|
-| `DEVBOX_USER` | Env var (no default — explicit is required) |
-| `TF_BIN` | Env var, default `tofu` |
-| `TF_STATE_REGION` | Env var, default `us-east-1` |
-| `TF_STATE_LOCK_TABLE` | Env var, default `devimage-tfstate-locks` |
-| `TF_STATE_BUCKET` | Env var override OR derived from `aws sts get-caller-identity` |
-| `TF_STATE_KEY` | Always derived: `users/${DEVBOX_USER}/devbox.tfstate` |
-| `INSTANCE_ID` | Env var override OR read from `tofu output -raw instance_id` |
-| `REGION` | Env var override OR read from `tofu output -raw aws_region` |
+Current state: `firewalld-docker-fix.yml` sets the default zone to `docker`
+(target=ACCEPT — effectively permissive). Under this workaround, traffic to :6080 and
+:8080 passes regardless of zone rules. However, the retirement criteria for that
+workaround (documented in the play header) include adding per-port allowances in the
+`public` zone as the proper fix. The `novnc-proxy` role should add its allowance
+explicitly now, making the configuration correct under both the current workaround state
+and the future clean state.
+
+Using the `ansible.posix.firewalld` module (collection already pinned at
+`ansible.posix==2.1.0` in `ansible/requirements.yml`):
+
+```yaml
+- name: Allow noVNC proxy port through firewalld (public zone)
+  ansible.posix.firewalld:
+    port: 6080/tcp
+    zone: public
+    permanent: true
+    state: enabled
+    immediate: true
+```
+
+This is idempotent whether the default zone is `docker` (current workaround state) or
+`public` (future clean state). The rule targets the `public` zone explicitly and does
+not depend on the default zone setting.
+
+Note: nginx also needs to handle plain HTTP on :6080 to produce the redirect. This does
+NOT require a separate :80 listener — both the HTTP and HTTPS server blocks listen on
+port 6080. nginx distinguishes them via TLS detection (presence/absence of a TLS
+ClientHello on the socket). No :80 firewalld rule and no :80 SG rule are needed.
 
 ---
 
-## Data Flow
+## Data Flow (Complete Request Paths)
+
+### WebSocket session (VNC frames)
 
 ```
-Operator/CI invokes:
-  ./run <command> [flags]
-        │
-        ├── sets DEVBOX_USER, TF_BIN, etc. from env
-        ├── calls _require_devbox_user (if command needs it)
-        ├── calls cmd_tf_ensure_init (if command needs initialized backend)
-        │         └── reads terraform/.terraform/terraform.tfstate via jq
-        │             if mismatch → calls cmd_tf_reinit
-        │                 → cd terraform && tofu init -reconfigure <backend flags>
-        │
-        ├── [tf commands]
-        │   cd terraform && tofu plan/apply/destroy <var flags>
-        │
-        ├── [lifecycle commands]
-        │   export DEVBOX_USER INSTANCE_ID REGION
-        │   exec scripts/devbox-{start,stop,status,ssm}.sh
-        │
-        └── [packer commands]
-            cd packer && packer build/validate/fmt .
+Browser
+  |
+  | 1. HTTPS :6080 -- TLS ClientHello
+  v
+nginx :6080 -- TLS termination (/etc/novnc/novnc-{cert,key}.pem)
+  |  Strict-Transport-Security: max-age=63072000; includeSubDomains
+  |  proxy_pass http://127.0.0.1:6081
+  |  proxy_set_header Upgrade $http_upgrade
+  |  proxy_set_header Connection "upgrade"
+  |  proxy_http_version 1.1
+  |  proxy_read_timeout 61s    (> 60s default; prevents race-condition disconnect)
+  |  proxy_buffering off
+  v
+websockify 127.0.0.1:6081 -- plaintext WebSocket, no TLS
+  |
+  | TCP
+  v
+TigerVNC localhost:5901
+  |
+  | VNC framebuffer frames (binary, over WebSocket back to browser)
+  v
+(browser renders desktop)
+```
+
+### HTTP-to-HTTPS redirect
+
+```
+Browser
+  |
+  | HTTP :6080 (plain HTTP request -- no TLS ClientHello)
+  v
+nginx :6080 HTTP server block
+  |  return 301 https://$host:6080$request_uri
+  v
+Browser follows redirect --> HTTPS :6080 (flow above)
+```
+
+### noVNC static asset serving
+
+```
+Browser
+  |
+  | HTTPS GET /  (or /vnc.html)
+  v
+nginx :6080 HTTPS server block
+  |  root /usr/local/share/noVNC/;
+  |  index vnc.html;
+  v
+File served directly by nginx (no proxy; only /websockify path proxies to websockify)
+  v
+noVNC JS client loads in browser --> opens WSS connection --> VNC session flow above
 ```
 
 ---
 
-## Suggested Build Order for Implementation
+## nginx Configuration Structure
 
-1. **Write `./run` skeleton** — dispatcher, help text, variable block, guard functions.
-   No command implementations yet; all commands `echo "TODO" && exit 1`.
+Two server blocks, both on port 6080:
 
-2. **Implement packer commands** — `packer-init`, `validate`, `build`, `fmt`.
-   These have no `DEVBOX_USER` or backend dependencies; safe to test without AWS creds.
+**Block 1 -- HTTP redirect (no ssl keyword, catches plaintext connections):**
+```nginx
+server {
+    listen 6080;
+    server_name _;
+    return 301 https://$host:6080$request_uri;
+}
+```
 
-3. **Implement tf-init and tf-reinit** — the backend derivation + `TF_STATE_BUCKET`
-   lazy resolution. These are the foundation for everything else.
+**Block 2 -- HTTPS proxy (ssl keyword, catches TLS connections):**
+```nginx
+server {
+    listen 6080 ssl;
+    server_name _;
 
-4. **Implement `cmd_tf_ensure_init`** — the prerequisite chain. Write a unit test
-   by manually editing `terraform/.terraform/terraform.tfstate` to have a wrong key
-   and confirming reinit fires.
+    ssl_certificate     /etc/novnc/novnc-cert.pem;
+    ssl_certificate_key /etc/novnc/novnc-key.pem;
+    ssl_protocols       TLSv1.2 TLSv1.3;
+    ssl_ciphers         HIGH:!aNULL:!MD5;
 
-5. **Implement tf-plan, tf-apply, tf-auto-apply, tf-destroy, tf-auto-destroy** —
-   all share the same pattern: call `cmd_tf_ensure_init`, then delegate to `tofu`.
+    # Security headers
+    add_header Strict-Transport-Security "max-age=63072000; includeSubDomains" always;
+    add_header X-Frame-Options SAMEORIGIN always;
+    add_header X-Content-Type-Options nosniff always;
 
-6. **Implement lifecycle commands** — `start`, `stop`, `status`, `devbox-ssm`,
-   `devbox-port-forward`. These call `cmd_tf_ensure_init` and then exec/call the
-   existing `scripts/*.sh`.
+    # Static noVNC assets
+    root  /usr/local/share/noVNC/;
+    index vnc.html;
 
-7. **Implement secrets-show** — standalone AWS SSM reads; no backend needed.
+    # WebSocket proxy to websockify on loopback
+    location /websockify {
+        proxy_pass         http://127.0.0.1:{{ novnc_proxy_novnc_loopback_port }}/;
+        proxy_http_version 1.1;
+        proxy_set_header   Upgrade    $http_upgrade;
+        proxy_set_header   Connection "upgrade";
+        proxy_set_header   Host       $host;
+        proxy_read_timeout 61s;
+        proxy_buffering    off;
+    }
+}
+```
 
-8. **Implement clean** — `rm -rf` of packer cache + terraform local state.
+Both blocks on port 6080 is valid nginx. The HTTP block catches connections that arrive
+without a TLS ClientHello; the SSL block handles TLS connections. nginx determines which
+to use via socket-level protocol detection, not port-level routing.
 
-9. **Update `.gitlab-ci.yml`** — replace inline packer/tofu in bake and deploy jobs
-   with `./run build` and `./run tf-init && ./run tf-apply`. Leave validate jobs
-   as direct tool calls (see "How CI Jobs Call the Script" above).
+nginx is available in the AL2023 core dnf repository (`dnf install nginx`) at version
+1.24.x. No third-party repo is required. Caddy is NOT available via COPR for AL2023
+(the COPR project has no `epel-2023` build target -- confirmed via `caddyserver/dist`
+GitHub issue #119) and would require a manual binary download or a custom repo, both of
+which add bake-time complexity and break package-manager auditability. nginx is the
+correct choice.
 
-10. **Update docs** — CLAUDE.md, error messages in `_common.sh` that reference
-    `make <target>` → `./run <target>`.
+---
 
-11. **Delete Makefile** — only after all tests pass and CI is green.
+## Build Order for v3.1 Implementation
+
+Role sequence respects the existing invariant (hardening last) and the new dependency
+chain (novnc-proxy after desktop):
+
+```
+base
+  -> certs
+  -> [language/toolchain roles as before]
+  -> secrets
+  -> vscode
+  -> desktop  (MODIFIED: novnc.service rebinds to loopback :6081, drops TLS flags)
+  -> novnc-proxy  (NEW: nginx on :6080, TLS termination, redirect, HSTS, firewalld rule)
+  -> hardening  (invariant: MUST remain last)
+```
+
+Implementation sequence within a single PR:
+
+1. Add `desktop_novnc_loopback_port: 6081` to `ansible/roles/desktop/defaults/main.yml`.
+2. Update `ansible/roles/desktop/templates/novnc.service.j2` -- remove `--cert/--key`,
+   rebind `--listen` to `127.0.0.1:{{ desktop_novnc_loopback_port }}`.
+3. Create `ansible/roles/novnc-proxy/` skeleton (defaults, tasks, templates, handlers).
+4. Write `novnc.nginx.conf.j2` with the two server blocks above.
+5. Write `tasks/main.yml`: install nginx, deploy config, enable service, firewalld rule.
+6. Update `ansible/playbook.yml`: insert `novnc-proxy` before `hardening`.
+7. Update `ansible/layer_config.yml`: add `novnc_proxy: true`.
+8. Bake and smoke-test:
+   - `curl -k http://<host>:6080/` must return 301.
+   - `curl -kI https://<host>:6080/` must return 200 with `Strict-Transport-Security`.
+   - noVNC browser session must function (WebSocket connect through proxy to VNC).
+   - `curl http://<host>:6081/` from outside must be unreachable (loopback binding).
 
 ---
 
 ## Anti-Patterns to Avoid
 
-### Monkeying with PATH inside ./run
+### Double TLS on Loopback
 
-Do not `export PATH="$SCRIPT_DIR:$PATH"` or anything that causes `./run` to shadow
-system binaries. The script operates on explicit paths or relies on the caller's PATH
-for `tofu`, `packer`, `aws`, `jq`. Consistent with the existing Makefile.
+**What:** Keeping `--cert/--key` in websockify's ExecStart after nginx takes over TLS.
+**Why wrong:** Re-encrypting loopback traffic burns CPU with zero security benefit.
+Loopback traffic never leaves the kernel.
+**Instead:** Remove `--cert/--key`; reuse the cert files in nginx only.
 
-### Eager TF_STATE_BUCKET resolution
+### Extending `desktop` with Proxy Logic
 
-Do not call `aws sts get-caller-identity` at the top of `./run` unconditionally.
-Commands like `./run help`, `./run fmt`, `./run validate` must work with no AWS
-credentials. Derive `TF_STATE_BUCKET` lazily inside `_tf_state_bucket()` and call
-it only from commands that actually need the backend.
+**What:** Adding nginx install, config, and service management inside `desktop/tasks/`.
+**Why wrong:** Violates single responsibility; prevents independent layer-gating of the
+proxy; contradicts the project convention (new components get their own role).
+**Instead:** New `novnc-proxy` role.
 
-### Reimplementing Make's prerequisite graph
+### Binding websockify to `0.0.0.0:6081`
 
-Do not build a dependency resolver in bash. Make's prerequisite graph maps directly
-to explicit function calls in the script. `cmd_tf_apply` calls `cmd_tf_ensure_init`
-which calls `cmd_tf_reinit` if needed. That is the full depth needed; do not generalize.
+**What:** Moving websockify from :6080 to :6081 but binding all interfaces.
+**Why wrong:** Port :6081 is not in the SG today, but relying on SG omission for security
+is not defense-in-depth. If the SG is widened or the host moved to a more permissive
+network, plaintext websockify would be directly exposed.
+**Instead:** Bind `127.0.0.1:6081` explicitly.
 
-### Embedding CI-specific logic in ./run
+### Separate :80 Listener for the Redirect
 
-`./run` is the operator script. CI uses it; CI does not own it. OIDC token exchange,
-`--role-session-name` construction, DEVBOX_USER format validation — these belong in
-`.gitlab-ci.yml`'s `before_script`, not in `./run`. The script should work identically
-for a local operator and a CI runner.
+**What:** Adding a second nginx listener on :80 for HTTP-to-HTTPS redirect.
+**Why wrong:** Port :80 is not in the SG and not in firewalld. A redirect on :80 is
+unreachable by external clients. The redirect must live on the same port as the service
+(:6080), differentiated from HTTPS by TLS detection, not by port number.
+**Instead:** Both server blocks on :6080; HTTP vs HTTPS distinguished by the `ssl`
+keyword in the `listen` directive.
 
-### Making validate jobs call ./run
+### Moving code-server Behind the Proxy
 
-The nine validate CI jobs each run in a purpose-specific image with a single binary.
-Adding `./run` as an indirection layer here would require either a multi-binary image
-or complex detection logic. Leave validate as direct tool invocations; `./run` adds
-value where variable setup is complex (bake, deploy, lifecycle).
+**What:** Putting code-server (:8080) behind the nginx proxy to get HSTS parity.
+**Why wrong:** code-server's `cert: true` already enforces HTTPS at the process level.
+Moving it behind a proxy requires either double TLS (nginx+code-server both with TLS)
+or disabling `cert: true` (plaintext code-server on loopback -- a security regression).
+The gap does not exist; no fix is needed.
+**Instead:** Confirm parity via audit (code-server rejects plaintext); no Ansible change.
 
 ---
 
-## Scalability Considerations
+## Integration Points
 
-| Concern | Current (1 operator) | If multi-operator |
-|---------|---------------------|-------------------|
-| State isolation | `DEVBOX_USER` threads through TF_STATE_KEY | No change — same mechanism |
-| Concurrent CI runs | CI serializes deploy via `when: manual` | Add DynamoDB lock contention handling (already present in tofu) |
-| New commands | Add a function + case branch to `./run` | Same pattern; file stays readable at 50+ commands |
+### Internal Boundaries
+
+| Boundary | Communication | Key Config |
+|----------|---------------|------------|
+| nginx <-> websockify | HTTP/1.1 WebSocket upgrade over loopback TCP | `proxy_http_version 1.1`; `Upgrade` + `Connection` headers forwarded; `proxy_read_timeout 61s`; `proxy_buffering off` |
+| `novnc-proxy` role -> `desktop` role | File system (cert/key paths; noVNC static asset dir) | Role ordering dependency: novnc-proxy runs after desktop |
+| `novnc-proxy` role -> `ansible.posix` | Ansible module for firewalld | Collection already pinned at `ansible.posix==2.1.0` in `requirements.yml` |
+| nginx -> firewalld | Port :6080/tcp allowed in `public` zone | `ansible.posix.firewalld` module; `permanent: true; immediate: true` |
+| novnc.service -> nginx | Dependency ordering: nginx should start before novnc (or independently; they don't share a socket) | Consider `After=nginx.service` in novnc.service if nginx fails to start first |
 
 ---
 
 ## Sources
 
-- Direct analysis of `Makefile`, `.gitlab-ci.yml`, `scripts/_common.sh`,
-  `scripts/devbox-start.sh`, `scripts/devbox-stop.sh`, `scripts/devbox-status.sh`,
-  `scripts/devbox-ssm.sh`, `.planning/PROJECT.md`, `.planning/codebase/ARCHITECTURE.md`,
-  `.planning/codebase/CONVENTIONS.md` — HIGH confidence (primary sources).
-- No web search performed; domain is well-understood bash scripting patterns.
+- noVNC wiki -- [Proxying with nginx](https://github.com/novnc/noVNC/wiki/Proxying-with-nginx) -- HIGH confidence (official noVNC project)
+- nginx docs -- [WebSocket proxying](https://nginx.org/en/docs/http/websocket.html) -- HIGH confidence (official nginx)
+- nginx AL2023 availability -- confirmed in AL2023 core dnf repo at version 1.24.x -- MEDIUM confidence (multiple community guides; consistent with AWS package listing)
+- Caddy on AL2023 -- NOT available via COPR (no `epel-2023` build target) -- MEDIUM confidence ([caddyserver/dist#119](https://github.com/caddyserver/dist/issues/119))
+- [Websockify + noVNC behind nginx](https://datawookie.dev/blog/2021/08/websockify-novnc-behind-an-nginx-proxy/) -- MEDIUM confidence (pattern consistent with official noVNC wiki)
+- Direct codebase inspection: `ansible/roles/desktop/tasks/main.yml`, `templates/novnc.service.j2`, `ansible/roles/vscode/defaults/main.yml`, `ansible/roles/vscode/templates/config.yaml.j2`, `ansible/roles/hardening/defaults/main.yml`, `ansible/playbook.yml`, `terraform/main.tf`, `ansible/firewalld-docker-fix.yml` -- HIGH confidence (primary sources)
+
+---
+
+*Architecture research for: v3.1 noVNC HTTPS-Only -- TLS reverse proxy integration*
+*Researched: 2026-06-09*
