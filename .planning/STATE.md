@@ -27,7 +27,7 @@ See: .planning/PROJECT.md (updated 2026-06-02 after v3.0 milestone start)
 Phase: Not started (between milestones)
 Plan: —
 Status: Between milestones
-Last activity: 2026-06-09 — Quick task 260609-dif (noVNC --ssl-only); v3.1 nginx milestone abandoned
+Last activity: 2026-06-11 — Completed quick task 260611-jq2: Amazon DCV ansible role
 
 ## Performance Metrics (v1.0)
 
@@ -102,6 +102,7 @@ See PROJECT.md Key Decisions table. Locked v1.0 decisions:
 | 260520-be1 | create gitlab CI pipeline: packer build AMI then tofu apply EC2 from that AMI | 2026-05-20 | 72f3157 | [260520-be1-create-gitlab-ci-pipeline-packer-build-a](./quick/260520-be1-create-gitlab-ci-pipeline-packer-build-a/) |
 | 260602-add-golang-dev-tools | add 11 pinned Go developer tools (gopls, dlv, golangci-lint, govulncheck, …) to the golang role | 2026-06-02 | 88541f0 | [260602-add-golang-dev-tools](./quick/260602-add-golang-dev-tools/) |
 | 260609-dif | enforce noVNC HTTPS-only via `novnc_proxy --ssl-only` (dropped the planned v3.1 nginx milestone) | 2026-06-09 | fb59449 | [260609-dif-enforce-https-only-on-novnc-via-novnc-pr](./quick/260609-dif-enforce-https-only-on-novnc-via-novnc-pr/) |
+| 260611-jq2 | create ansible role installing and configuring Amazon DCV (pinned tarball, PAM auth, virtual session, :8443 web viewer) | 2026-06-11 | 78e169b | [260611-jq2-create-ansible-role-installing-and-confi](./quick/260611-jq2-create-ansible-role-installing-and-confi/) |
 
 ## Session Continuity
 
