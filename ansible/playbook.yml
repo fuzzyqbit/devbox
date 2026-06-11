@@ -56,6 +56,9 @@
     - role: desktop
       when: layers.desktop | default(false)
 
+    - role: dcv
+      when: (layers.dcv | default(false)) and (layers.desktop | default(false))
+
     - role: hardening  # MUST remain last — invariant (JUP-08 / CLAUDE.md §8)
       when: layers.hardening | default(false)
 
