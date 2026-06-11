@@ -187,6 +187,7 @@ DEVBOX_USER="${DEVBOX_USER:-}"
 TF_BIN="${TF_BIN:-tofu}"
 TF_STATE_REGION="${TF_STATE_REGION:-us-east-1}"
 TF_STATE_LOCK_TABLE="${TF_STATE_LOCK_TABLE:-devimage-tfstate-locks}"
+DEVBOX_FORWARD_DEFAULT_PORT="${DEVBOX_FORWARD_DEFAULT_PORT:-8080}"
 INSTANCE_ID="${INSTANCE_ID:-}"
 REGION="${REGION:-}"
 # TF_STATE_BUCKET is NOT derived at startup — computed lazily by
@@ -386,15 +387,51 @@ cmd_devbox_port_forward() {
   local instance_id region
   instance_id="$(cd "$REPO_ROOT/terraform" && "$TF_BIN" output -raw instance_id)"
   region="$(cd "$REPO_ROOT/terraform" && "$TF_BIN" output -raw aws_region)"
-  echo "Forwarding :8080 from ${instance_id} to localhost..."
-  echo "Browse to https://localhost:8080 (code-server)."
-  echo "For noVNC :6080, open a second forwarding session manually with portNumber=6080."
+
+  # Port specs: PORT or REMOTE:LOCAL, zero or more. No args = code-server :8080.
+  # e.g.  ./run devbox-port-forward            -> 8080
+  #       ./run devbox-port-forward 6080       -> noVNC
+  #       ./run devbox-port-forward 8080 6080  -> both, one SSM session each
+  #       ./run devbox-port-forward 8888:18888 -> remote 8888 on localhost:18888
+  local specs=("$@")
+  [ ${#specs[@]} -eq 0 ] && specs=("$DEVBOX_FORWARD_DEFAULT_PORT")
+
+  local spec remote_ports=() local_ports=() remote local_port
+  for spec in "${specs[@]}"; do
+    remote="${spec%%:*}"
+    local_port="${spec##*:}"
+    if [[ ! "$remote" =~ ^[0-9]+$ ]] || [[ ! "$local_port" =~ ^[0-9]+$ ]]; then
+      _error "invalid port spec '${spec}' (expected PORT or REMOTE:LOCAL, e.g. 6080 or 8888:18888)"
+      exit 1
+    fi
+    remote_ports+=("$remote")
+    local_ports+=("$local_port")
+  done
+
   echo "Ctrl-C to stop forwarding."
-  exec aws ssm start-session \
-    --target "$instance_id" \
-    --region "$region" \
-    --document-name AWS-StartPortForwardingSession \
-    --parameters '{"portNumber":["8080"],"localPortNumber":["8080"]}'
+  if [ ${#remote_ports[@]} -eq 1 ]; then
+    echo "Forwarding ${instance_id}:${remote_ports[0]} -> localhost:${local_ports[0]} ..."
+    exec aws ssm start-session \
+      --target "$instance_id" \
+      --region "$region" \
+      --document-name AWS-StartPortForwardingSession \
+      --parameters "{\"portNumber\":[\"${remote_ports[0]}\"],\"localPortNumber\":[\"${local_ports[0]}\"]}"
+  fi
+
+  # Multiple ports: AWS-StartPortForwardingSession is single-port, so run one
+  # background session per spec and reap them together on Ctrl-C.
+  local pids=() i
+  trap 'kill "${pids[@]}" 2>/dev/null' INT TERM
+  for i in "${!remote_ports[@]}"; do
+    echo "Forwarding ${instance_id}:${remote_ports[$i]} -> localhost:${local_ports[$i]} ..."
+    aws ssm start-session \
+      --target "$instance_id" \
+      --region "$region" \
+      --document-name AWS-StartPortForwardingSession \
+      --parameters "{\"portNumber\":[\"${remote_ports[$i]}\"],\"localPortNumber\":[\"${local_ports[$i]}\"]}" &
+    pids+=("$!")
+  done
+  wait
 }
 
 # --------------------------------------------------------------------------
@@ -476,7 +513,9 @@ ${BOLD}Instance lifecycle${RESET} (override resolution: INSTANCE_ID=i-... REGION
 
 ${BOLD}SSM access${RESET} (Phase 2 -- replaces public :22 ingress)
   devbox-ssm           Open an SSM Session Manager shell to the devbox
-  devbox-port-forward  Forward :8080 from the devbox to localhost over SSM
+  devbox-port-forward  Forward ports from the devbox over SSM (default :8080).
+                       Args: PORT or REMOTE:LOCAL, repeatable.
+                       e.g. ./run devbox-port-forward 8080 6080 8888:18888
   jupyter              Launch JupyterLab on demand (127.0.0.1:8888, loopback-only) over SSM
 
 ${BOLD}Secrets${RESET}
