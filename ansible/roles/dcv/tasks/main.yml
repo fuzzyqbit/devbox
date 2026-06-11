@@ -16,7 +16,7 @@
 
 - name: Import NICE GPG key
   ansible.builtin.rpm_key:
-    key: https:<MRCLEAN:ENTROPY:001>
+    key: https://d1uj6qtbmh3dt5.cloudfront.net/NICE-GPG-KEY
     state: present
 
 # --- Download and extract DCV tarball ---
