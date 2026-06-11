@@ -1,0 +1,16 @@
+---
+# Amazon DCV version pins (REP posture — update after bake verification).
+# Matches the deferred-pin pattern in CLAUDE.md §9 (Packer SSM :NN follow-up).
+dcv_version: "2025.0"
+dcv_build: "20103"
+
+# Web port DCV listens on (SSM port-forward target).
+dcv_web_port: 8443
+
+# SHA-256 checksum of the DCV tarball. Leave empty until pinned after first bake.
+# When non-empty, get_url will verify the download against this value.
+# To pin: run `sha256sum nice-dcv-<version>-<build>-amzn2023-x86_64.tgz` after download.
+dcv_tarball_sha256: ""
+
+dev_user: ec2-user
+dev_home: /home/ec2-user
