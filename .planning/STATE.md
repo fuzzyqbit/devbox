@@ -106,12 +106,13 @@ See PROJECT.md Key Decisions table. Locked v1.0 decisions:
 
 ## Session Continuity
 
-Last session: 2026-06-09 — quick task `260609-dif` (noVNC `--ssl-only`); started v3.1 noVNC HTTPS-Only as a full nginx milestone, then collapsed it to the one-line flag and abandoned the phased scaffold.
+Last session: 2026-06-11 — resumed from pause; mrclean damage sweep clean (placeholder existed only in the known 67faeb3→78e169b incident, final tree byte-verified); committed `run` multi-port port-forward (8817e6a); removed pause artifacts; pushed main.
 Stopped at: between milestones (no active milestone)
 Next: `/gsd:new-milestone` — start the next milestone (Observability / Lifecycle / Image-lifecycle queued)
 
 ## Operator Next Steps
 
-- (Optional) `DEVBOX_USER=$(whoami) ./run build` then confirm noVNC: `novnc.service` starts with `--ssl-only`, `wss://<host>:6080` connects, plain `http://<host>:6080` refused (quick task `260609-dif` bake-time UAT)
-- (Optional) same bake clears the carried Phase-8 checks (Jupyter venv, `mise --version`, Go tools)
+- `DEVBOX_USER=$(whoami) ./run build` (needs AWS creds) — validates controller-side secrets publish + DCV install, clears the 3 deferred v3.0 runtime UAT checks (Jupyter venv, mise, Go tools), and the `260609-dif` noVNC `--ssl-only` checks
+- After first successful bake: pin `dcv_tarball_sha256` in `ansible/roles/dcv/defaults/main.yml` (`sha256sum` of the downloaded tarball)
+- Optional: add mrclean allowlist entry for the NICE GPG key URL; fix broken `.ansible-lint` config (`'parseable' was unexpected`); pre-existing `no-changeme` hook fires on `!= "changeme"` assert lines already on main (desktop/secrets/dcv) — hook pattern needs an exclusion, CI has no such gate
 - `/gsd:new-milestone` — define the next milestone (Observability / Lifecycle / Image-lifecycle are queued in Pending)
