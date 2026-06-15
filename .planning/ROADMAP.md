@@ -78,12 +78,17 @@ missing rather than producing a half-installed image.
      compiles and installs xrdp and xorgxrdp against the running Xorg ABI.
   3. If a required build dependency — especially `xorg-x11-server-devel` — is unavailable,
      the bake fails with an explicit assertion (hard gate) instead of continuing.
-**Plans**: TBD
+**Plans**: 1 plan
+
+Plans:
+- [ ] 10-01-PLAN.md — `xrdp` role: pinned defaults + AL2023 build-dep install + RDP-03 hard-gate assert + sha256-verified xrdp & xorgxrdp build/install (RDP-01/02/03)
 
 **Notes**: `xorgxrdp` links the running Xorg server ABI, so `xorg-x11-server-devel`
 availability (RDP-03) is a hard gate — the build must abort, not skip. The role's source
 vendoring + sha256 pin (RDP-01) follows the same convention as the `mise` and Packer-source
-pins already in the repo.
+pins already in the repo. Single cohesive plan: the build is a strict linear spine
+(defaults → deps+assert → xrdp → xorgxrdp, all in one `tasks/main.yml`), so a wave split
+would only chain file-conflicting plans; 3 tasks fit within one ~50%-context plan.
 
 #### Phase 11: Service Config, PAM, Session + Bake Verification
 **Goal**: xrdp runs as an enabled, TLS-protected systemd service on `:3389`, authenticates
@@ -153,7 +158,7 @@ deferred-at-close items). The milestone is not "shipped" until RDP-14 is recorde
 | 7. Docs + Cleanup | v2.0 | 1/1 | Complete | 2026-06-02 |
 | 8. Jupyter + mise AMI Layer | v3.0 | 4/4 | Complete | 2026-06-02 |
 | 9. Jupyter Operator Surface + Docs | v3.0 | 1/1 | Complete | 2026-06-02 |
-| 10. xrdp / xorgxrdp From-Source Build Role | v3.2 | 0/TBD | Not started | - |
+| 10. xrdp / xorgxrdp From-Source Build Role | v3.2 | 0/1 | Planned | - |
 | 11. Service Config, PAM, Session + Bake Verification | v3.2 | 0/TBD | Not started | - |
 | 12. Network, Operator Surface + VNC/noVNC Removal | v3.2 | 0/TBD | Not started | - |
 
