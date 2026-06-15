@@ -2,8 +2,8 @@
 gsd_state_version: 1.0
 milestone: v3.2
 milestone_name: XRDP Remote Desktop
-status: Defining requirements
-stopped_at: between milestones (no active milestone)
+status: in-progress
+stopped_at: Phase 10 complete (xrdp build role); Phase 11 next
 last_updated: "2026-06-15T18:29:26.347Z"
 last_activity: 2026-06-15 — Milestone v3.2 started
 progress:
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-06-02 after v3.0 milestone start)
 
 **Core value:** A single operator can spin up, hibernate, and tear down a reproducible, hardened cloud workstation with one command — without leaking credentials or exposing a vulnerable host to the public internet.
-**Current focus:** Milestone v3.2 XRDP Remote Desktop — replace VNC/noVNC with xrdp built from source (airgap-safe), PAM auth, native RDP client on `:3389`. Defining requirements.
+**Current focus:** Milestone v3.2 XRDP Remote Desktop. Phase 10 (xrdp/xorgxrdp from-source build role) COMPLETE + verified (passed). Next: Phase 11 (xrdp service config + PAM + session + bake verification).
 
 ## Current Position
 
-Phase: Not started (defining requirements)
-Plan: —
-Status: Defining requirements
-Last activity: 2026-06-15 — Milestone v3.2 started
+Phase: 10 — xrdp/xorgxrdp From-Source Build Role — Complete (verified: passed)
+Plan: 10-01 (3 tasks) done — commits b12864f, 9991e6b
+Status: Phase 10 complete; Phase 11 next
+Last activity: 2026-06-15 — Executed + verified Phase 10 (xrdp build role)
 
 ## Performance Metrics (v1.0)
 
@@ -106,9 +106,9 @@ See PROJECT.md Key Decisions table. Locked v1.0 decisions:
 
 ## Session Continuity
 
-Last session: 2026-06-15T18:29:26.343Z
-Stopped at: between milestones (no active milestone)
-Next: `/gsd:new-milestone` — start the next milestone (Observability / Lifecycle / Image-lifecycle queued)
+Last session: 2026-06-15 — milestone v3.2 started; Phase 10 (xrdp/xorgxrdp from-source build role) planned, executed, and verified (passed). RESEARCH e6b0261, PLAN ad22d7c, exec b12864f/9991e6b.
+Stopped at: Phase 10 complete; xrdp role builds xrdp 0.10.6 + xorgxrdp 0.10.5 from sha256-pinned source.
+Next: `/gsd:plan-phase 11` — xrdp service config (xrdp.ini TLS :3389) + PAM + sesman/xorgxrdp backend + DE session + bake verification (RDP-04…08, 13)
 
 ## Operator Next Steps
 
