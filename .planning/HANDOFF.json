@@ -1,0 +1,37 @@
+{
+  "version": "1.0",
+  "timestamp": "2026-06-15T19:52:07.256Z",
+  "phase": "11",
+  "phase_name": "Service Config, PAM, Session + Bake Verification",
+  "phase_dir": ".planning/phases/11-service-config-pam-session-bake-verification",
+  "plan": 1,
+  "task": 3,
+  "total_tasks": 3,
+  "status": "blocked",
+  "milestone": "v3.2 XRDP Remote Desktop",
+  "completed_tasks": [
+    {"id": 1, "name": "xrdp.ini TLS + sesman.ini Xorg backend + cert/ldconfig", "status": "done", "commit": "f30fbc7"},
+    {"id": 2, "name": "PAM delegation + GNOME startwm.sh + colord polkit", "status": "done", "commit": "3a80ae6"},
+    {"id": 3, "name": "systemd units + enable + playbook wiring + RDP-13 assert", "status": "done", "commit": "e296d0b"}
+  ],
+  "remaining_tasks": [
+    {"id": 4, "name": "GAP-CLOSURE: fix the 4 CRITICAL + HIGH runtime blockers from the adversarial review", "status": "not_started"}
+  ],
+  "blockers": [
+    {"description": "ARCHITECTURE DECISION PENDING: xorgxrdp backend collides with CIS 2.2.1 (which removes xorg-x11-server-common, deleting the X server xorgxrdp needs; hardening runs after xrdp). Options: (a) keep xorgxrdp + install xorg-x11-server-Xorg+dbus-x11 + set amzn2023cis_rule_2_2_1=false [least rework]; (b) pivot to xrdp-over-Xvnc backend [dodges CIS, discards xorgxrdp work]; (c) reinstall X after hardening [kludge]. User asked to CLARIFY before deciding, then paused.", "type": "technical", "workaround": "none — must decide before gap-closure plan"}
+  ],
+  "human_actions_pending": [
+    {"action": "Decide the xorgxrdp-vs-CIS resolution (a/b/c above)", "context": "Gates the Phase 11 gap-closure plan and Phase 12.", "blocking": true},
+    {"action": "Confirm the 16 build-dep RPMs + xorg-x11-server-Xorg are reachable via github/AL2023 repos at bake (no S3 mirror / no private mirror in this env)", "context": "Airgap reality clarified: build pulls from github downloads + AL2023 repos, NOT S3/private mirror.", "blocking": false},
+    {"action": "RDP-14 live UAT: native RDP client -> :3389 -> PAM login -> GNOME renders (needs baked AMI + Phase-12 SG)", "context": "Milestone-close gate.", "blocking": false}
+  ],
+  "decisions": [
+    {"decision": "Milestone v3.2 = replace VNC/noVNC with xrdp built FROM SOURCE (airgap: no xrdp RPM)", "rationale": "xrdp not in AL2023 repos/EPEL; airgap. github source fetch works.", "phase": "v3.2"},
+    {"decision": "Phase 10 (build role) DONE + verified: xrdp 0.10.6 + xorgxrdp 0.10.5 from sha256-pinned github source", "rationale": "RDP-01/02/03 met; both sha256s real-world verified.", "phase": "10"},
+    {"decision": "GSD settings changed this session: model_profile=quality (executor->opus), workflow.use_worktrees=false", "rationale": "user selection via /gsd-settings; uncommitted in config.json (included in WIP commit)", "phase": "v3.2"},
+    {"decision": "Phase 11 VERIFICATION marked FAILED (not passed) despite 7/7 static", "rationale": "adversarial review found 4 CRITICAL runtime blockers the static verify missed", "phase": "11"}
+  ],
+  "uncommitted_files": [".planning/config.json", ".planning/phases/11-.../11-VERIFICATION.md (corrected to failed)"],
+  "next_action": "Resume the clarify-then-decide on the xorgxrdp-vs-CIS conflict (see 11-VERIFICATION.md ADVERSARIAL ADDENDUM). The user wanted to clarify the options before choosing. Once decided, run /gsd:plan-phase 11 --gaps to close the CRITICAL+HIGH findings.",
+  "context_notes": "Long session. xrdp arrived after a failed VNC-PAM debugging chain (the noVNC username/Plain scheme is on main at commit 29de35b, slated for Phase-12 revert). Phase 11 was executed but the ultracode adversarial review (opus cavecrew-reviewer) caught that CIS hardening deletes the X server xorgxrdp needs — bake green but RDP broken. The KEY insight: the static gsd-verifier 'passed' is NOT trustworthy for runtime; the adversarial pass is what caught the real blockers. Local main is 16 commits ahead of origin (NOTHING pushed since DCV revert d3bd9a0). Build env: github downloads + AL2023 dnf repos, NOT S3/private mirror."
+}
