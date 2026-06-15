@@ -227,3 +227,39 @@
   ansible.builtin.command:
     cmd: ldconfig
   changed_when: false
+
+# --- PAM delegation (RDP-06) — overwrite the make-installed file for exact content ---
+# Delegates to password-auth so RDP logins inherit the CIS faillock + pwquality stack.
+- name: Install xrdp-sesman PAM file delegating to password-auth (RDP-06)
+  ansible.builtin.copy:
+    src: xrdp-sesman.pam
+    dest: /etc/pam.d/xrdp-sesman
+    owner: root
+    group: root
+    mode: "0644"
+
+# --- GNOME Xorg session launcher (RDP-07) — overwrite make-installed default ---
+- name: Template startwm.sh GNOME Xorg session launcher (RDP-07)
+  ansible.builtin.template:
+    src: startwm.sh.j2
+    dest: /etc/xrdp/startwm.sh
+    owner: root
+    group: root
+    mode: "0755"
+
+# --- colord polkit rule (RESEARCH Pitfall 6) — avoid the color-manager auth hang ---
+- name: Ensure polkit local-authority directory exists (Pitfall 6)
+  ansible.builtin.file:
+    path: /etc/polkit-1/localauthority/50-local.d
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Allow colord without an auth prompt for GNOME-over-xrdp sessions (Pitfall 6)
+  ansible.builtin.copy:
+    src: 45-allow-colord.pkla
+    dest: /etc/polkit-1/localauthority/50-local.d/45-allow.colord.pkla
+    owner: root
+    group: root
+    mode: "0644"

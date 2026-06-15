@@ -1,0 +1,6 @@
+[Allow colord for all users]
+Identity=unix-user:*
+Action=org.freedesktop.color-manager.*
+ResultAny=yes
+ResultInactive=yes
+ResultActive=yes
