@@ -10,9 +10,9 @@
 
 ### Build & Packaging (airgap-safe)
 
-- [ ] **RDP-01**: xrdp and xorgxrdp source tarballs are vendored and pinned by version + sha256 (matching the repo's pinning convention), so the bake requires no network fetch from EPEL or upstream.
-- [ ] **RDP-02**: The `xrdp` Ansible role installs the build toolchain + Xorg SDK from the AL2023 mirror, then builds and installs xrdp and xorgxrdp from the pinned source against the running Xorg ABI.
-- [ ] **RDP-03**: The build fails loudly (assert) at bake time if a required build dependency — especially `xorg-x11-server-devel` — is unavailable, rather than producing a half-installed image.
+- [x] **RDP-01**: xrdp and xorgxrdp source tarballs are vendored and pinned by version + sha256 (matching the repo's pinning convention), so the bake requires no network fetch from EPEL or upstream.
+- [x] **RDP-02**: The `xrdp` Ansible role installs the build toolchain + Xorg SDK from the AL2023 mirror, then builds and installs xrdp and xorgxrdp from the pinned source against the running Xorg ABI.
+- [x] **RDP-03**: The build fails loudly (assert) at bake time if a required build dependency — especially `xorg-x11-server-devel` — is unavailable, rather than producing a half-installed image.
 
 ### Service & Configuration
 
@@ -54,9 +54,9 @@ Phase → requirement mapping (from `.planning/ROADMAP.md`, Phases 10-12). Every
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| RDP-01 | Phase 10 — xrdp/xorgxrdp from-source build role | Pending |
-| RDP-02 | Phase 10 — xrdp/xorgxrdp from-source build role | Pending |
-| RDP-03 | Phase 10 — xrdp/xorgxrdp from-source build role | Pending |
+| RDP-01 | Phase 10 — xrdp/xorgxrdp from-source build role | Complete |
+| RDP-02 | Phase 10 — xrdp/xorgxrdp from-source build role | Complete |
+| RDP-03 | Phase 10 — xrdp/xorgxrdp from-source build role | Complete |
 | RDP-04 | Phase 11 — Service config, PAM, session + bake verification | Pending |
 | RDP-05 | Phase 11 — Service config, PAM, session + bake verification | Pending |
 | RDP-06 | Phase 11 — Service config, PAM, session + bake verification | Pending |

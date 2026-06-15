@@ -2,15 +2,16 @@
 gsd_state_version: 1.0
 milestone: v3.2
 milestone_name: XRDP Remote Desktop
-status: planning
-last_updated: "2026-06-15T17:03:05.102Z"
-last_activity: 2026-06-15
+status: Defining requirements
+stopped_at: between milestones (no active milestone)
+last_updated: "2026-06-15T18:29:26.347Z"
+last_activity: 2026-06-15 — Milestone v3.2 started
 progress:
-  total_phases: 0
-  completed_phases: 0
-  total_plans: 0
-  completed_plans: 0
-  percent: 0
+  total_phases: 3
+  completed_phases: 1
+  total_plans: 1
+  completed_plans: 1
+  percent: 100
 ---
 
 # Project State
@@ -105,7 +106,7 @@ See PROJECT.md Key Decisions table. Locked v1.0 decisions:
 
 ## Session Continuity
 
-Last session: 2026-06-11 — resumed from pause; mrclean damage sweep clean (placeholder existed only in the known 67faeb3→78e169b incident, final tree byte-verified); committed `run` multi-port port-forward (8817e6a); removed pause artifacts; pushed main.
+Last session: 2026-06-15T18:29:26.343Z
 Stopped at: between milestones (no active milestone)
 Next: `/gsd:new-milestone` — start the next milestone (Observability / Lifecycle / Image-lifecycle queued)
 

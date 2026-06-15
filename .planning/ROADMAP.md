@@ -81,7 +81,7 @@ missing rather than producing a half-installed image.
 **Plans**: 1 plan
 
 Plans:
-- [ ] 10-01-PLAN.md — `xrdp` role: pinned defaults + AL2023 build-dep install + RDP-03 hard-gate assert + sha256-verified xrdp & xorgxrdp build/install (RDP-01/02/03)
+- [x] 10-01-PLAN.md — `xrdp` role: pinned defaults + AL2023 build-dep install + RDP-03 hard-gate assert + sha256-verified xrdp & xorgxrdp build/install (RDP-01/02/03)
 
 **Notes**: `xorgxrdp` links the running Xorg server ABI, so `xorg-x11-server-devel`
 availability (RDP-03) is a hard gate — the build must abort, not skip. The role's source
@@ -158,7 +158,7 @@ deferred-at-close items). The milestone is not "shipped" until RDP-14 is recorde
 | 7. Docs + Cleanup | v2.0 | 1/1 | Complete | 2026-06-02 |
 | 8. Jupyter + mise AMI Layer | v3.0 | 4/4 | Complete | 2026-06-02 |
 | 9. Jupyter Operator Surface + Docs | v3.0 | 1/1 | Complete | 2026-06-02 |
-| 10. xrdp / xorgxrdp From-Source Build Role | v3.2 | 0/1 | Planned | - |
+| 10. xrdp / xorgxrdp From-Source Build Role | v3.2 | 1/1 | Complete   | 2026-06-15 |
 | 11. Service Config, PAM, Session + Bake Verification | v3.2 | 0/TBD | Not started | - |
 | 12. Network, Operator Surface + VNC/noVNC Removal | v3.2 | 0/TBD | Not started | - |
 
