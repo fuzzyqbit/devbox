@@ -1,10 +1,10 @@
 ---
 gsd_state_version: 1.0
-milestone: null
-milestone_name: null
-status: between-milestones
-last_updated: "2026-06-09T13:43:42.048Z"
-last_activity: 2026-06-09
+milestone: v3.2
+milestone_name: XRDP Remote Desktop
+status: planning
+last_updated: "2026-06-15T17:03:05.102Z"
+last_activity: 2026-06-15
 progress:
   total_phases: 0
   completed_phases: 0
@@ -20,14 +20,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-06-02 after v3.0 milestone start)
 
 **Core value:** A single operator can spin up, hibernate, and tear down a reproducible, hardened cloud workstation with one command — without leaking credentials or exposing a vulnerable host to the public internet.
-**Current focus:** No active milestone. noVNC HTTPS-only shipped as quick task `260609-dif` (`novnc_proxy --ssl-only`); the planned v3.1 nginx milestone was abandoned. Start the next with `/gsd:new-milestone`.
+**Current focus:** Milestone v3.2 XRDP Remote Desktop — replace VNC/noVNC with xrdp built from source (airgap-safe), PAM auth, native RDP client on `:3389`. Defining requirements.
 
 ## Current Position
 
-Phase: Not started (between milestones)
+Phase: Not started (defining requirements)
 Plan: —
-Status: Between milestones
-Last activity: 2026-06-15 — Reverted quick task 260611-jq2 (Amazon DCV role scrapped; license unobtainable in airgap)
+Status: Defining requirements
+Last activity: 2026-06-15 — Milestone v3.2 started
 
 ## Performance Metrics (v1.0)
 

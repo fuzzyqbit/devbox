@@ -6,9 +6,23 @@
 
 Personal cloud workstation that bakes an AL2023 AMI and provisions per-user EC2 from it. End-to-end secure-by-default: per-build secrets via SSM Parameter Store + IAM instance profile + IMDSv2; SSM Session Manager for shell (no port 22); CIDR-allowlisted code-server (:8080) + noVNC (:6080); loopback-only on-demand JupyterLab (`./run jupyter`); reproducible builds via committed `.terraform.lock.hcl` + pinned Galaxy collections + Packer source via SSM Parameter Store + manifest-driven AMI handoff; CI + tiered pre-commit gates against every invariant. The operator surface is a single `./run` shell dispatcher (the Makefile was retired in v2.0); the GitLab CI pipeline calls `./run` for bake + deploy.
 
-**No active milestone.** noVNC HTTPS-only enforcement shipped as quick task `260609-dif` (2026-06-09) — `novnc_proxy --ssl-only` rejects plaintext on `:6080`. The originally-planned v3.1 nginx-reverse-proxy milestone (redirect + HSTS + headers) was abandoned in favour of the one-line flag; nginx research archived to `milestones/v3.1-abandoned-research/`.
+noVNC HTTPS-only enforcement shipped as quick task `260609-dif` (2026-06-09) — `novnc_proxy --ssl-only` rejects plaintext on `:6080`. The originally-planned v3.1 nginx-reverse-proxy milestone (redirect + HSTS + headers) was abandoned in favour of the one-line flag; nginx research archived to `milestones/v3.1-abandoned-research/`.
 
 **Deferred to a later cycle:** observability (CloudWatch metrics + login events), lifecycle automation (idle auto-stop, scheduled stop), image lifecycle (old AMI deregistration + inventory), Packer SSM `:NN` version pin (requires AWS creds).
+
+## Current Milestone: v3.2 XRDP Remote Desktop
+
+**Goal:** Replace the VNC/noVNC desktop stack with **xrdp built from source** (airgap-safe), authenticating via **PAM**, so operators connect with a native RDP client and a full-length system password.
+
+**Context:** The VNC/noVNC path proved fundamentally mismatched with full-length password auth — VeNCrypt `Plain` needs a username the stock noVNC browser client won't supply, dropping `~/.vnc/passwd` broke the `vncserver` wrapper, and Xvnc hit PAM-service-name traps; `VncAuth` is browser-native but 8-char DES-capped. RDP is the clean fix: xrdp authenticates the system user against PAM (full length) and every RDP client prompts username+password natively. xrdp is not packaged for AL2023 (EPEL/source only) and the environment is **airgapped** — the same wall that scrapped DCV — so xrdp + xorgxrdp are built from vendored, sha256-pinned source at bake.
+
+**Target features:**
+- New `xrdp` role: build + install xrdp and the `xorgxrdp` Xorg backend from pinned source; configure `xrdp.ini` (TLS, `:3389`), `sesman.ini` (Xorg backend), `/etc/pam.d/xrdp-sesman`; systemd units; DE session startup
+- Remove the VNC/noVNC stack (vncserver/novnc services, `SecurityTypes Plain`, `/etc/pam.d/vnc`); revert the noVNC username-injection workaround (`29de35b`)
+- Terraform SG `:3389` ingress (replacing `:6080`); `run` port-forward → `:3389`
+- Bake-time + runtime **verification gate**: build/services asserted at bake; RDP login with the `secrets-show` PAM password confirmed on a live instance
+
+**Decision:** Build-from-source chosen (vs vendored RPMs / EPEL) because the airgap blocks package installs and from-source is the most self-contained path. `xorgxrdp` backend chosen (vs xrdp-over-Xvnc) to drop the VNC stack entirely. Credential reuses the `ec2-user` PAM password the `secrets` bootstrap already sets from SSM.
 
 ## Abandoned: v3.1 noVNC HTTPS-Only (nginx milestone)
 
@@ -79,9 +93,9 @@ A single operator can spin up, hibernate, and tear down a reproducible, hardened
 
 ### Active
 
-<!-- v1.0 complete 2026-05-14 (23 reqs). v2.0/v3.0 complete 2026-06-02. v3.1 requirements defined below. -->
+<!-- v1.0 complete 2026-05-14 (23 reqs). v2.0/v3.0 complete 2026-06-02. v3.2 requirements defined below. -->
 
-(see Milestone v3.1 requirements in `.planning/REQUIREMENTS.md`)
+(see Milestone v3.2 requirements in `.planning/REQUIREMENTS.md`)
 
 ### Out of Scope
 
@@ -141,4 +155,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-06-09 — v3.1 noVNC HTTPS-Only milestone started.*
+*Last updated: 2026-06-15 — v3.2 XRDP Remote Desktop milestone started.*
