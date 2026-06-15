@@ -27,7 +27,7 @@ See: .planning/PROJECT.md (updated 2026-06-02 after v3.0 milestone start)
 Phase: Not started (between milestones)
 Plan: —
 Status: Between milestones
-Last activity: 2026-06-11 — Completed quick task 260611-jq2: Amazon DCV ansible role
+Last activity: 2026-06-15 — Reverted quick task 260611-jq2 (Amazon DCV role scrapped; license unobtainable in airgap)
 
 ## Performance Metrics (v1.0)
 
@@ -102,7 +102,6 @@ See PROJECT.md Key Decisions table. Locked v1.0 decisions:
 | 260520-be1 | create gitlab CI pipeline: packer build AMI then tofu apply EC2 from that AMI | 2026-05-20 | 72f3157 | [260520-be1-create-gitlab-ci-pipeline-packer-build-a](./quick/260520-be1-create-gitlab-ci-pipeline-packer-build-a/) |
 | 260602-add-golang-dev-tools | add 11 pinned Go developer tools (gopls, dlv, golangci-lint, govulncheck, …) to the golang role | 2026-06-02 | 88541f0 | [260602-add-golang-dev-tools](./quick/260602-add-golang-dev-tools/) |
 | 260609-dif | enforce noVNC HTTPS-only via `novnc_proxy --ssl-only` (dropped the planned v3.1 nginx milestone) | 2026-06-09 | fb59449 | [260609-dif-enforce-https-only-on-novnc-via-novnc-pr](./quick/260609-dif-enforce-https-only-on-novnc-via-novnc-pr/) |
-| 260611-jq2 | create ansible role installing and configuring Amazon DCV (pinned tarball, PAM auth, virtual session, :8443 web viewer) | 2026-06-11 | 78e169b | [260611-jq2-create-ansible-role-installing-and-confi](./quick/260611-jq2-create-ansible-role-installing-and-confi/) |
 
 ## Session Continuity
 
@@ -112,7 +111,6 @@ Next: `/gsd:new-milestone` — start the next milestone (Observability / Lifecyc
 
 ## Operator Next Steps
 
-- `DEVBOX_USER=$(whoami) ./run build` (needs AWS creds) — validates controller-side secrets publish + DCV install, clears the 3 deferred v3.0 runtime UAT checks (Jupyter venv, mise, Go tools), and the `260609-dif` noVNC `--ssl-only` checks
-- After first successful bake: pin `dcv_tarball_sha256` in `ansible/roles/dcv/defaults/main.yml` (`sha256sum` of the downloaded tarball)
-- Optional: add mrclean allowlist entry for the NICE GPG key URL; fix broken `.ansible-lint` config (`'parseable' was unexpected`); pre-existing `no-changeme` hook fires on `!= "changeme"` assert lines already on main (desktop/secrets/dcv) — hook pattern needs an exclusion, CI has no such gate
+- `DEVBOX_USER=$(whoami) ./run build` (needs AWS creds) — validates controller-side secrets publish, clears the 3 deferred v3.0 runtime UAT checks (Jupyter venv, mise, Go tools), and the `260609-dif` noVNC `--ssl-only` checks
+- Optional: fix broken `.ansible-lint` config (`'parseable' was unexpected`); pre-existing `no-changeme` hook fires on `!= "changeme"` assert lines already on main (desktop/secrets) — hook pattern needs an exclusion, CI has no such gate
 - `/gsd:new-milestone` — define the next milestone (Observability / Lifecycle / Image-lifecycle are queued in Pending)

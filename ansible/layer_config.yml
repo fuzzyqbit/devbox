@@ -18,5 +18,4 @@ layers:
   git: true
   devtools: true
   desktop: true
-  dcv: true
   hardening: true
