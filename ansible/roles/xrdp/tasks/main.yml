@@ -263,3 +263,93 @@
     owner: root
     group: root
     mode: "0644"
+
+# --- systemd units + enable (RDP-08) — place units explicitly (Pitfall 1) ---
+# make install may install init.d fallback instead of systemd units when
+# pkg-config systemd is absent; copy the corrected /usr/local/sbin units regardless.
+- name: Install xrdp systemd unit (RDP-08)
+  ansible.builtin.copy:
+    src: xrdp.service
+    dest: /usr/lib/systemd/system/xrdp.service
+    owner: root
+    group: root
+    mode: "0644"
+  notify: reload systemd
+
+- name: Install xrdp-sesman systemd unit (RDP-08)
+  ansible.builtin.copy:
+    src: xrdp-sesman.service
+    dest: /usr/lib/systemd/system/xrdp-sesman.service
+    owner: root
+    group: root
+    mode: "0644"
+  notify: reload systemd
+
+# daemon_reload here guarantees the just-placed units are loaded before enable (Pitfall 8).
+- name: Enable xrdp service at boot (RDP-08)
+  ansible.builtin.systemd:
+    name: xrdp
+    enabled: true
+    daemon_reload: true
+
+- name: Enable xrdp-sesman service at boot (RDP-08)
+  ansible.builtin.systemd:
+    name: xrdp-sesman
+    enabled: true
+    daemon_reload: true
+
+# ── RDP-13 bake assertion ──
+# Fail the bake loudly if the binary, the xorgxrdp module, either ini file, or
+# either enabled service is absent. Does NOT attempt a live RDP login (Phase-12 UAT).
+- name: Stat xrdp binary (RDP-13)
+  ansible.builtin.stat:
+    path: /usr/local/sbin/xrdp
+  register: xrdp_rdp13_binary
+
+- name: Stat xrdpdev Xorg driver module (RDP-13)
+  ansible.builtin.stat:
+    path: /usr/lib64/xorg/modules/drivers/xrdpdev_drv.so
+  register: xrdp_rdp13_module
+
+- name: Stat xrdp.ini config file (RDP-13)
+  ansible.builtin.stat:
+    path: /etc/xrdp/xrdp.ini
+  register: xrdp_rdp13_ini
+
+- name: Stat sesman.ini config file (RDP-13)
+  ansible.builtin.stat:
+    path: /etc/xrdp/sesman.ini
+  register: xrdp_rdp13_sesman
+
+- name: Assert xrdp binary, xorgxrdp module, and config files are present (RDP-13)
+  ansible.builtin.assert:
+    that:
+      - xrdp_rdp13_binary.stat.exists
+      - xrdp_rdp13_module.stat.exists
+      - xrdp_rdp13_ini.stat.exists
+      - xrdp_rdp13_sesman.stat.exists
+    fail_msg: >-
+      RDP-13 bake assertion FAILED. One or more required files are missing:
+        /usr/local/sbin/xrdp exists: {{ xrdp_rdp13_binary.stat.exists | default(false) }}
+        /usr/lib64/xorg/modules/drivers/xrdpdev_drv.so exists: {{ xrdp_rdp13_module.stat.exists | default(false) }}
+        /etc/xrdp/xrdp.ini exists: {{ xrdp_rdp13_ini.stat.exists | default(false) }}
+        /etc/xrdp/sesman.ini exists: {{ xrdp_rdp13_sesman.stat.exists | default(false) }}
+      The Phase 10 build may not have run, or make install may have failed silently.
+    quiet: false
+
+- name: Check xrdp + xrdp-sesman service enablement (RDP-13)
+  ansible.builtin.command:
+    cmd: systemctl is-enabled xrdp xrdp-sesman
+  register: xrdp_rdp13_enabled
+  changed_when: false
+  failed_when: false
+
+- name: Assert xrdp and xrdp-sesman are enabled (RDP-13)
+  ansible.builtin.assert:
+    that:
+      - xrdp_rdp13_enabled.rc == 0
+    fail_msg: >-
+      RDP-13 bake assertion FAILED. xrdp or xrdp-sesman is not enabled.
+      Output: {{ xrdp_rdp13_enabled.stdout | default('') }}
+      Run: systemctl is-enabled xrdp xrdp-sesman
+    quiet: false

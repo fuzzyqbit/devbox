@@ -56,6 +56,10 @@
     - role: desktop
       when: layers.desktop | default(false)
 
+    - role: xrdp
+      when: layers.xrdp | default(false)
+      # xrdp config + service (Phase 11 RDP-08); MUST stay before hardening
+
     - role: hardening  # MUST remain last — invariant (JUP-08 / CLAUDE.md §8)
       when: layers.hardening | default(false)
 
