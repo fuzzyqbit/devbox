@@ -166,3 +166,64 @@
     - "/tmp/xorgxrdp-{{ xorgxrdp_version }}"
     - "/tmp/xrdp-{{ xrdp_version }}.tar.gz"
     - "/tmp/xorgxrdp-{{ xorgxrdp_version }}.tar.gz"
+
+# ── Phase 11: config + cert + service (RDP-04/05/06/07/08/13) ──
+# Phase 10 (above) built + installed xrdp/xorgxrdp. The block below configures the
+# service, generates the TLS cert, wires PAM/session, enables the systemd units,
+# and asserts the bake. /etc/xrdp already exists from the Phase 10 make install.
+
+# --- TLS cert (RDP-04) — mirrors the desktop role noVNC openssl pattern ---
+- name: Generate self-signed TLS cert for xrdp (RDP-04)
+  ansible.builtin.command:
+    cmd: >
+      openssl req -x509 -nodes -newkey rsa:2048
+      -keyout /etc/xrdp/key.pem
+      -out /etc/xrdp/cert.pem
+      -days 3650 -subj '/CN=devbox'
+  args:
+    creates: /etc/xrdp/cert.pem
+
+- name: Set xrdp TLS cert/key permissions (RDP-04)
+  # key.pem is 0600 root-only: xrdp runs as root in this config (no runtime_user split).
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    owner: root
+    group: root
+    mode: "{{ item.mode }}"
+  loop:
+    - { path: /etc/xrdp/cert.pem, mode: "0644" }
+    - { path: /etc/xrdp/key.pem, mode: "0600" }
+
+# --- Config files (RDP-04 / RDP-05) — overwrite the make-installed defaults ---
+- name: Template TLS-enabled xrdp.ini (RDP-04)
+  ansible.builtin.template:
+    src: xrdp.ini.j2
+    dest: /etc/xrdp/xrdp.ini
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Template sesman.ini with Xorg backend (RDP-05)
+  ansible.builtin.template:
+    src: sesman.ini.j2
+    dest: /etc/xrdp/sesman.ini
+    owner: root
+    group: root
+    mode: "0644"
+
+# --- ld.so wiring (RESEARCH Pitfall 5) — make /usr/local/lib loadable ---
+# Phase 10 installed libxup.so under /usr/local/lib/xrdp; /usr/local/lib is not in
+# the default ld.so search path on AL2023. Add it so the Xorg session can load it.
+- name: Add /usr/local/lib to the dynamic linker search path for xrdp (Pitfall 5)
+  ansible.builtin.copy:
+    dest: /etc/ld.so.conf.d/xrdp.conf
+    owner: root
+    group: root
+    mode: "0644"
+    content: |
+      /usr/local/lib
+
+- name: Refresh the dynamic linker cache (Pitfall 5)
+  ansible.builtin.command:
+    cmd: ldconfig
+  changed_when: false

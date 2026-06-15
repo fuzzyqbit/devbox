@@ -1,0 +1,40 @@
+{# Source: sesman/sesman.ini.in v0.10.6 [CITED: github.com/neutrinolabs/xrdp] #}
+{# Phase 11 RDP-05 — xorgxrdp (Xorg) backend only; no Xvnc backend. #}
+{# CRITICAL: param=/usr/libexec/Xorg (full path); bare 'Xorg' fails on AL2023. #}
+[Globals]
+EnableUserWindowManager=true
+UserWindowManager=startwm.sh
+DefaultWindowManager=startwm.sh
+ReconnectScript=reconnectwm.sh
+
+[Security]
+AllowRootLogin=false
+MaxLoginRetry=4
+TerminalServerUsers=tsusers
+TerminalServerAdmins=tsadmins
+AlwaysGroupCheck=false
+RestrictOutboundClipboard=none
+RestrictInboundClipboard=none
+
+[Sessions]
+X11DisplayOffset=10
+MaxSessions=1
+KillDisconnected=false
+DisconnectedTimeLimit=0
+IdleTimeLimit=0
+Policy=Default
+
+[Logging]
+LogFile=xrdp-sesman.log
+LogLevel=INFO
+EnableSyslog=true
+
+[Xorg]
+param=/usr/libexec/Xorg
+param=-config
+param=xrdp/xorg.conf
+param=-noreset
+param=-nolisten
+param=tcp
+param=-logfile
+param=.xorgxrdp.%s.log
