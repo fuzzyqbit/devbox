@@ -1,0 +1,169 @@
+---
+# xrdp role — build xrdp + xorgxrdp from sha256-pinned source tarballs
+# Phase 10: BUILD + INSTALL only. No systemd enable, no xrdp.ini/sesman.ini
+# templates, no PAM file content, no playbook.yml wiring — those are Phase 11/12.
+
+# ── Step 1: Install build toolchain + Xorg SDK from AL2023 core repo ─────────
+# All packages are from the AL2023 core mirror only; no third-party repo.
+# xorg-x11-server-devel: RDP-03 hard-gate dep (Xorg SDK headers for xorgxrdp build)
+# mesa-libGL-devel: satisfies the 'dri' pkg-config dep pulled in by xorg-server.pc (RESEARCH Pitfall 2)
+- name: Install xrdp build dependencies from AL2023 core repo (RDP-02 + RDP-03)
+  ansible.builtin.dnf:
+    name:
+      - gcc
+      - make
+      - autoconf
+      - automake
+      - libtool
+      - pkgconfig
+      - openssl-devel
+      - pam-devel
+      - libX11-devel
+      - libXfixes-devel
+      - libXrandr-devel
+      - libjpeg-turbo-devel
+      - nasm
+      - pixman-devel
+      - xorg-x11-server-devel  # RDP-03 hard-gate dep: Xorg SDK headers required by xorgxrdp build
+      - mesa-libGL-devel        # satisfies 'dri' pkg-config dep pulled in by xorg-server.pc (Pitfall 2)
+    state: present
+  register: xrdp_build_deps_install
+
+# ── Step 2: RDP-03 hard gate — abort bake loudly if any dep failed ────────────
+- name: Assert xrdp build dependencies installed successfully (RDP-03)
+  ansible.builtin.assert:
+    that:
+      - xrdp_build_deps_install is success
+    fail_msg: >-
+      One or more xrdp build dependencies failed to install.
+      The most likely culprit is xorg-x11-server-devel, which is required by
+      the xorgxrdp Xorg driver build. Verify that xorg-x11-server-devel is
+      available in the AL2023 core repository on the bake instance:
+        dnf info xorg-x11-server-devel
+      All build deps must come from the AL2023 core mirror only (no external repos).
+      If the repo is unreachable, check network connectivity from the bake VM.
+    quiet: false
+
+# ── Step 3: Fetch xrdp source tarball (sha256-pinned, RDP-01) ────────────────
+- name: Download xrdp {{ xrdp_version }} source tarball (sha256-verified)
+  ansible.builtin.get_url:
+    url: "{{ xrdp_source_base_url }}/xrdp/releases/download/v{{ xrdp_version }}/xrdp-{{ xrdp_version }}.tar.gz"
+    dest: "/tmp/xrdp-{{ xrdp_version }}.tar.gz"
+    mode: "0644"
+    checksum: "sha256:{{ xrdp_checksum_sha256 }}"
+
+# ── Step 4: Extract xrdp source (Thrift/devtools pattern: chdir into versioned dir) ──
+- name: Extract xrdp {{ xrdp_version }} source archive
+  ansible.builtin.unarchive:
+    src: "/tmp/xrdp-{{ xrdp_version }}.tar.gz"
+    dest: /tmp
+    remote_src: true
+    creates: "/tmp/xrdp-{{ xrdp_version }}/configure"
+
+# ── Step 5: Configure xrdp ───────────────────────────────────────────────────
+# Release tarballs already include a generated configure script; ./bootstrap is
+# NOT needed (anti-pattern: bootstrap is for git checkouts only — RESEARCH §anti-patterns).
+# --with-pam-rules=redhat: mandatory — installs /etc/pam.d/xrdp-sesman at make install
+# time; cannot be added retroactively (RESEARCH Pitfall 4). Phase 11 overrides content.
+- name: Configure xrdp {{ xrdp_version }}
+  ansible.builtin.command:
+    cmd: >
+      ./configure
+      --prefix=/usr/local
+      --sysconfdir=/etc
+      --enable-pam
+      --with-pam-rules=redhat
+      --enable-jpeg
+      --enable-tjpeg
+      --enable-pixman
+      --disable-tests
+    chdir: "/tmp/xrdp-{{ xrdp_version }}"
+    creates: "/tmp/xrdp-{{ xrdp_version }}/Makefile"
+
+# ── Step 6: Build xrdp ───────────────────────────────────────────────────────
+- name: Build xrdp {{ xrdp_version }}
+  ansible.builtin.command:
+    cmd: "make -j{{ ansible_processor_vcpus | default(2) }}"
+    chdir: "/tmp/xrdp-{{ xrdp_version }}"
+    creates: "/tmp/xrdp-{{ xrdp_version }}/xrdp/xrdp"
+
+# ── Step 7: Install xrdp ─────────────────────────────────────────────────────
+# Creates /usr/local/sbin/xrdp and /usr/local/lib/pkgconfig/xrdp.pc
+# The xrdp.pc file is consumed by xorgxrdp configure in Step 11 (via PKG_CONFIG_PATH).
+- name: Install xrdp {{ xrdp_version }}
+  ansible.builtin.command:
+    cmd: make install
+    chdir: "/tmp/xrdp-{{ xrdp_version }}"
+    creates: /usr/local/sbin/xrdp
+
+# ── Step 8: Fetch xorgxrdp source tarball (sha256-pinned, RDP-01) ────────────
+# ORDERING NOTE: xorgxrdp MUST be built AFTER xrdp is installed (Step 7 above).
+# xorgxrdp configure requires /usr/local/lib/pkgconfig/xrdp.pc (installed by xrdp
+# make install). Building before install causes: "Package 'xrdp' not found" (Pitfall 1).
+- name: Download xorgxrdp {{ xorgxrdp_version }} source tarball (sha256-verified)
+  ansible.builtin.get_url:
+    url: "{{ xrdp_source_base_url }}/xorgxrdp/releases/download/v{{ xorgxrdp_version }}/xorgxrdp-{{ xorgxrdp_version }}.tar.gz"
+    dest: "/tmp/xorgxrdp-{{ xorgxrdp_version }}.tar.gz"
+    mode: "0644"
+    checksum: "sha256:{{ xorgxrdp_checksum_sha256 }}"
+
+# ── Step 9: Extract xorgxrdp source ──────────────────────────────────────────
+- name: Extract xorgxrdp {{ xorgxrdp_version }} source archive
+  ansible.builtin.unarchive:
+    src: "/tmp/xorgxrdp-{{ xorgxrdp_version }}.tar.gz"
+    dest: /tmp
+    remote_src: true
+    creates: "/tmp/xorgxrdp-{{ xorgxrdp_version }}/configure"
+
+# ── Step 10: Configure xorgxrdp ──────────────────────────────────────────────
+# PKG_CONFIG_PATH is MANDATORY: xrdp make install puts xrdp.pc in /usr/local/lib/pkgconfig,
+# which is not in the default pkg-config search path on AL2023 (RESEARCH Pitfall 1).
+# mesa-libGL-devel (installed in Step 1) satisfies the 'dri' dep from xorg-server.pc (Pitfall 2).
+# Release tarball ships configure; ./bootstrap is not needed (RESEARCH §anti-patterns).
+- name: Configure xorgxrdp {{ xorgxrdp_version }} against installed xrdp pkg-config (RDP-02)
+  ansible.builtin.command:
+    cmd: ./configure
+    chdir: "/tmp/xorgxrdp-{{ xorgxrdp_version }}"
+    creates: "/tmp/xorgxrdp-{{ xorgxrdp_version }}/Makefile"
+  environment:
+    PKG_CONFIG_PATH: /usr/local/lib/pkgconfig
+
+# ── Step 11: Build xorgxrdp ──────────────────────────────────────────────────
+- name: Build xorgxrdp {{ xorgxrdp_version }}
+  ansible.builtin.command:
+    cmd: "make -j{{ ansible_processor_vcpus | default(2) }}"
+    chdir: "/tmp/xorgxrdp-{{ xorgxrdp_version }}"
+    creates: "/tmp/xorgxrdp-{{ xorgxrdp_version }}/module/libxorgxrdp.la"
+
+# ── Step 12: Install xorgxrdp ────────────────────────────────────────────────
+# Expected module path on AL2023 x86_64: /usr/lib64/xorg/modules/drivers/xrdpdev_drv.so
+# BAKE-TIME VERIFICATION ITEM (RESEARCH Pitfall 3 / Open Question 2):
+# If AL2023's xorg-server.pc moduledir resolves to /usr/local/lib/xorg/... instead of
+# /usr/lib64/xorg/..., the creates: guard and Phase 11 Xorg config must use the actual
+# path. Verify post-install: ls /usr/lib64/xorg/modules/drivers/xrdpdev_drv.so
+- name: Install xorgxrdp {{ xorgxrdp_version }} Xorg driver modules
+  ansible.builtin.command:
+    cmd: make install
+    chdir: "/tmp/xorgxrdp-{{ xorgxrdp_version }}"
+    creates: /usr/lib64/xorg/modules/drivers/xrdpdev_drv.so
+
+# ── Step 13: SELinux relabel (Pitfall 6 future-proofing) ─────────────────────
+# AL2023 defaults to SELinux permissive, but relabelling xorgxrdp modules now avoids
+# audit denials if the operator later switches to enforcing mode. Cheap + forward-safe.
+- name: SELinux relabel xorgxrdp module directory (Pitfall 6 future-proofing)
+  ansible.builtin.command:
+    cmd: restorecon -Rv /usr/lib64/xorg/modules/
+  changed_when: false
+
+# ── Step 14: Cleanup /tmp source trees and tarballs ──────────────────────────
+# Belt-and-suspenders: playbook post_tasks also globs /tmp/*.tar.gz; this removes
+# the extracted source directories which the global glob does not cover.
+- name: Clean up xrdp + xorgxrdp source trees and tarballs from /tmp
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - "/tmp/xrdp-{{ xrdp_version }}"
+    - "/tmp/xorgxrdp-{{ xorgxrdp_version }}"
+    - "/tmp/xrdp-{{ xrdp_version }}.tar.gz"
+    - "/tmp/xorgxrdp-{{ xorgxrdp_version }}.tar.gz"
