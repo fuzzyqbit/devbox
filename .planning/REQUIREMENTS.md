@@ -50,4 +50,23 @@
 
 ## Traceability
 
-(filled by ROADMAP.md — phase → requirement mapping)
+Phase → requirement mapping (from `.planning/ROADMAP.md`, Phases 10-12). Every RDP-01…RDP-14 maps to exactly one phase; RDP-14 is the live-instance human-UAT gate that closes the milestone.
+
+| Requirement | Phase | Status |
+|-------------|-------|--------|
+| RDP-01 | Phase 10 — xrdp/xorgxrdp from-source build role | Pending |
+| RDP-02 | Phase 10 — xrdp/xorgxrdp from-source build role | Pending |
+| RDP-03 | Phase 10 — xrdp/xorgxrdp from-source build role | Pending |
+| RDP-04 | Phase 11 — Service config, PAM, session + bake verification | Pending |
+| RDP-05 | Phase 11 — Service config, PAM, session + bake verification | Pending |
+| RDP-06 | Phase 11 — Service config, PAM, session + bake verification | Pending |
+| RDP-07 | Phase 11 — Service config, PAM, session + bake verification | Pending |
+| RDP-08 | Phase 11 — Service config, PAM, session + bake verification | Pending |
+| RDP-13 | Phase 11 — Service config, PAM, session + bake verification | Pending |
+| RDP-09 | Phase 12 — Network, operator surface + VNC/noVNC removal | Pending |
+| RDP-10 | Phase 12 — Network, operator surface + VNC/noVNC removal | Pending |
+| RDP-11 | Phase 12 — Network, operator surface + VNC/noVNC removal | Pending |
+| RDP-12 | Phase 12 — Network, operator surface + VNC/noVNC removal | Pending |
+| RDP-14 | Milestone-close gate (live-instance human UAT) | Pending |
+
+**Coverage:** 14/14 requirements mapped — no orphans, no duplicates.
