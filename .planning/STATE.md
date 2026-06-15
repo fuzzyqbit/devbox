@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v3.2
 milestone_name: XRDP Remote Desktop
-status: in-progress
-stopped_at: Phase 10 complete (xrdp build role); Phase 11 next
-last_updated: "2026-06-15T18:29:26.347Z"
-last_activity: 2026-06-15 — Milestone v3.2 started
+status: completed
+stopped_at: Phase 11 complete; xrdp configured as enabled TLS systemd service on :3389 with PAM + GNOME Xorg session + RDP-13 bake assert; role wired before hardening.
+last_updated: "2026-06-15T19:40:00.000Z"
+last_activity: 2026-06-15 — Executed Phase 11 (xrdp config/PAM/session/systemd + bake assert)
 progress:
   total_phases: 3
-  completed_phases: 1
-  total_plans: 1
-  completed_plans: 1
+  completed_phases: 2
+  total_plans: 3
+  completed_plans: 3
   percent: 100
 ---
 
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-06-02 after v3.0 milestone start)
 
 **Core value:** A single operator can spin up, hibernate, and tear down a reproducible, hardened cloud workstation with one command — without leaking credentials or exposing a vulnerable host to the public internet.
-**Current focus:** Milestone v3.2 XRDP Remote Desktop. Phase 10 (xrdp/xorgxrdp from-source build role) COMPLETE + verified (passed). Next: Phase 11 (xrdp service config + PAM + session + bake verification).
+**Current focus:** Milestone v3.2 XRDP Remote Desktop. Phase 11 (xrdp service config + PAM + session + bake verification) COMPLETE. Next: Phase 11 verification, then Phase 12 (network/operator surface + VNC/noVNC removal).
 
 ## Current Position
 
-Phase: 10 — xrdp/xorgxrdp From-Source Build Role — Complete (verified: passed)
-Plan: 10-01 (3 tasks) done — commits b12864f, 9991e6b
-Status: Phase 10 complete; Phase 11 next
-Last activity: 2026-06-15 — Executed + verified Phase 10 (xrdp build role)
+Phase: 11 — Service Config, PAM, Session + Bake Verification — Complete (execution)
+Plan: 11-01 (3 tasks) done — commits f30fbc7, 3a80ae6, e296d0b
+Status: Phase 11 executed; Phase 11 verification + Phase 12 next
+Last activity: 2026-06-15 — Executed Phase 11 (xrdp config/PAM/session/systemd + RDP-13 bake assert)
 
 ## Performance Metrics (v1.0)
 
@@ -52,6 +52,12 @@ Commits: 66 in `b0bd004..7e63829`. Files changed: 75 (+14488 / −69 LOC).
 | 05 | 01 | 5min | 2 | 1 |
 | 06 P01 | 5min | 1 tasks | 1 files |
 | 06 P02 | 4min | 2 tasks | 3 files |
+
+### v3.2 Performance Metrics
+
+| Phase | Plan | Duration | Tasks | Files |
+|-------|------|----------|-------|-------|
+| 11 | 01 | ~5min | 3 | 11 |
 
 ## Accumulated Context
 
@@ -106,9 +112,9 @@ See PROJECT.md Key Decisions table. Locked v1.0 decisions:
 
 ## Session Continuity
 
-Last session: 2026-06-15 — milestone v3.2 started; Phase 10 (xrdp/xorgxrdp from-source build role) planned, executed, and verified (passed). RESEARCH e6b0261, PLAN ad22d7c, exec b12864f/9991e6b.
-Stopped at: Phase 10 complete; xrdp role builds xrdp 0.10.6 + xorgxrdp 0.10.5 from sha256-pinned source.
-Next: `/gsd:plan-phase 11` — xrdp service config (xrdp.ini TLS :3389) + PAM + sesman/xorgxrdp backend + DE session + bake verification (RDP-04…08, 13)
+Last session: 2026-06-15 — Phase 11 executed. xrdp configured as enabled TLS systemd service on :3389 (xrdp.ini security_layer=tls + own self-signed cert), sesman.ini Xorg backend (/usr/libexec/Xorg), PAM → password-auth, GNOME startwm.sh + colord polkit, both systemd units enabled, role wired before hardening, RDP-13 bake assert. exec f30fbc7/3a80ae6/e296d0b. Hardening grep-gate passes (returns 1).
+Stopped at: Phase 11 complete; xrdp config/PAM/session/systemd + bake assert delivered. RDP-04/05/06/07/08/13 satisfied at bake-config level (RDP-07 live login = Phase-12 RDP-14 UAT).
+Next: `/gsd:verify-phase 11` then `/gsd:plan-phase 12` — Terraform SG :3389 ingress + `./run devbox-port-forward` :3389 + VNC/noVNC removal (RDP-09…12) + RDP-14 live UAT (milestone close)
 
 ## Operator Next Steps
 

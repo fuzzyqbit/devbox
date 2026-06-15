@@ -16,11 +16,11 @@
 
 ### Service & Configuration
 
-- [ ] **RDP-04**: xrdp listens on `:3389` with TLS enabled (`security_layer`/`certificate`/`key_file`), reusing the existing self-signed cert pattern.
-- [ ] **RDP-05**: `sesman.ini` is configured for the xorgxrdp (Xorg) backend — no Xvnc/VNC backend.
-- [ ] **RDP-06**: `/etc/pam.d/xrdp-sesman` delegates to `password-auth` so RDP logins inherit the CIS-hardened PAM stack (pwquality, faillock), consistent with the rest of the image.
-- [ ] **RDP-07**: An operator logs into the desktop session over RDP as `ec2-user` with the `./run secrets-show` password and reaches the installed desktop environment.
-- [ ] **RDP-08**: xrdp + xrdp-sesman are enabled as systemd services and start on boot; the role inserts before `hardening` (hardening-stays-last invariant preserved).
+- [x] **RDP-04**: xrdp listens on `:3389` with TLS enabled (`security_layer`/`certificate`/`key_file`), reusing the existing self-signed cert pattern.
+- [x] **RDP-05**: `sesman.ini` is configured for the xorgxrdp (Xorg) backend — no Xvnc/VNC backend.
+- [x] **RDP-06**: `/etc/pam.d/xrdp-sesman` delegates to `password-auth` so RDP logins inherit the CIS-hardened PAM stack (pwquality, faillock), consistent with the rest of the image.
+- [x] **RDP-07**: An operator logs into the desktop session over RDP as `ec2-user` with the `./run secrets-show` password and reaches the installed desktop environment. _(config delivered: startwm.sh GNOME Xorg session + PAM → password-auth, reusing the existing secrets-role password; live login proof is the Phase-12-close RDP-14 UAT.)_
+- [x] **RDP-08**: xrdp + xrdp-sesman are enabled as systemd services and start on boot; the role inserts before `hardening` (hardening-stays-last invariant preserved).
 
 ### Network & Operator Surface
 
@@ -34,7 +34,7 @@
 
 ### Verification (first-class — not deferred)
 
-- [ ] **RDP-13**: A bake-time assertion confirms the xrdp and xorgxrdp binaries/modules are present and the services are enabled.
+- [x] **RDP-13**: A bake-time assertion confirms the xrdp and xorgxrdp binaries/modules are present and the services are enabled.
 - [ ] **RDP-14**: A documented runtime UAT confirms a real RDP client authenticates via PAM and renders the desktop on a live instance — recorded before the milestone closes.
 
 ---
@@ -57,12 +57,12 @@ Phase → requirement mapping (from `.planning/ROADMAP.md`, Phases 10-12). Every
 | RDP-01 | Phase 10 — xrdp/xorgxrdp from-source build role | Complete |
 | RDP-02 | Phase 10 — xrdp/xorgxrdp from-source build role | Complete |
 | RDP-03 | Phase 10 — xrdp/xorgxrdp from-source build role | Complete |
-| RDP-04 | Phase 11 — Service config, PAM, session + bake verification | Pending |
-| RDP-05 | Phase 11 — Service config, PAM, session + bake verification | Pending |
-| RDP-06 | Phase 11 — Service config, PAM, session + bake verification | Pending |
-| RDP-07 | Phase 11 — Service config, PAM, session + bake verification | Pending |
-| RDP-08 | Phase 11 — Service config, PAM, session + bake verification | Pending |
-| RDP-13 | Phase 11 — Service config, PAM, session + bake verification | Pending |
+| RDP-04 | Phase 11 — Service config, PAM, session + bake verification | Complete |
+| RDP-05 | Phase 11 — Service config, PAM, session + bake verification | Complete |
+| RDP-06 | Phase 11 — Service config, PAM, session + bake verification | Complete |
+| RDP-07 | Phase 11 — Service config, PAM, session + bake verification | Complete (config; live UAT = RDP-14) |
+| RDP-08 | Phase 11 — Service config, PAM, session + bake verification | Complete |
+| RDP-13 | Phase 11 — Service config, PAM, session + bake verification | Complete |
 | RDP-09 | Phase 12 — Network, operator surface + VNC/noVNC removal | Pending |
 | RDP-10 | Phase 12 — Network, operator surface + VNC/noVNC removal | Pending |
 | RDP-11 | Phase 12 — Network, operator surface + VNC/noVNC removal | Pending |
