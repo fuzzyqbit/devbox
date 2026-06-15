@@ -1,7 +1,7 @@
 ---
 # xrdp role — build xrdp + xorgxrdp from sha256-pinned source tarballs
-# Phase 10: BUILD + INSTALL only. No systemd enable, no xrdp.ini/sesman.ini
-# templates, no PAM file content, no playbook.yml wiring — those are Phase 11/12.
+# Phase 10: BUILD + INSTALL only. No systemd enable, no ini templates,
+# no PAM file content, no playbook.yml wiring — those are Phase 11/12.
 
 # ── Step 1: Install build toolchain + Xorg SDK from AL2023 core repo ─────────
 # All packages are from the AL2023 core mirror only; no third-party repo.
@@ -61,9 +61,8 @@
     creates: "/tmp/xrdp-{{ xrdp_version }}/configure"
 
 # ── Step 5: Configure xrdp ───────────────────────────────────────────────────
-# Release tarballs already include a generated configure script; ./bootstrap is
-# NOT needed (anti-pattern: bootstrap is for git checkouts only — RESEARCH §anti-patterns).
-# --with-pam-rules=redhat: mandatory — installs /etc/pam.d/xrdp-sesman at make install
+# Release tarballs ship a generated configure script; no build-system regeneration needed.
+# --with-pam-rules=redhat: mandatory — installs the redhat PAM rules at make install
 # time; cannot be added retroactively (RESEARCH Pitfall 4). Phase 11 overrides content.
 - name: Configure xrdp {{ xrdp_version }}
   ansible.builtin.command:
@@ -119,7 +118,7 @@
 # PKG_CONFIG_PATH is MANDATORY: xrdp make install puts xrdp.pc in /usr/local/lib/pkgconfig,
 # which is not in the default pkg-config search path on AL2023 (RESEARCH Pitfall 1).
 # mesa-libGL-devel (installed in Step 1) satisfies the 'dri' dep from xorg-server.pc (Pitfall 2).
-# Release tarball ships configure; ./bootstrap is not needed (RESEARCH §anti-patterns).
+# Release tarball ships configure; no build-system regeneration step needed.
 - name: Configure xorgxrdp {{ xorgxrdp_version }} against installed xrdp pkg-config (RDP-02)
   ansible.builtin.command:
     cmd: ./configure
