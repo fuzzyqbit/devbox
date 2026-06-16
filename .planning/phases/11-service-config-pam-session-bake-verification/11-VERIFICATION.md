@@ -1,9 +1,9 @@
 ---
 phase: 11-service-config-pam-session-bake-verification
 verified: 2026-06-15T00:00:00Z
-status: failed
-status_note: "Static config verification passed 7/7, BUT an adversarial review (opus) found 4 CRITICAL runtime blockers the static checks + RDP-13 bake-assert all miss. The bake would be GREEN while no RDP session can start. Do NOT treat this phase as done. See ADVERSARIAL REVIEW ADDENDUM below. Blocked on an architecture decision (xorgxrdp vs CIS 2.2.1)."
-score: 7/7 static must-haves; FAILED on adversarial runtime review
+status: human_needed
+status_note: "BAKE-CONFIG CLEAR after 3 adversarial rounds. R1 (11-01): static 7/7 but adversarial found 4 CRITICAL + decision. R2 (11-02): decision (a) + closed all 4 CRITICAL/3 HIGH/3 RISK. R2 re-review found 2 more bake-fixable (xorg.conf, SELinux fcontext) + fragilities → R3 (11-03) closed them (xorg.conf vendored+asserted at /etc/X11/xrdp/xorg.conf, xrdp_exec_t fcontext, tsusers determinism, gnome-session). FINAL adversarial review = BAKE-CONFIG CLEAR; its one HIGH assert-gap (input-module stats) closed in 2236f0e. NO remaining bake-fixable green-but-broken blocker. Only RDP-14 live UAT residuals remain (AVC-clean enforcing boot, FIPS TLS handshake, firewalld :3389, GNOME render) — they REQUIRE ./run build + a live instance. Phase stays human_needed until RDP-14 passes."
+score: bake-config CLEAR (3 adversarial rounds, 14 findings closed); 4 residuals are live-UAT-only (RDP-14)
 overrides_applied: 0
 human_verification:
   - test: "Live RDP login as ec2-user — connect from a native RDP client to the baked instance on :3389, authenticate with the password from `./run secrets-show`, and confirm the GNOME desktop renders"
@@ -46,6 +46,51 @@ The gsd-verifier confirmed the static config matches the plan (TLS, sesman keys,
 - **RISK** — replace the `.pkla` colord polkit with a `.rules` file (AL2023 polkit 121+ ignores `.pkla`); confirm `dbus-x11` present (covered by #1); evaluate `pam_loginuid.so required` in the sesman PAM stack.
 
 Next: `/gsd:plan-phase 11 --gaps`.
+
+---
+
+## ⚠ ADVERSARIAL REVIEW ADDENDUM #2 (2026-06-16, opus) — after gap-closure 11-02
+
+Plan 11-02 closed all 10 round-1 findings (verified: X server installed, CIS 2.2.1 disabled at hardening/defaults, layer gate fixed, RDP-13 extended, post-hardening Xorg guard, FIPS cert, SELinux relabel, sesman race, polkit .rules, pam_loginuid). A fresh adversarial review of the **committed** code then found the bake can STILL go green while no RDP session starts:
+
+**CRITICAL (bake-fixable now):**
+1. **`/etc/xrdp/xorg.conf` is referenced but never verified.** `sesman.ini.j2` passes `param=xrdp/xorg.conf` (→ `/etc/xrdp/xorg.conf`), the Xorg config that loads the xrdpdev/xrdpkeyb/xrdpmouse driver modules. Nothing templates/copies it (assumed from `make install`) and the RDP-13 assert does NOT stat it. If absent → `/usr/libexec/Xorg -config xrdp/xorg.conf` exits non-zero, no X session, bake green. **Fix:** add `/etc/xrdp/xorg.conf` to the RDP-13 stat+assert; template+install it if `make install` doesn't place it under `--prefix=/usr/local`/`--sysconfdir=/etc`.
+2. **SELinux: relabel ≠ policy for source-built daemons.** `restorecon` only applies EXISTING fcontext; xrdp/xrdp-sesman in `/usr/local/sbin` get `bin_t`, not `xrdp_exec_t` (no `semanage fcontext`/policy module in the repo). Under enforcing (hardening sets it; reboot enters it), the daemons run `init_t` and the sesman→Xorg exec + socket may hit AVC denials that silently kill the session while `xrdp.service` stays active. **Fix (bake):** `semanage fcontext -a -t xrdp_exec_t '/usr/local/sbin/(xrdp|xrdp-sesman)'` (+ libs) BEFORE restorecon. **Residual:** the actual AVC only appears at first boot under enforcing → confirmable only at RDP-14.
+
+**HIGH (fragile, fix or document):**
+- `TerminalServerUsers=tsusers` / `tsadmins` groups are never created and ec2-user is in neither; login works ONLY because `AlwaysGroupCheck=false` skips the gate when the group is absent. If anything ever creates `tsusers`, every login is silently denied. **Fix:** make login deterministic — either create `tsusers` + add ec2-user, or keep current + a bake assert that the group is absent + a comment.
+
+**RISK (live-UAT only — needs ./run build):**
+- `gnome-session` is assumed transitive via `@Desktop`; not installed by name → black-screen risk. **Fix (cheap):** add `gnome-session` to the desktop role dnf list.
+- FIPS handshake depth: cert is well-formed (SAN/sha256/RSA-2048, generated pre-FIPS — idempotent on fresh bake) but the runtime TLS handshake under the kernel FIPS provider is unproven at bake.
+- firewalld 3389: not dropped in the default build only because `containers: true` sets the docker zone (ACCEPT). If an operator runs `containers: false` with `desktop/xrdp: true`, the stock `public` zone drops 3389/8080/6080. **Fix (robust):** explicit `firewall-cmd --add-port=3389/tcp`.
+
+**Confirmed mitigated:** host firewall (default build), other CIS rules (no X/GNOME/dbus/colord/faillock collision beyond 2.2.1), dnf ordering (Xorg installed before relabel), the W1 post-hardening guard (sound), cert idempotency (sound).
+
+Round-3 gap-closure (11-03) implements the bake-fixable items (xorg.conf assert+template, semanage fcontext, tsusers determinism, gnome-session, firewalld 3389). The deep residuals (SELinux-under-enforcing, FIPS handshake, GNOME render) are signed off only by the live RDP-14 UAT.
+
+---
+
+## ✅ FINAL ADVERSARIAL VERDICT (2026-06-16, opus) — BAKE-CONFIG CLEAR
+
+Round-3 (11-03, commits 3e0de34/d4a4eff) closed the ADDENDUM #2 bake-fixable findings. A final adversarial review of the **complete committed phase** (11-01 + 11-02 + 11-03) confirmed all four R3 fixes are correct in code and introduced no regression:
+
+- **xorg.conf** — `files/xorg.conf` is byte-equivalent to upstream xorgxrdp 0.10.5; installed to `/etc/X11/xrdp/xorg.conf` (the path Xorg's relative `param=xrdp/xorg.conf` resolves to as root); stat-asserted in RDP-13. Vendoring matches what `make install` writes, so it cannot break a working session.
+- **SELinux fcontext** — `semanage fcontext -a -t xrdp_exec_t '/usr/local/sbin/xrdp(-sesman)?'` runs idempotently BEFORE restorecon (verified line order); `semanage -a` persists to the policy store and survives the hardening reboot; `policycoreutils-python-utils` provides semanage (AL2023 dnf).
+- **tsusers** — group created + ec2-user appended (`append: true`); positive login gating; runs after ec2-user exists.
+- **gnome-session** — installed by name in the desktop role (AL2023 core); startwm.sh execs it directly (no gdm dependency).
+- No CIS package-purge collision (only 2.2.1 touches X, disabled + W1 post-hardening guard); no-GPU DRMDevice falls back to software cleanly (xorgxrdp continues with glamor=FALSE; startwm forces llvmpipe); dead `.pkla` present but not installed.
+
+The review's one HIGH assert-coverage gap — RDP-13 stat'd `xrdpdev_drv.so` (drivers/) but not the input modules `xrdpkeyb_drv.so`/`xrdpmouse_drv.so` (input/) the vendored xorg.conf loads — was closed in **2236f0e** (both now stat'd + asserted; bake fails loudly if a partial make install omitted them).
+
+**No remaining BAKE-FIXABLE green-but-broken blocker.** Phase status = `human_needed`: the ONLY remaining gates are inherently live and require `./run build` + a running instance:
+
+1. **AVC-clean boot under SELinux enforcing** — the `xrdp_exec_t` mapping + label are set at bake (permissive); the confined-domain boot is only observable live.
+2. **FIPS TLS handshake** — cert is well-formed (SAN/sha256/RSA-2048); the FIPS-strict RDP handshake is live-only.
+3. **firewalld :3389 ingress** — perimeter/runtime; routed to Phase 12 (SG :3389 + host firewall).
+4. **Live GNOME-over-RDP render** — pam_loginuid, llvmpipe software render, colord polkit are all wired; a real interactive login is the only proof. This IS RDP-14.
+
+**Verdict:** bake-config complete and runtime-honest. Do NOT close the phase (or the milestone) until RDP-14 (live RDP login as ec2-user → GNOME renders) is recorded. Phase 12 (network/operator surface + VNC/noVNC removal) can proceed in parallel; RDP-14 is the milestone-close gate.
 
 ---
 

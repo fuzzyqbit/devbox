@@ -2,10 +2,10 @@
 gsd_state_version: 1.0
 milestone: v3.2
 milestone_name: XRDP Remote Desktop
-status: verifying
-stopped_at: 11-03 gap-closure (round 3) executed — 2/2 tasks committed (3e0de34 xorg.conf vendor+assert + xrdp_exec_t fcontext + tsusers gating; d4a4eff gnome-session by name). Phase 11 awaits a final adversarial re-verification pass before being marked done.
-last_updated: "2026-06-16T01:02:05.406Z"
-last_activity: 2026-06-16 -- Phase 11 plan 11-03 round-3 gap-closure executed
+status: human_needed
+stopped_at: Phase 11 BAKE-CONFIG CLEAR after 3 adversarial gap-closure rounds (11-01 config; 11-02 fixed 10 findings; 11-03 fixed 4 more; 2236f0e closed the final input-module assert gap). Final opus adversarial verdict = no remaining bake-fixable green-but-broken blocker. Phase is human_needed: only open gate is RDP-14 live UAT (needs ./run build + a running instance). Phase 12 can proceed in parallel.
+last_updated: "2026-06-16T01:20:00.000Z"
+last_activity: 2026-06-16 -- Phase 11 gap-closure complete + adversarially CLEAR; RDP-14 live UAT outstanding
 progress:
   total_phases: 3
   completed_phases: 2
