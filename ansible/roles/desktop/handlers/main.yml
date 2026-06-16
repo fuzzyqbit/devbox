@@ -1,4 +1,3 @@
 ---
-- name: reload systemd
-  systemd:
-    daemon_reload: true
+# No handlers: the former "reload systemd" handler was notified only by the removed
+# remote-desktop unit-install tasks (RDP-11). No surviving desktop task notifies a handler.
