@@ -380,15 +380,23 @@
     enabled: true
     daemon_reload: true
 
-# --- Host firewalld :3389/tcp allow (RDP-09-adjacent, Pitfall 5) — robust under BOTH container modes ---
-# The EC2 SG (plan 12-01, gated on var.allowed_web_cidrs) is the perimeter; this opens :3389 host-side
-# so a containers:false bake (stock `public` zone, target=DROP) does not silently drop RDP despite the
-# SG allowing it. Under containers:true the default zone is `docker` (target=ACCEPT, already permissive)
-# and this add is harmless belt-and-braces. Adding to the DEFAULT zone covers both modes.
+# --- Host firewalld :3389/tcp allow (RDP-09-adjacent, Pitfall 5) — defensive no-op at xrdp-role time ---
+# IMPORTANT: at this point in the bake, firewalld is NOT installed, so every task below is a guarded
+# defensive no-op in BOTH container modes. The real RDP perimeter is the EC2 security group (RDP-09,
+# plan 12-01, gated on var.allowed_web_cidrs) — reachability does not depend on this block:
+#   - containers:false → firewalld is never installed (the AL2023 minimal base ships without it, and
+#     the CIS host-firewall rules 3.4.* are all disabled in roles/hardening/defaults/main.yml). Nothing
+#     filters :3389; the SG is the only gate.
+#   - containers:true  → firewalld IS installed, but only later by firewalld-docker-fix.yml, which runs
+#     as a POST-play AFTER all roles (incl. hardening) and sets the default zone to `docker`
+#     (target=ACCEPT). So at xrdp-role time firewalld is still absent here, and once it appears the
+#     default zone is already permissive — :3389 is not dropped either way.
+# The tasks are kept (not removed) as honest defense-in-depth: IF a future host posture ever runs
+# firewalld with a restrictive default zone at bake time, the `firewall-cmd --state == running` guard
+# below makes them open :3389 in the default zone; otherwise they cleanly no-op.
 # This task lives INSIDE the xrdp role (already before hardening) — NOT a new trailing role/import —
 # so the hardening-stays-last invariant holds (Pitfall 5). Command-only (no community.general dep),
-# mirroring firewalld-docker-fix.yml's firewall-cmd style and this role's semanage approach. No new
-# package: firewalld is already installed (CIS scan requirement / firewalld-docker-fix path).
+# mirroring firewalld-docker-fix.yml's firewall-cmd style and this role's semanage approach.
 - name: Check whether firewalld is running (RDP-09-adjacent)
   # failed_when:false so a host WITHOUT firewalld (rc != 0 / "not running") no-ops rather than
   # aborting the bake — the host firewall task is robustness, not a hard prerequisite.
