@@ -141,8 +141,11 @@ bake assertion)
 **Plans**: 4 plans (2 waves)
 
 Plans:
+**Wave 1**
 - [ ] 12-01-PLAN.md — Terraform SG: add :3389 ingress (gated on allowed_web_cidrs), drop :6080; outputs + variable descriptions noVNC→RDP (RDP-09)
 - [ ] 12-02-PLAN.md — Operator surface: ./run port-forward help + secrets-show RDP label, start/status scripts, CLAUDE.md §1/§2/§5/§7 native-RDP-over-SSM docs (RDP-10)
+
+**Wave 2** *(blocked on Wave 1 completion)*
 - [ ] 12-03-PLAN.md — Ansible removal: excise tigervnc/noVNC from the desktop role + secrets RDP-password relabel + bootstrap restart-loop swap to xrdp (RDP-11)
 - [ ] 12-04-PLAN.md — Revert noVNC username workaround + drop its import; idempotent host-firewalld :3389 allow in the xrdp role (RDP-12, RDP-09-adjacent)
 
