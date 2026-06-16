@@ -99,7 +99,7 @@ resource "aws_iam_role_policy_attachment" "devbox_ssm_core" {
 # SSH (:22) ingress intentionally absent. Shell access is brokered by AWS SSM
 # Session Manager — see PROJECT.md Key Decisions (NET-04) and
 # .planning/phases/02-network-exposure-remediation/02-RESEARCH.md.
-# Web ports (:8080, :6080) are gated by var.allowed_web_cidrs (default
+# Web ports (:8080, :3389) are gated by var.allowed_web_cidrs (default
 # ["10.0.0.0/8"]). Operator-managed externally — supply via per-operator
 # tfvars / `-var` / `TF_VAR_allowed_web_cidrs` and run `./run tf-apply`.
 
@@ -117,9 +117,9 @@ resource "aws_security_group" "devbox" {
   }
 
   ingress {
-    description = "noVNC (HTTPS) restricted to operator CIDR allowlist"
-    from_port   = 6080
-    to_port     = 6080
+    description = "RDP (xrdp/TLS) restricted to operator CIDR allowlist"
+    from_port   = 3389
+    to_port     = 3389
     protocol    = "tcp"
     cidr_blocks = var.allowed_web_cidrs
   }
