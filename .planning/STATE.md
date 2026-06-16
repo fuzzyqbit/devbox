@@ -3,9 +3,9 @@ gsd_state_version: 1.0
 milestone: v3.2
 milestone_name: XRDP Remote Desktop
 status: verifying
-stopped_at: 12-04 executed + committed (RDP-12 revert + host-firewalld :3389 + RDP-11 repo-wide completeness gate GREEN); Phase 12 complete (4/4), milestone v3.2 ready for verification.
-last_updated: "2026-06-16T02:35:53.660Z"
-last_activity: 2026-06-16
+stopped_at: Milestone v3.2 CODE-COMPLETE. Phase 12 PASSED (4/4; RDP-09/10/11/12, adversarially CLEAR after 2 doc/comment cleanups c34bff7/ea1c0d3); 12-VERIFICATION.md written. Phases 10/11/12 all bake-config complete. SOLE remaining gate = RDP-14 live UAT (live RDP login → GNOME render on a baked instance) — needs ./run build + AWS, tracked in 11-HUMAN-UAT.md. Milestone not "shipped" until RDP-14 recorded. Operator: local main far ahead of origin — push pending.
+last_updated: "2026-06-16T02:45:00.000Z"
+last_activity: 2026-06-16 -- Phase 12 verified PASSED; v3.2 code-complete, RDP-14 live UAT outstanding
 progress:
   total_phases: 3
   completed_phases: 3
