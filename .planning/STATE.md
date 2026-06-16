@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v3.2
 milestone_name: XRDP Remote Desktop
 status: executing
-stopped_at: 11-03 executed; Phase 11 awaits a final adversarial re-verification pass before being marked done.
-last_updated: "2026-06-16T02:00:16.540Z"
-last_activity: 2026-06-16 -- Phase 12 planning complete
+stopped_at: 12-01 executed + committed (Terraform SG :3389 + noVNC scrub, RDP-09 network half); ready for 12-02.
+last_updated: "2026-06-16T02:07:39.496Z"
+last_activity: 2026-06-16
 progress:
   total_phases: 3
   completed_phases: 2
   total_plans: 8
-  completed_plans: 4
-  percent: 50
+  completed_plans: 5
+  percent: 63
 ---
 
 # Project State
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-06-02 after v3.0 milestone start)
 
 **Core value:** A single operator can spin up, hibernate, and tear down a reproducible, hardened cloud workstation with one command — without leaking credentials or exposing a vulnerable host to the public internet.
-**Current focus:** Phase 11 — service-config-pam-session-bake-verification
+**Current focus:** Phase 12 — Network, Operator Surface + VNC/noVNC Removal
 
 ## Current Position
 
-Phase: 11 (service-config-pam-session-bake-verification) — EXECUTED, awaiting re-verification
-Plan: 3 of 3 (11-03 round-3 gap-closure complete)
-Status: Ready to execute
-Last activity: 2026-06-16 -- Phase 12 planning complete
+Phase: 12 (Network, Operator Surface + VNC/noVNC Removal) — EXECUTING
+Plan: 2 of 4
+Status: 12-01 complete (RDP-09 network half); ready to execute 12-02
+Last activity: 2026-06-16 -- 12-01 executed + committed
 
 ## Performance Metrics (v1.0)
 
@@ -52,6 +52,7 @@ Commits: 66 in `b0bd004..7e63829`. Files changed: 75 (+14488 / −69 LOC).
 | 05 | 01 | 5min | 2 | 1 |
 | 06 P01 | 5min | 1 tasks | 1 files |
 | 06 P02 | 4min | 2 tasks | 3 files |
+| Phase 12 P01 | ~4min | 2 tasks | 3 files |
 
 ### v3.2 Performance Metrics
 
@@ -104,6 +105,12 @@ See PROJECT.md Key Decisions table. Locked v1.0 decisions:
 - `gnome-session` installed by name in the desktop role (no Debian `-xsession` variant on AL2023) — guards the GNOME-over-RDP black screen.
 - The pre-existing `no-changeme` false-positive (`desktop_vnc_password != "changeme"`, line 7) remains tolerated — my new lines introduce no `changeme`; do not edit the pre-existing guard.
 
+**v3.2 decisions (Phase 12 plan 12-01 — Terraform SG :3389 + noVNC scrub):**
+
+- RDP-09: the EC2 SG opens inbound TCP `:3389` gated on `var.allowed_web_cidrs`, mirroring the `:8080` code-server ingress exactly; the `:6080` noVNC ingress is removed. SSM-first no-:22 posture, IMDSv2-only metadata, and all-outbound egress unchanged. TCP-only (no UDP 3389 — xrdp TLS does not require it).
+- The `vnc-password` SSM param path `/devbox/<user>/vnc-password` and the `ssm_vnc_password_param` output KEY are RETAINED — it IS the RDP/PAM login password (locked credential model). Descriptions relabelled noVNC→RDP only; never renamed (renaming risks orphaning pre-baked AMIs for zero benefit).
+- `novnc_url` TF output replaced by an `rdp_endpoint` NOTE output (RDP is a native-client / SSM-tunnel endpoint, not a browser URL). Terraform surface now has zero `:6080`/noVNC references; remaining noVNC residue (Ansible, `./run`/scripts, CLAUDE.md) is owned by later 12-xx plans.
+
 ## Deferred / Carried Forward
 
 | Category | Item | Status | Originated |
@@ -131,11 +138,12 @@ See PROJECT.md Key Decisions table. Locked v1.0 decisions:
 
 ## Session Continuity
 
-Last session: 2026-06-15 — Resumed Phase 11. Its verification was corrected from "passed" to FAILED last session: the static gsd-verifier passed 7/7 but an adversarial (opus) review found 4 CRITICAL runtime blockers (no X server installed; CIS 2.2.1 deletes the X server xorgxrdp needs; xrdp layer-gated on `layers.xrdp` alone instead of `and layers.desktop`; RDP-13 assert blind to all of it). This session: clarified the 3 options and the operator chose **(a)** — keep xorgxrdp, install `xorg-x11-server-Xorg`+`dbus-x11`, set `amzn2023cis_rule_2_2_1=false` as a documented desktop exception. Decision recorded in 11-VERIFICATION.md ADVERSARIAL ADDENDUM.
+Last session: 2026-06-16T02:07:31.193Z
 This session (2026-06-16): executed the 11-02 gap-closure plan — all 3 tasks committed atomically (ac3b3cb install X server + dbus-x11 + disable CIS 2.2.1 + fix layer gate; 54740e8 FIPS cert + SELinux relabel + sesman boot-race fix + colord .rules; a50abd1 extend RDP-13 + post-hardening X-server regression assert). All 4 CRITICAL + 3 HIGH + 3 RISK findings closed against the Xorg backend. Every task's automated verify printed PASS; hardening-stays-last grep-gate still = 1; vendored CIS default + 11-01-PLAN.md untouched. Two minor deviations (CLAUDE.md is gitignored → deviation doc on disk only; sesman comment reworded to clear the `! grep BindsTo/StopWhenUnneeded` gate).
 This session (2026-06-16, round 3): executed the 11-03 gap-closure plan — both tasks committed atomically (3e0de34 vendor+assert /etc/X11/xrdp/xorg.conf + idempotent semanage `xrdp_exec_t` fcontext before restorecon + `policycoreutils-python-utils` runtime dep + deterministic `tsusers` gating; d4a4eff `gnome-session` by name in the desktop role). Closes the four round-3 BAKE-FIXABLE findings from adversarial review addendum #2 (CRITICAL #2 xorg.conf, CRITICAL #1 fcontext, HIGH tsusers, RISK gnome-session). Every task's automated verify printed PASS; fcontext add ordered before restorecon (line 406 < 424); hardening-stays-last grep-gate still = 1; 11-01/11-02-PLAN.md untouched. One self-introduced deviation (reworded the gnome-session comment to avoid tripping the plan's own `-xsession`/line-length gates). Pre-existing `no-changeme` false-positive on `desktop_vnc_password != "changeme"` (line 7) tolerated — no new `changeme` introduced.
-Stopped at: 11-03 executed; Phase 11 awaits a final adversarial re-verification pass before being marked done.
-Next: re-verify Phase 11 with an adversarial pass (confirm the bake would now be GREEN-and-runnable with all three rounds of findings closed), then `/gsd:plan-phase 12` (Terraform SG :3389 + `./run` port-forward + VNC/noVNC removal incl. revert of noVNC username fix 29de35b + RDP-14 live UAT). Operator: local main is now 22 commits ahead of origin — push pending.
+This session (2026-06-16): executed Phase 12 plan 12-01 (Terraform SG :3389 + noVNC scrub) — both tasks committed atomically (7a665e4 add :3389 RDP ingress gated on var.allowed_web_cidrs + drop :6080 noVNC ingress + SG header comment; ba59556 scrub noVNC from outputs.tf/variables.tf, replace novnc_url with rdp_endpoint note, relabel ssm_vnc_password_param description with path retained). Every acceptance check passed: :3389 present + gated (1), 6080/noVNC residue across main.tf/outputs.tf/variables.tf (0), :8080 + no-:22 + egress + IMDSv2 intact, vnc-password SSM path retained (fixed-string match), rdp_endpoint added, ssm_vnc_password_param key unchanged. `tofu fmt -check` rc=0 + `tofu validate` Success. No `changeme` introduced. RDP-09 (network half) complete. No deviations.
+Stopped at: 12-01 executed + committed; ready for 12-02.
+Next: execute Phase 12 plan 12-02 (`./run devbox-port-forward` :3389 + docs for native RDP over SSM) and 12-03 (Ansible VNC/noVNC stack removal + revert of noVNC username fix 29de35b). Operator: local main is now ahead of origin — push pending.
 
 ## Operator Next Steps
 
