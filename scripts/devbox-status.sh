@@ -51,14 +51,14 @@ if [[ "$STATE" == "running" ]]; then
   echo "                      (or: DEVBOX_USER=${DEVBOX_USER} ./run devbox-ssm)"
   if [[ "$PRIVATE_IP" != "N/A" ]]; then
     echo "code-server (browser): https://${PRIVATE_IP}:8080  (reachable from VPC; requires your CIDR in allowed_web_cidrs)"
-    echo "noVNC (browser):       https://${PRIVATE_IP}:6080  (reachable from VPC; requires your CIDR in allowed_web_cidrs)"
+    echo "RDP desktop:           ${PRIVATE_IP}:3389  (native RDP client; reachable from VPC; requires your CIDR in allowed_web_cidrs)"
     echo "JupyterLab (on-demand):  DEVBOX_USER=${DEVBOX_USER} ./run jupyter"
     echo "                         then forward :8888 over SSM in a second shell"
     echo "                         (127.0.0.1:8888 loopback-only; no password)"
     echo ""
     echo "Off-VPC operator? Use SSM port forwarding:"
     echo "  DEVBOX_USER=${DEVBOX_USER} ./run devbox-port-forward"
-    echo "  Then browse to https://localhost:8080 (and a second session for :6080)"
+    echo "  Then browse to https://localhost:8080 (and './run devbox-port-forward 3389' -> an RDP client on localhost:3389)"
   fi
   echo ""
   echo "If browser access fails: check var.allowed_web_cidrs in your tfvars."
