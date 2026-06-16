@@ -380,6 +380,54 @@
     enabled: true
     daemon_reload: true
 
+# --- Host firewalld :3389/tcp allow (RDP-09-adjacent, Pitfall 5) — robust under BOTH container modes ---
+# The EC2 SG (plan 12-01, gated on var.allowed_web_cidrs) is the perimeter; this opens :3389 host-side
+# so a containers:false bake (stock `public` zone, target=DROP) does not silently drop RDP despite the
+# SG allowing it. Under containers:true the default zone is `docker` (target=ACCEPT, already permissive)
+# and this add is harmless belt-and-braces. Adding to the DEFAULT zone covers both modes.
+# This task lives INSIDE the xrdp role (already before hardening) — NOT a new trailing role/import —
+# so the hardening-stays-last invariant holds (Pitfall 5). Command-only (no community.general dep),
+# mirroring firewalld-docker-fix.yml's firewall-cmd style and this role's semanage approach. No new
+# package: firewalld is already installed (CIS scan requirement / firewalld-docker-fix path).
+- name: Check whether firewalld is running (RDP-09-adjacent)
+  # failed_when:false so a host WITHOUT firewalld (rc != 0 / "not running") no-ops rather than
+  # aborting the bake — the host firewall task is robustness, not a hard prerequisite.
+  ansible.builtin.command:
+    cmd: firewall-cmd --state
+  register: xrdp_firewalld_state
+  changed_when: false
+  failed_when: false
+
+- name: Query whether :3389/tcp is already allowed in the firewalld default zone (RDP-09-adjacent)
+  ansible.builtin.command:
+    cmd: firewall-cmd --query-port=3389/tcp
+  register: xrdp_firewalld_3389_present
+  changed_when: false
+  failed_when: false
+  when: xrdp_firewalld_state.stdout == "running"
+
+- name: Open :3389/tcp on the host firewall, permanently and at runtime (RDP-09-adjacent)
+  # --permanent persists across reboots; the non-permanent add takes effect now without a reload race.
+  # Guarded on firewalld running AND the port not already allowed, so this is idempotent across re-bakes.
+  ansible.builtin.command:
+    cmd: "{{ item }}"
+  loop:
+    - firewall-cmd --permanent --add-port=3389/tcp
+    - firewall-cmd --add-port=3389/tcp
+  register: xrdp_firewalld_3389_add
+  changed_when: true
+  when:
+    - xrdp_firewalld_state.stdout == "running"
+    - xrdp_firewalld_3389_present.rc | default(1) != 0
+
+- name: Reload firewalld so the permanent :3389/tcp rule is active (RDP-09-adjacent)
+  ansible.builtin.command:
+    cmd: firewall-cmd --reload
+  changed_when: true
+  when:
+    - xrdp_firewalld_state.stdout == "running"
+    - xrdp_firewalld_3389_add is changed
+
 # --- SELinux fcontext for the source-built daemons (CRITICAL #1) — MUST run BEFORE restorecon ---
 # restorecon only APPLIES existing policy: with no fcontext mapping the source-built
 # /usr/local/sbin/xrdp{,-sesman} get bin_t, not the confined xrdp_exec_t, so under enforcing they
