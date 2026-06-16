@@ -29,5 +29,6 @@ dev_home: /home/ec2-user
 # Airgap policy (CLAUDE.md §2 / RESEARCH C2): both packages live in the AL2023 core dnf
 # repos. Install via ansible.builtin.dnf only — NO S3, NO private mirror, NO new get_url.
 xrdp_runtime_deps:
-  - xorg-x11-server-Xorg  # provides /usr/libexec/Xorg, the X server referenced by sesman.ini [Xorg] param (AL2023-core)
-  - dbus-x11              # provides dbus-launch, called by startwm.sh to start the GNOME session (AL2023-core)
+  - xorg-x11-server-Xorg          # provides /usr/libexec/Xorg, the X server referenced by sesman.ini [Xorg] param (AL2023-core)
+  - dbus-x11                      # provides dbus-launch, called by startwm.sh to start the GNOME session (AL2023-core)
+  - policycoreutils-python-utils  # provides `semanage`, used to add the xrdp_exec_t fcontext for /usr/local/sbin/xrdp(-sesman) (AL2023-core; airgap=dnf)

@@ -240,6 +240,32 @@
     group: root
     mode: "0644"
 
+# --- xorg.conf (RDP-05, CRITICAL #2) — vendor + copy the xorgxrdp Xorg config DETERMINISTICALLY ---
+# sesman.ini [Xorg] passes `param=-config` + `param=xrdp/xorg.conf` (RELATIVE). Xorg run as root
+# resolves a relative -config path against its config search root /etc/X11 → /etc/X11/xrdp/xorg.conf.
+# xorgxrdp 0.10.5 `make install` lands it at the same path (xrdpdevsysconfdir=$(sysconfdir)/X11/xrdp,
+# with the role configuring --sysconfdir=/etc). So the correct present-and-asserted path is
+# /etc/X11/xrdp/xorg.conf, NOT /etc/xrdp/xorg.conf — do NOT edit sesman.ini's relative path.
+# DECISION: we VENDOR (files/xorg.conf) + COPY rather than rely on `make install` having placed it,
+# because the adversarial review flagged this file as "assumed, never verified" and Phase 10 cleanup
+# deletes the source tree. Vendoring removes the assumption; the RDP-13 stat+assert below proves
+# presence so a missing xorg.conf fails the bake loudly instead of yielding a green-but-RDP-dead AMI.
+- name: Ensure /etc/X11/xrdp directory exists (RDP-05, CRITICAL #2)
+  ansible.builtin.file:
+    path: /etc/X11/xrdp
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Install vendored xorgxrdp xorg.conf to /etc/X11/xrdp/xorg.conf (RDP-05, CRITICAL #2)
+  ansible.builtin.copy:
+    src: xorg.conf
+    dest: /etc/X11/xrdp/xorg.conf
+    owner: root
+    group: root
+    mode: "0644"
+
 # --- ld.so wiring (RESEARCH Pitfall 5) — make /usr/local/lib loadable ---
 # Phase 10 installed libxup.so under /usr/local/lib/xrdp; /usr/local/lib is not in
 # the default ld.so search path on AL2023. Add it so the Xorg session can load it.
@@ -301,6 +327,25 @@
     group: root
     mode: "0644"
 
+# --- tsusers login gate (HIGH) — make sesman's TerminalServerUsers gate deterministic ---
+# sesman.ini sets TerminalServerUsers=tsusers with AlwaysGroupCheck=false. Without the group,
+# login worked only by the accidental allow-all when the group is absent. Creating tsusers AND
+# adding ec2-user makes login POSITIVELY gated: only tsusers members log in, non-members are denied.
+# ec2-user is guaranteed present (xrdp is gated on layers.desktop → secrets+desktop roles run first
+# and create ec2-user), so this cannot lock ec2-user out. We do NOT create tsadmins — admins are
+# optional (TerminalServerAdmins=tsadmins absent is fine); ec2-user is a normal user, not an admin.
+- name: Create the tsusers login-gate group (HIGH)
+  ansible.builtin.group:
+    name: tsusers
+    state: present
+
+- name: Add {{ dev_user }} to the tsusers login-gate group (HIGH)
+  # append: true so ec2-user's existing groups (wheel, etc.) are preserved, not stripped.
+  ansible.builtin.user:
+    name: "{{ dev_user }}"
+    groups: tsusers
+    append: true
+
 # --- systemd units + enable (RDP-08) — place units explicitly (Pitfall 1) ---
 # make install may install init.d fallback instead of systemd units when
 # pkg-config systemd is absent; copy the corrected /usr/local/sbin units regardless.
@@ -335,11 +380,45 @@
     enabled: true
     daemon_reload: true
 
+# --- SELinux fcontext for the source-built daemons (CRITICAL #1) — MUST run BEFORE restorecon ---
+# restorecon only APPLIES existing policy: with no fcontext mapping the source-built
+# /usr/local/sbin/xrdp{,-sesman} get bin_t, not the confined xrdp_exec_t, so under enforcing they
+# run unconfined (bin_t/init_t) instead of transitioning into the xrdp_t domain. This semanage
+# fcontext task is the MITIGATION: it adds an xrdp_exec_t mapping for both daemons (ONE regex covers
+# both) so the restorecon task that follows can apply the confined label. Placing it BEFORE
+# restorecon is load-bearing — restorecon reads the mapping this task registers. The actual
+# AVC-clean boot under enforcing is only provable at the live RDP-14 UAT (AL2023 is permissive at
+# bake; the label only matters after the hardening role flips SELinux to enforcing).
+# Idempotency double-guard (no community.general dependency, command-only):
+#   1. query existing mappings (semanage fcontext -l) and skip the add when our regex already maps;
+#   2. on the add itself, tolerate "already defined" (re-bake over an existing mapping) AND tolerate
+#      "invalid"/"not defined" (the optional xrdp_exec_t type is absent if the targeted policy does
+#      not ship the xrdp module) so neither a re-bake nor a policy-absent host hard-fails the bake.
+- name: Query existing SELinux fcontext mappings (CRITICAL #1)
+  ansible.builtin.command:
+    cmd: semanage fcontext -l
+  register: xrdp_fcontext_existing
+  changed_when: false
+  failed_when: false
+
+- name: Map /usr/local/sbin/xrdp(-sesman)? to xrdp_exec_t for confined enforcing-mode (CRITICAL #1)
+  ansible.builtin.command:
+    cmd: semanage fcontext -a -t xrdp_exec_t '/usr/local/sbin/xrdp(-sesman)?'
+  register: result
+  when: "'/usr/local/sbin/xrdp(-sesman)?' not in xrdp_fcontext_existing.stdout"
+  changed_when: true
+  failed_when: >-
+    result.rc != 0
+    and 'already defined' not in (result.stderr | default(''))
+    and 'invalid' not in (result.stderr | default(''))
+    and 'not defined' not in (result.stderr | default(''))
+
 # --- Full SELinux relabel (HIGH) — done at bake, BEFORE hardening flips SELinux to enforcing ---
 # The Phase-10 restorecon only covered the xorg module dir. Relabel the newly-installed X
 # server, the /usr/local xrdp binaries + libs, and /etc/xrdp (cert.pem/key.pem included) so an
 # enforcing-mode boot raises no AVC denials that would silently break the RDP session. Placed
-# AFTER cert + config + unit + polkit tasks so every relabelled file already exists.
+# AFTER cert + config + unit + polkit tasks so every relabelled file already exists. The
+# fcontext task above runs first so restorecon here applies the new xrdp_exec_t label.
 - name: SELinux relabel the X server, /usr/local xrdp binaries, and /etc/xrdp (HIGH)
   ansible.builtin.command:
     cmd: restorecon -RvF /usr/libexec/Xorg /usr/local/sbin /usr/local/bin /usr/local/lib /etc/xrdp
@@ -397,6 +476,14 @@
     path: /etc/pam.d/xrdp-sesman
   register: xrdp_rdp13_pam
 
+# CRITICAL #2 — the xorgxrdp Xorg config sesman.ini's relative `param=xrdp/xorg.conf` resolves to
+# (/etc/X11 config root → /etc/X11/xrdp/xorg.conf). Without it Xorg cannot load the xrdpdev/
+# xrdpkeyb/xrdpmouse driver modules, so no RDP session starts — assert it so the bake fails loudly.
+- name: Stat the xorgxrdp Xorg config /etc/X11/xrdp/xorg.conf (RDP-13)
+  ansible.builtin.stat:
+    path: /etc/X11/xrdp/xorg.conf
+  register: xrdp_rdp13_xorgconf
+
 - name: Assert xrdp binary, xorgxrdp module, config files, X server, cert/key, startwm + PAM are present (RDP-13)
   ansible.builtin.assert:
     that:
@@ -409,6 +496,7 @@
       - xrdp_rdp13_key.stat.exists
       - xrdp_rdp13_startwm.stat.exists
       - xrdp_rdp13_pam.stat.exists
+      - xrdp_rdp13_xorgconf.stat.exists
     fail_msg: >-
       RDP-13 bake assertion FAILED. One or more required files are missing:
         /usr/local/sbin/xrdp exists: {{ xrdp_rdp13_binary.stat.exists | default(false) }}
@@ -420,6 +508,11 @@
         /etc/xrdp/key.pem exists: {{ xrdp_rdp13_key.stat.exists | default(false) }}
         /etc/xrdp/startwm.sh exists: {{ xrdp_rdp13_startwm.stat.exists | default(false) }}
         /etc/pam.d/xrdp-sesman exists: {{ xrdp_rdp13_pam.stat.exists | default(false) }}
+        /etc/X11/xrdp/xorg.conf exists: {{ xrdp_rdp13_xorgconf.stat.exists | default(false) }}
+      If /etc/X11/xrdp/xorg.conf is missing here, Xorg cannot start the xorgxrdp session: that
+      file loads the xrdpdev/xrdpkeyb/xrdpmouse driver modules sesman exec's Xorg with. It is
+      vendored in-repo (ansible/roles/xrdp/files/xorg.conf) and copied to /etc/X11/xrdp/xorg.conf,
+      where sesman.ini's relative `param=xrdp/xorg.conf` resolves against Xorg's /etc/X11 config root.
       If /usr/libexec/Xorg is missing here, the runtime-dep install (xorg-x11-server-Xorg,
       CRITICAL #1) was skipped or failed — this assert runs INSIDE the xrdp role, BEFORE the
       hardening role, so CIS rule 2.2.1 has not run yet and is NOT the cause at this point.
