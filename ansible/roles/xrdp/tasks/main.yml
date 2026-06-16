@@ -484,6 +484,20 @@
     path: /etc/X11/xrdp/xorg.conf
   register: xrdp_rdp13_xorgconf
 
+# The vendored xorg.conf loads Driver "xrdpkeyb" + Driver "xrdpmouse" (InputDevice sections);
+# those are separate input modules under .../modules/input/ (not the drivers/ dir of xrdpdev).
+# A partial make install could place xrdpdev but not the input modules → Xorg fails to load the
+# xrdpKeyboard/xrdpMouse InputDevices and no session starts. Assert them so the bake fails loudly.
+- name: Stat the xrdpkeyb input driver module (RDP-13)
+  ansible.builtin.stat:
+    path: /usr/lib64/xorg/modules/input/xrdpkeyb_drv.so
+  register: xrdp_rdp13_keyb
+
+- name: Stat the xrdpmouse input driver module (RDP-13)
+  ansible.builtin.stat:
+    path: /usr/lib64/xorg/modules/input/xrdpmouse_drv.so
+  register: xrdp_rdp13_mouse
+
 - name: Assert xrdp binary, xorgxrdp module, config files, X server, cert/key, startwm + PAM are present (RDP-13)
   ansible.builtin.assert:
     that:
@@ -497,6 +511,8 @@
       - xrdp_rdp13_startwm.stat.exists
       - xrdp_rdp13_pam.stat.exists
       - xrdp_rdp13_xorgconf.stat.exists
+      - xrdp_rdp13_keyb.stat.exists
+      - xrdp_rdp13_mouse.stat.exists
     fail_msg: >-
       RDP-13 bake assertion FAILED. One or more required files are missing:
         /usr/local/sbin/xrdp exists: {{ xrdp_rdp13_binary.stat.exists | default(false) }}
@@ -509,6 +525,11 @@
         /etc/xrdp/startwm.sh exists: {{ xrdp_rdp13_startwm.stat.exists | default(false) }}
         /etc/pam.d/xrdp-sesman exists: {{ xrdp_rdp13_pam.stat.exists | default(false) }}
         /etc/X11/xrdp/xorg.conf exists: {{ xrdp_rdp13_xorgconf.stat.exists | default(false) }}
+        .../modules/input/xrdpkeyb_drv.so exists: {{ xrdp_rdp13_keyb.stat.exists | default(false) }}
+        .../modules/input/xrdpmouse_drv.so exists: {{ xrdp_rdp13_mouse.stat.exists | default(false) }}
+      If either input module (xrdpkeyb/xrdpmouse) is missing here, make install placed xrdpdev but
+      not the input drivers — Xorg will fail to load the xrdpKeyboard/xrdpMouse InputDevices the
+      vendored xorg.conf declares, and no RDP session starts.
       If /etc/X11/xrdp/xorg.conf is missing here, Xorg cannot start the xorgxrdp session: that
       file loads the xrdpdev/xrdpkeyb/xrdpmouse driver modules sesman exec's Xorg with. It is
       vendored in-repo (ansible/roles/xrdp/files/xorg.conf) and copied to /etc/X11/xrdp/xorg.conf,
