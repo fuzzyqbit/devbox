@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v3.2
 milestone_name: XRDP Remote Desktop
 status: executing
-stopped_at: 12-02 executed + committed (operator surface + docs → native RDP-over-SSM :3389, RDP-10); ready for 12-03.
-last_updated: "2026-06-16T02:17:45.715Z"
+stopped_at: 12-03 executed + committed (RDP-11 VNC/noVNC removal); ready for 12-04 (RDP-12 novnc-plain-username-fix revert).
+last_updated: "2026-06-16T02:26:29.793Z"
 last_activity: 2026-06-16
 progress:
   total_phases: 3
   completed_phases: 2
   total_plans: 8
-  completed_plans: 6
-  percent: 75
+  completed_plans: 7
+  percent: 88
 ---
 
 # Project State
@@ -26,9 +26,9 @@ See: .planning/PROJECT.md (updated 2026-06-02 after v3.0 milestone start)
 ## Current Position
 
 Phase: 12 (Network, Operator Surface + VNC/noVNC Removal) — EXECUTING
-Plan: 3 of 4
-Status: 12-02 complete (RDP-10 operator-surface half); ready to execute 12-03
-Last activity: 2026-06-16 -- 12-02 executed + committed
+Plan: 4 of 4
+Status: 12-03 complete (RDP-11 VNC/noVNC removal); ready to execute 12-04 (RDP-12 workaround revert)
+Last activity: 2026-06-16 -- 12-03 executed + committed
 
 ## Performance Metrics (v1.0)
 
@@ -53,6 +53,7 @@ Commits: 66 in `b0bd004..7e63829`. Files changed: 75 (+14488 / −69 LOC).
 | 06 P01 | 5min | 1 tasks | 1 files |
 | 06 P02 | 4min | 2 tasks | 3 files |
 | Phase 12 P01 | ~4min | 2 tasks | 3 files |
+| Phase 12 P03 | 9min | 2 tasks | 10 files |
 
 ### v3.2 Performance Metrics
 
@@ -62,6 +63,7 @@ Commits: 66 in `b0bd004..7e63829`. Files changed: 75 (+14488 / −69 LOC).
 | 11 | 02 | 8min | 3 | 6 |
 | 11 | 03 | ~10min | 2 | 4 |
 | 12 | 02 | ~4min | 3 | 4 |
+| 12 | 03 | ~9min | 2 | 10 |
 
 ## Accumulated Context
 
@@ -118,6 +120,13 @@ See PROJECT.md Key Decisions table. Locked v1.0 decisions:
 - The `/devbox/<user>/vnc-password` SSM fetch path in `run` is RETAINED unchanged — it IS the RDP/PAM login password (locked credential model). Only the human-facing label changed: `secrets-show` now prints `RDP login (ec2-user @ <host>:3389) password:` (path never renamed/removed).
 - CLAUDE.md (§1/§2/§5/§7) documents connecting a native RDP client (mstsc/FreeRDP/Remmina) over `./run devbox-port-forward 3389`. CLAUDE.md is git-untracked (commit effde0f) → edited on-disk for the operator but NOT committed; the authoritative committed record lives in `run`/`scripts` + the 12-02 SUMMARY. Zero `:6080`/noVNC reference now remains in `run`, `scripts/`, or CLAUDE.md; `shellcheck` clean.
 
+**v3.2 decisions (Phase 12 plan 12-03 — Ansible VNC/noVNC stack removal, RDP-11):**
+
+- RDP-11: surgically excised the VNC/noVNC stack from the `desktop` role — dropped `tigervnc-server` as a single dnf list item (gnome-shell/gnome-session/dejavu fonts/mesa-dri-drivers kept), deleted the VNC config dir / TigerVNC PAM-password / `/etc/pam.d/vnc` / xstartup / vncserver-unit tasks, the entire noVNC block (python3-pip, websockify, tarball, `/etc/novnc` cert, novnc-unit), the 6 VNC defaults, the dead `reload systemd` handler, and the 3 templates (vncserver/novnc/xstartup `.j2`). ffmpeg + VLC + the dconf lock-disable (comment reworded to RDP/headless) kept.
+- Deleted (not kept) the bake-time D4 user-password task + the D1 `desktop_vnc_password != "changeme"` assert: the boot bootstrap is the authoritative runtime password setter (chpasswd before first RDP login, research A1); D1 removal also cleared one of three pre-existing `no-changeme` false-positives (two legitimate asserts remain in `secrets/generate.yml`, untouched).
+- Both BAKED secrets-bootstrap artifacts swapped onto the RDP path: `devbox-secrets-bootstrap.sh.j2` restart loop (S6) AND `devbox-secrets-bootstrap.service.j2` `Before=`/`Description` (S7, the plan-flagged blocker — this unit is rendered into /etc/systemd/system in the AMI) now name `code-server.service xrdp.service xrdp-sesman.service`, no dead vnc/novnc names.
+- The `vnc-password` SSM param path, the `desktop_vnc_password` fact, and the generate/publish/fetch/chpasswd credential pipeline are KEPT (relabel-not-rename — it is the RDP/PAM login password). hardening-stays-last grep-gate still = 1; xrdp role untouched (`param=/usr/libexec/Xorg` intact). RDP-12 (`novnc-plain-username-fix.yml` revert) remains for 12-04. WR-05 (bootstrap `.sh.j2` outside shellcheck glob) carried forward unchanged.
+
 ## Deferred / Carried Forward
 
 | Category | Item | Status | Originated |
@@ -145,13 +154,14 @@ See PROJECT.md Key Decisions table. Locked v1.0 decisions:
 
 ## Session Continuity
 
-Last session: 2026-06-16T02:17:45.710Z
+Last session: 2026-06-16T02:26:22.652Z
 This session (2026-06-16): executed the 11-02 gap-closure plan — all 3 tasks committed atomically (ac3b3cb install X server + dbus-x11 + disable CIS 2.2.1 + fix layer gate; 54740e8 FIPS cert + SELinux relabel + sesman boot-race fix + colord .rules; a50abd1 extend RDP-13 + post-hardening X-server regression assert). All 4 CRITICAL + 3 HIGH + 3 RISK findings closed against the Xorg backend. Every task's automated verify printed PASS; hardening-stays-last grep-gate still = 1; vendored CIS default + 11-01-PLAN.md untouched. Two minor deviations (CLAUDE.md is gitignored → deviation doc on disk only; sesman comment reworded to clear the `! grep BindsTo/StopWhenUnneeded` gate).
 This session (2026-06-16, round 3): executed the 11-03 gap-closure plan — both tasks committed atomically (3e0de34 vendor+assert /etc/X11/xrdp/xorg.conf + idempotent semanage `xrdp_exec_t` fcontext before restorecon + `policycoreutils-python-utils` runtime dep + deterministic `tsusers` gating; d4a4eff `gnome-session` by name in the desktop role). Closes the four round-3 BAKE-FIXABLE findings from adversarial review addendum #2 (CRITICAL #2 xorg.conf, CRITICAL #1 fcontext, HIGH tsusers, RISK gnome-session). Every task's automated verify printed PASS; fcontext add ordered before restorecon (line 406 < 424); hardening-stays-last grep-gate still = 1; 11-01/11-02-PLAN.md untouched. One self-introduced deviation (reworded the gnome-session comment to avoid tripping the plan's own `-xsession`/line-length gates). Pre-existing `no-changeme` false-positive on `desktop_vnc_password != "changeme"` (line 7) tolerated — no new `changeme` introduced.
 This session (2026-06-16): executed Phase 12 plan 12-01 (Terraform SG :3389 + noVNC scrub) — both tasks committed atomically (7a665e4 add :3389 RDP ingress gated on var.allowed_web_cidrs + drop :6080 noVNC ingress + SG header comment; ba59556 scrub noVNC from outputs.tf/variables.tf, replace novnc_url with rdp_endpoint note, relabel ssm_vnc_password_param description with path retained). Every acceptance check passed: :3389 present + gated (1), 6080/noVNC residue across main.tf/outputs.tf/variables.tf (0), :8080 + no-:22 + egress + IMDSv2 intact, vnc-password SSM path retained (fixed-string match), rdp_endpoint added, ssm_vnc_password_param key unchanged. `tofu fmt -check` rc=0 + `tofu validate` Success. No `changeme` introduced. RDP-09 (network half) complete. No deviations.
 This session (2026-06-16): executed Phase 12 plan 12-02 (operator surface + docs → native RDP over SSM, RDP-10) — Tasks 1+2 committed atomically (1393b15 relabel run port-forward help + secrets-show to RDP :3389, vnc-password SSM fetch path unchanged, no port-parser logic change per D4; 60b409c advertise RDP :3389 in devbox-start/status connection info). Task 3 edited CLAUDE.md §1/§2/§5/§7 on-disk (git-ignored → NOT committed). Every acceptance check passed: 0 6080/noVNC residue across run+scripts+CLAUDE.md; vnc-password path retained (fixed-string=2); `devbox-port-forward 3389` documented in CLAUDE.md; `shellcheck run scripts/devbox-start.sh scripts/devbox-status.sh` rc=0; `git ls-files CLAUDE.md` EMPTY (untracked); code-server/JupyterLab/§8-hardening surfaces intact; no `changeme` introduced. RDP-10 operator-surface half complete. No deviations (one harness note: executor shell runs errexit → re-ran gates with `set +e` and fixed-string grep for the `${DEVBOX_USER}` path).
-Stopped at: 12-02 executed + committed; ready for 12-03.
-Next: execute Phase 12 plan 12-03 (Ansible VNC/noVNC stack removal — RDP-11 — + revert of noVNC username fix 29de35b — RDP-12). Operator: local main is now ahead of origin — push pending.
+This session (2026-06-16): executed Phase 12 plan 12-03 (Ansible VNC/noVNC stack removal — RDP-11) — both tasks committed atomically (eba3017 excise the VNC/noVNC stack from the desktop role: drop tigervnc-server as a single dnf list item, delete the VNC config dir / TigerVNC PAM-password / /etc/pam.d/vnc / xstartup / vncserver-unit tasks + the entire noVNC block + the 6 VNC defaults + the dead reload-systemd handler + the D1 assert, git rm vncserver/novnc/xstartup .j2; reword the dconf lock-disable comment; keep gnome-shell/gnome-session/mesa/fonts/ffmpeg/VLC; 73761ba point both baked secrets-bootstrap artifacts at xrdp — .sh.j2 restart loop S6 + .service.j2 Before=/Description S7 swap vncserver/novnc → xrdp/xrdp-sesman, Description drops VNC; relabel publish.yml description + defaults comment + chpasswd comment VNC→RDP; KEEP the vnc-password param path + desktop_vnc_password fact + generate/publish/fetch/chpasswd pipeline). Every acceptance gate PASS: 0 functional VNC/noVNC residue in the desktop role; gnome-shell/gnome-session/mesa/dejavu/ffmpeg/VLC/lock-enabled positively present; 3 templates deleted; both baked bootstrap artifacts name xrdp.service+xrdp-sesman.service with no dead vnc/novnc names; .service.j2 Description has no "VNC"; RDP-password pipeline intact (chpasswd + vnc-password fetch + secrets_ssm_vnc_param kept). hardening-stays-last grep-gate = 1; xrdp Xorg backend (param=/usr/libexec/Xorg) intact; pre-commit hooks ran on both commits (no --no-verify) and passed. No deviations (one harness note: executor shell errexit aborts on `grep -q` rc=1 = no-match → ran removal-proofs via variable capture with `|| true`; ansible-lint rc=3 is the known-broken .ansible-lint config, CI authoritative).
+Stopped at: 12-03 executed + committed; ready for 12-04.
+Next: execute Phase 12 plan 12-04 (RDP-12 — revert ansible/novnc-plain-username-fix.yml commit 29de35b + drop its playbook.yml import). Operator: local main is now ahead of origin — push pending.
 
 ## Operator Next Steps
 

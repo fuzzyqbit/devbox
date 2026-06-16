@@ -146,7 +146,7 @@ Plans:
 - [x] 12-02-PLAN.md — Operator surface: ./run port-forward help + secrets-show RDP label, start/status scripts, CLAUDE.md §1/§2/§5/§7 native-RDP-over-SSM docs (RDP-10)
 
 **Wave 2** *(blocked on Wave 1 completion)*
-- [ ] 12-03-PLAN.md — Ansible removal: excise tigervnc/noVNC from the desktop role + secrets RDP-password relabel + bootstrap restart-loop swap to xrdp (RDP-11)
+- [x] 12-03-PLAN.md — Ansible removal: excise tigervnc/noVNC from the desktop role + secrets RDP-password relabel + bootstrap restart-loop swap to xrdp (RDP-11)
 - [ ] 12-04-PLAN.md — Revert noVNC username workaround + drop its import; idempotent host-firewalld :3389 allow in the xrdp role (RDP-12, RDP-09-adjacent)
 
 **Notes**: This is the irreversible-cleanup phase, so it is ordered last by design. The
@@ -173,7 +173,7 @@ deferred-at-close items). The milestone is not "shipped" until RDP-14 is recorde
 | 9. Jupyter Operator Surface + Docs | v3.0 | 1/1 | Complete | 2026-06-02 |
 | 10. xrdp / xorgxrdp From-Source Build Role | v3.2 | 1/1 | Complete   | 2026-06-15 |
 | 11. Service Config, PAM, Session + Bake Verification | v3.2 | 3/3 | Complete   | 2026-06-16 |
-| 12. Network, Operator Surface + VNC/noVNC Removal | v3.2 | 2/4 | In Progress|  |
+| 12. Network, Operator Surface + VNC/noVNC Removal | v3.2 | 3/4 | In Progress|  |
 
 ## Shipped Milestones
 
