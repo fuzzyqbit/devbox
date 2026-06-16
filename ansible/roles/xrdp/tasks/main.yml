@@ -172,6 +172,30 @@
 # service, generates the TLS cert, wires PAM/session, enables the systemd units,
 # and asserts the bake. /etc/xrdp already exists from the Phase 10 make install.
 
+# --- Runtime deps (RDP-05/07) — install the X server + dbus-x11 from AL2023 core ---
+# xorg-x11-server-Xorg provides /usr/libexec/Xorg (sesman.ini [Xorg] param); dbus-x11
+# provides dbus-launch (startwm.sh). Airgap policy: dnf from AL2023 core only — mirrors
+# the Step-1 dnf pattern above. CIS rule 2.2.1 (which removes xorg-x11-server-common,
+# a dep of -Xorg) is disabled in hardening/defaults so this survives the hardening role.
+- name: Install xrdp runtime dependencies from AL2023 core repo (RDP-05/07)
+  ansible.builtin.dnf:
+    name: "{{ xrdp_runtime_deps }}"
+    state: present
+  register: xrdp_runtime_deps_install
+
+- name: Assert xrdp runtime dependencies installed successfully (RDP-05/07)
+  ansible.builtin.assert:
+    that:
+      - xrdp_runtime_deps_install is success
+    fail_msg: >-
+      One or more xrdp runtime dependencies failed to install:
+      xorg-x11-server-Xorg (provides /usr/libexec/Xorg, the X server the xorgxrdp
+      sesman.ini [Xorg] backend exec's) and dbus-x11 (provides dbus-launch, called by
+      startwm.sh). Both MUST come from the AL2023 core repo (airgap policy: no external
+      repo, no S3, no private mirror). Verify availability on the bake instance:
+        dnf info xorg-x11-server-Xorg dbus-x11
+    quiet: false
+
 # --- TLS cert (RDP-04) — mirrors the desktop role noVNC openssl pattern ---
 - name: Generate self-signed TLS cert for xrdp (RDP-04)
   ansible.builtin.command:

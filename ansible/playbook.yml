@@ -57,8 +57,10 @@
       when: layers.desktop | default(false)
 
     - role: xrdp
-      when: layers.xrdp | default(false)
-      # xrdp config + service (Phase 11 RDP-08); MUST stay before hardening
+      when: (layers.xrdp | default(false)) and (layers.desktop | default(false))
+      # xrdp config + service (Phase 11 RDP-08); MUST stay before hardening.
+      # Gated on desktop too: xrdp needs GNOME (desktop role) + the ec2-user password
+      # (secrets role, gated on vscode OR desktop), so both must exist before xrdp configures auth.
 
     - role: hardening  # MUST remain last — invariant (JUP-08 / CLAUDE.md §8)
       when: layers.hardening | default(false)

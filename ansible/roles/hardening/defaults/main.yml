@@ -24,3 +24,14 @@ amzn2023cis_rule_5_3: false
 
 # --- AIDE: filesystem integrity checking is overkill for a dev box ---
 amzn2023cis_config_aide: false
+
+# --- X server (CIS 2.2.1): the SINGLE accepted Level-2 CIS deviation for the devimage ---
+# This host is a GRAPHICAL DESKTOP — the X server (xorg-x11-server-Xorg, via xrdp/xorgxrdp)
+# is required BY PURPOSE, so the NIST 800-53 CM-7 / CIS "no X server on a server" rationale
+# does not apply here. CIS rule 2.2.1 removes xorg-x11-server-common (a dep of -Xorg); leaving
+# it enabled would delete the X server AFTER the xrdp role installed it (hardening runs last).
+# Set false here (parent-role default override — the proven mechanism, same as the rule_3_4_*
+# overrides above); do NOT edit the vendored AMAZON2023-CIS default (lost on a role bump).
+# A post-hardening assert in playbook.yml makes a future CIS-role bump re-enabling 2.2.1 a
+# LOUD bake failure rather than a silent regression (Phase 11 RDP-05/07).
+amzn2023cis_rule_2_2_1: false
