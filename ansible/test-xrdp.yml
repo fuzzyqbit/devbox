@@ -1,0 +1,62 @@
+---
+# ──────────────────────────────────────────────────────────────────────────────
+# Standalone test harness for the xrdp role on a LIVE instance.
+# NOT wired into playbook.yml — run it directly (see commands at the bottom of this file
+# / the repo notes). It exists to iterate on the xrdp role without a full Packer bake.
+#
+# Runs ONLY the xrdp role (Phase 10 build + Phase 11 config/PAM/session/systemd +
+# the RDP-13 bake asserts), bypassing the `layers.xrdp and layers.desktop` gate that
+# guards it in the real playbook.
+#
+# Prereqs on the TARGET for a meaningful test:
+#   - github.com reachable (the role fetches xrdp/xorgxrdp source via get_url).
+#   - For a full desktop RENDER test: GNOME already installed (i.e. run against an AMI
+#     baked with the `desktop` role, or run the desktop role first) — this playbook does
+#     NOT install GNOME.
+#   - For an actual RDP LOGIN: ec2-user needs a password. The real pipeline sets it from
+#     SSM via the secrets role + bootstrap; this harness does NOT. Pass -e test_password=...
+#     below to set one just for the test (or set it manually: `echo 'ec2-user:PW' | sudo chpasswd`).
+#   - root (become). On an already-hardened instance SELinux is enforcing — the role's
+#     semanage/restorecon tasks matter there; on a fresh instance it's permissive.
+# ──────────────────────────────────────────────────────────────────────────────
+- name: TEST xrdp role (temporary, live)
+  hosts: "{{ target | default('all') }}"
+  become: true
+  gather_facts: true
+  vars:
+    dev_user: ec2-user
+    dev_home: /home/ec2-user
+
+  pre_tasks:
+    # Optional: set the ec2-user password so you can actually RDP in for the test.
+    # Skipped unless you pass -e test_password=...  (no secret is hardcoded here).
+    - name: TEST-ONLY — set ec2-user password for the login test
+      ansible.builtin.user:
+        name: "{{ dev_user }}"
+        password: "{{ test_password | password_hash('sha512') }}"
+      when: test_password is defined and test_password | length > 0
+
+  roles:
+    - xrdp
+
+  post_tasks:
+    # The role already runs the RDP-13 bake asserts. These are quick live-runtime checks
+    # on top — they report, they do not fail the run.
+    - name: Show xrdp + xrdp-sesman service state
+      ansible.builtin.command: systemctl is-active xrdp xrdp-sesman
+      register: _xrdp_active
+      changed_when: false
+      failed_when: false
+
+    - name: Show :3389 listener
+      ansible.builtin.command: ss -tlnp
+      register: _xrdp_listen
+      changed_when: false
+      failed_when: false
+
+    - name: Report
+      ansible.builtin.debug:
+        msg:
+          - "services is-active: {{ _xrdp_active.stdout_lines | default([]) }}"
+          - "3389 listening: {{ ':3389' in _xrdp_listen.stdout }}"
+          - "Xorg present: check /usr/libexec/Xorg ; xorg.conf: /etc/X11/xrdp/xorg.conf"
