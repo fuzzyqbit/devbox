@@ -5,8 +5,11 @@
 Description=xrdp session manager
 Documentation=man:xrdp-sesman(8) man:sesman.ini(5)
 After=network.target
-StopWhenUnneeded=true
-BindsTo=xrdp.service
+# Non-racing boot dependency (W2): the stop-when-unneeded directive and the reciprocal
+# binds-to-xrdp directive were removed from this section. sesman is now pulled in
+# independently at boot by WantedBy=multi-user.target below; ordering/dependency comes solely
+# from xrdp.service's one-directional Requires=xrdp-sesman.service + After=...xrdp-sesman.service.
+# The old reciprocal binding plus the stop-when-unneeded directive let systemd stop sesman at boot.
 
 [Service]
 Type=exec

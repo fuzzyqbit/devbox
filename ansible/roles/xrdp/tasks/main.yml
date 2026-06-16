@@ -197,13 +197,18 @@
     quiet: false
 
 # --- TLS cert (RDP-04) — mirrors the desktop role noVNC openssl pattern ---
+# FIPS-safe: RSA-2048 is FIPS-acceptable; -sha256 forces a FIPS-approved digest; a
+# subjectAltName is required for a modern/FIPS-strict TLS handshake (CN-only certs are
+# rejected). creates: guards idempotency — fresh bakes have no prior cert (bake-time, not
+# a live rotation). RDP-13 asserts the SAN is present so the RDP TLS cert survives FIPS mode.
 - name: Generate self-signed TLS cert for xrdp (RDP-04)
   ansible.builtin.command:
     cmd: >
-      openssl req -x509 -nodes -newkey rsa:2048
+      openssl req -x509 -nodes -newkey rsa:2048 -sha256
       -keyout /etc/xrdp/key.pem
       -out /etc/xrdp/cert.pem
       -days 3650 -subj '/CN=devbox'
+      -addext "subjectAltName=DNS:devbox"
   args:
     creates: /etc/xrdp/cert.pem
 
@@ -254,6 +259,11 @@
 
 # --- PAM delegation (RDP-06) — overwrite the make-installed file for exact content ---
 # Delegates to password-auth so RDP logins inherit the CIS faillock + pwquality stack.
+# pam_loginuid evaluation (RISK/W3): the file pins `session required pam_loginuid.so` — the
+# upstream redhat-standard handling for xrdp-sesman (it is `required` in sshd's stack too).
+# Setting the audit loginuid does NOT block a PAM-authenticated RDP session under systemd, so
+# it is intentionally retained as `required`. Its live-session effect is a runtime property
+# not fully provable at bake — covered by the RDP-14 human UAT gate.
 - name: Install xrdp-sesman PAM file delegating to password-auth (RDP-06)
   ansible.builtin.copy:
     src: xrdp-sesman.pam
@@ -272,9 +282,12 @@
     mode: "0755"
 
 # --- colord polkit rule (RESEARCH Pitfall 6) — avoid the color-manager auth hang ---
-- name: Ensure polkit local-authority directory exists (Pitfall 6)
+# AL2023 ships polkit 121+, which IGNORES /etc/polkit-1/localauthority .pkla files. The
+# allow-rule MUST be a JavaScript .rules file under /etc/polkit-1/rules.d/ (the dead .pkla
+# at files/45-allow-colord.pkla is no longer installed).
+- name: Ensure polkit rules.d directory exists (Pitfall 6)
   ansible.builtin.file:
-    path: /etc/polkit-1/localauthority/50-local.d
+    path: /etc/polkit-1/rules.d
     state: directory
     owner: root
     group: root
@@ -282,8 +295,8 @@
 
 - name: Allow colord without an auth prompt for GNOME-over-xrdp sessions (Pitfall 6)
   ansible.builtin.copy:
-    src: 45-allow-colord.pkla
-    dest: /etc/polkit-1/localauthority/50-local.d/45-allow.colord.pkla
+    src: 45-allow-colord.rules
+    dest: /etc/polkit-1/rules.d/45-allow-colord.rules
     owner: root
     group: root
     mode: "0644"
@@ -321,6 +334,16 @@
     name: xrdp-sesman
     enabled: true
     daemon_reload: true
+
+# --- Full SELinux relabel (HIGH) — done at bake, BEFORE hardening flips SELinux to enforcing ---
+# The Phase-10 restorecon only covered the xorg module dir. Relabel the newly-installed X
+# server, the /usr/local xrdp binaries + libs, and /etc/xrdp (cert.pem/key.pem included) so an
+# enforcing-mode boot raises no AVC denials that would silently break the RDP session. Placed
+# AFTER cert + config + unit + polkit tasks so every relabelled file already exists.
+- name: SELinux relabel the X server, /usr/local xrdp binaries, and /etc/xrdp (HIGH)
+  ansible.builtin.command:
+    cmd: restorecon -RvF /usr/libexec/Xorg /usr/local/sbin /usr/local/bin /usr/local/lib /etc/xrdp
+  changed_when: false
 
 # ── RDP-13 bake assertion ──
 # Fail the bake loudly if the binary, the xorgxrdp module, either ini file, or

@@ -1,0 +1,10 @@
+// AL2023 polkit-121 JavaScript rules file (the .pkla format is ignored on polkit 121+).
+// Ports the intent of the dead 45-allow-colord.pkla: grant all org.freedesktop.color-manager.*
+// actions without an auth prompt, so the GNOME color-manager cannot hang a GNOME-over-RDP
+// session waiting for credentials. Scope is color-manager only (not a broad polkit bypass);
+// single-operator devimage. Phase 11 RDP-07 / RESEARCH Pitfall 6.
+polkit.addRule(function(action, subject) {
+    if (action.id.indexOf("org.freedesktop.color-manager.") === 0) {
+        return polkit.Result.YES;
+    }
+});
