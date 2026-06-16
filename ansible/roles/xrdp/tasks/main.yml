@@ -368,20 +368,63 @@
     path: /etc/xrdp/sesman.ini
   register: xrdp_rdp13_sesman
 
-- name: Assert xrdp binary, xorgxrdp module, and config files are present (RDP-13)
+# --- Extended RDP-13 stats (CRITICAL #4) — the runtime the original assert was blind to ---
+# /usr/libexec/Xorg (the X server CRITICAL #1 installs), the TLS cert + key, the GNOME session
+# launcher, and the PAM file. The bake MUST fail if ANY is absent — without them no RDP session
+# can start even though the role's own binary/module/inis are present.
+- name: Stat the X server /usr/libexec/Xorg (RDP-13)
+  ansible.builtin.stat:
+    path: /usr/libexec/Xorg
+  register: xrdp_rdp13_xserver
+
+- name: Stat the TLS cert /etc/xrdp/cert.pem (RDP-13)
+  ansible.builtin.stat:
+    path: /etc/xrdp/cert.pem
+  register: xrdp_rdp13_cert
+
+- name: Stat the TLS key /etc/xrdp/key.pem (RDP-13)
+  ansible.builtin.stat:
+    path: /etc/xrdp/key.pem
+  register: xrdp_rdp13_key
+
+- name: Stat the GNOME session launcher /etc/xrdp/startwm.sh (RDP-13)
+  ansible.builtin.stat:
+    path: /etc/xrdp/startwm.sh
+  register: xrdp_rdp13_startwm
+
+- name: Stat the PAM file /etc/pam.d/xrdp-sesman (RDP-13)
+  ansible.builtin.stat:
+    path: /etc/pam.d/xrdp-sesman
+  register: xrdp_rdp13_pam
+
+- name: Assert xrdp binary, xorgxrdp module, config files, X server, cert/key, startwm + PAM are present (RDP-13)
   ansible.builtin.assert:
     that:
       - xrdp_rdp13_binary.stat.exists
       - xrdp_rdp13_module.stat.exists
       - xrdp_rdp13_ini.stat.exists
       - xrdp_rdp13_sesman.stat.exists
+      - xrdp_rdp13_xserver.stat.exists
+      - xrdp_rdp13_cert.stat.exists
+      - xrdp_rdp13_key.stat.exists
+      - xrdp_rdp13_startwm.stat.exists
+      - xrdp_rdp13_pam.stat.exists
     fail_msg: >-
       RDP-13 bake assertion FAILED. One or more required files are missing:
         /usr/local/sbin/xrdp exists: {{ xrdp_rdp13_binary.stat.exists | default(false) }}
         /usr/lib64/xorg/modules/drivers/xrdpdev_drv.so exists: {{ xrdp_rdp13_module.stat.exists | default(false) }}
         /etc/xrdp/xrdp.ini exists: {{ xrdp_rdp13_ini.stat.exists | default(false) }}
         /etc/xrdp/sesman.ini exists: {{ xrdp_rdp13_sesman.stat.exists | default(false) }}
-      The Phase 10 build may not have run, or make install may have failed silently.
+        /usr/libexec/Xorg exists: {{ xrdp_rdp13_xserver.stat.exists | default(false) }}
+        /etc/xrdp/cert.pem exists: {{ xrdp_rdp13_cert.stat.exists | default(false) }}
+        /etc/xrdp/key.pem exists: {{ xrdp_rdp13_key.stat.exists | default(false) }}
+        /etc/xrdp/startwm.sh exists: {{ xrdp_rdp13_startwm.stat.exists | default(false) }}
+        /etc/pam.d/xrdp-sesman exists: {{ xrdp_rdp13_pam.stat.exists | default(false) }}
+      If /usr/libexec/Xorg is missing here, the runtime-dep install (xorg-x11-server-Xorg,
+      CRITICAL #1) was skipped or failed — this assert runs INSIDE the xrdp role, BEFORE the
+      hardening role, so CIS rule 2.2.1 has not run yet and is NOT the cause at this point.
+      (A post-hardening assert in playbook.yml catches a CIS-2.2.1 deletion.) Otherwise the
+      Phase 10 build may not have run, or make install / a config task failed silently.
     quiet: false
 
 - name: Check xrdp + xrdp-sesman service enablement (RDP-13)
@@ -399,4 +442,26 @@
       RDP-13 bake assertion FAILED. xrdp or xrdp-sesman is not enabled.
       Output: {{ xrdp_rdp13_enabled.stdout | default('') }}
       Run: systemctl is-enabled xrdp xrdp-sesman
+    quiet: false
+
+# --- RDP-13 cert-SAN proof (Task 2 FIPS requirement) — the cert the TLS handshake presents ---
+# A FIPS-strict TLS handshake rejects CN-only certs; prove the self-signed cert carries the
+# subjectAltName Task 2's cert-gen added, not just that cert.pem exists.
+- name: Read the xrdp TLS cert text for the SAN check (RDP-13)
+  ansible.builtin.command:
+    cmd: openssl x509 -in /etc/xrdp/cert.pem -noout -text
+  register: xrdp_rdp13_certtext
+  changed_when: false
+  failed_when: false
+
+- name: Assert the xrdp TLS cert carries a subjectAltName (RDP-13)
+  ansible.builtin.assert:
+    that:
+      - "'Subject Alternative Name' in xrdp_rdp13_certtext.stdout"
+      - "'DNS:devbox' in xrdp_rdp13_certtext.stdout"
+    fail_msg: >-
+      RDP-13 bake assertion FAILED. The xrdp TLS cert /etc/xrdp/cert.pem has no
+      subjectAltName — a FIPS-strict RDP TLS handshake will reject it. The cert-gen task
+      (RDP-04) must pass -addext "subjectAltName=DNS:devbox" (Task 2). If the cert predates
+      that change, remove /etc/xrdp/cert.pem and re-run the bake to regenerate it.
     quiet: false
