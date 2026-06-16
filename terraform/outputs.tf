@@ -4,7 +4,7 @@ output "instance_id" {
 }
 
 output "private_ip" {
-  description = "Private IP address. Devbox is private-only — reached over VPC-internal routes for code-server/noVNC and via SSM Session Manager for shell."
+  description = "Private IP address. Devbox is private-only — reached over VPC-internal routes for code-server/RDP and via SSM Session Manager for shell."
   value       = aws_instance.devbox.private_ip
 }
 
@@ -18,9 +18,9 @@ output "code_server_url" {
   value       = "https://${aws_instance.devbox.private_ip}:8080"
 }
 
-output "novnc_url" {
-  description = "noVNC remote desktop URL (private IP — reach over VPC peering / Direct Connect / VPN, or use SSM port forwarding with portNumber=6080)"
-  value       = "https://${aws_instance.devbox.private_ip}:6080"
+output "rdp_endpoint" {
+  description = "RDP desktop endpoint (xrdp/TLS :3389) — native RDP client only; not a browser URL"
+  value       = "${aws_instance.devbox.private_ip}:3389 — connect with a native RDP client (mstsc / FreeRDP / Remmina), or `./run devbox-port-forward 3389` then localhost:3389"
 }
 
 output "security_group_id" {
@@ -39,7 +39,7 @@ output "ssm_code_server_password_param" {
 }
 
 output "ssm_vnc_password_param" {
-  description = "SSM Parameter Store name for the VNC password"
+  description = "SSM Parameter Store name for the RDP/desktop login password (the ec2-user PAM password)"
   value       = "/devbox/${var.devbox_user}/vnc-password"
 }
 
