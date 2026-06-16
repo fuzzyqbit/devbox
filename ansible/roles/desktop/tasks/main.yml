@@ -22,6 +22,10 @@
   dnf:
     name:
       - gnome-shell
+      # gnome-session provides /usr/bin/gnome-session, the binary startwm.sh execs to render
+      # the GNOME-over-RDP session (RDP-07); AL2023-core (the Debian "-xsession" variant
+      # does not exist here).
+      - gnome-session
       - tigervnc-server
       - dejavu-sans-fonts
       - dejavu-sans-mono-fonts
