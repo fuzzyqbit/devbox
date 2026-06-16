@@ -2,10 +2,10 @@
 gsd_state_version: 1.0
 milestone: v3.2
 milestone_name: XRDP Remote Desktop
-status: executing
-stopped_at: 11-02 gap-closure executed (3/3 tasks, commits ac3b3cb/54740e8/a50abd1) — all 4 CRITICAL + 3 HIGH + 3 RISK findings closed against the Xorg backend. Phase 11 awaits an adversarial re-verification pass before it is marked done.
-last_updated: "2026-06-16T00:30:04.613Z"
-last_activity: 2026-06-16 -- Phase 11 plan 11-02 gap-closure executed
+status: verifying
+stopped_at: 11-03 gap-closure (round 3) executed — 2/2 tasks committed (3e0de34 xorg.conf vendor+assert + xrdp_exec_t fcontext + tsusers gating; d4a4eff gnome-session by name). Phase 11 awaits a final adversarial re-verification pass before being marked done.
+last_updated: "2026-06-16T01:02:05.406Z"
+last_activity: 2026-06-16 -- Phase 11 plan 11-03 round-3 gap-closure executed
 progress:
   total_phases: 3
   completed_phases: 2
@@ -26,9 +26,9 @@ See: .planning/PROJECT.md (updated 2026-06-02 after v3.0 milestone start)
 ## Current Position
 
 Phase: 11 (service-config-pam-session-bake-verification) — EXECUTED, awaiting re-verification
-Plan: 2 of 2 (11-02 gap-closure complete)
-Status: All 11-02 tasks committed; ready for an adversarial re-verification pass
-Last activity: 2026-06-16 -- Phase 11 plan 11-02 gap-closure executed
+Plan: 3 of 3 (11-03 round-3 gap-closure complete)
+Status: Phase complete — ready for verification
+Last activity: 2026-06-16 -- Phase 11 plan 11-03 round-3 gap-closure executed
 
 ## Performance Metrics (v1.0)
 
@@ -59,6 +59,7 @@ Commits: 66 in `b0bd004..7e63829`. Files changed: 75 (+14488 / −69 LOC).
 |-------|------|----------|-------|-------|
 | 11 | 01 | ~5min | 3 | 11 |
 | 11 | 02 | 8min | 3 | 6 |
+| 11 | 03 | ~10min | 2 | 4 |
 
 ## Accumulated Context
 
@@ -95,6 +96,14 @@ See PROJECT.md Key Decisions table. Locked v1.0 decisions:
 - sesman boot-race fixed by dropping `StopWhenUnneeded` + `BindsTo` and relying on `WantedBy` + xrdp.service's one-directional `Requires`/`After` (W2).
 - CLAUDE.md is git-untracked (commit effde0f); deviation docs that "must go in CLAUDE.md" are written to the operator's local copy, with the authoritative record in the relevant role's inline comment.
 
+**v3.2 decisions (Phase 11 round-3 gap-closure 11-03):**
+
+- xorg.conf is VENDORED in-repo (`ansible/roles/xrdp/files/xorg.conf`) + copied to `/etc/X11/xrdp/xorg.conf` (NOT `/etc/xrdp/xorg.conf`) + RDP-13 stat-asserted — removes the "assumed from make install" fragility; the path is where xorgxrdp 0.10.5 installs it and where Xorg's relative `-config` resolves. sesman.ini NOT edited.
+- SELinux confinement of the source-built daemons uses an idempotent `semanage fcontext -a -t xrdp_exec_t '/usr/local/sbin/xrdp(-sesman)?'` BEFORE restorecon, with a command-only double-guard (when-check + already-defined/invalid/not-defined stderr tolerance) — no community.general dependency; tolerates re-bake and optional-type-absent. The AVC-clean enforcing boot is the RDP-14 residual.
+- sesman login is positively gated (option a): `tsusers` group created + ec2-user appended (`append:true`); `tsadmins` NOT created (admins optional).
+- `gnome-session` installed by name in the desktop role (no Debian `-xsession` variant on AL2023) — guards the GNOME-over-RDP black screen.
+- The pre-existing `no-changeme` false-positive (`desktop_vnc_password != "changeme"`, line 7) remains tolerated — my new lines introduce no `changeme`; do not edit the pre-existing guard.
+
 ## Deferred / Carried Forward
 
 | Category | Item | Status | Originated |
@@ -124,8 +133,9 @@ See PROJECT.md Key Decisions table. Locked v1.0 decisions:
 
 Last session: 2026-06-15 — Resumed Phase 11. Its verification was corrected from "passed" to FAILED last session: the static gsd-verifier passed 7/7 but an adversarial (opus) review found 4 CRITICAL runtime blockers (no X server installed; CIS 2.2.1 deletes the X server xorgxrdp needs; xrdp layer-gated on `layers.xrdp` alone instead of `and layers.desktop`; RDP-13 assert blind to all of it). This session: clarified the 3 options and the operator chose **(a)** — keep xorgxrdp, install `xorg-x11-server-Xorg`+`dbus-x11`, set `amzn2023cis_rule_2_2_1=false` as a documented desktop exception. Decision recorded in 11-VERIFICATION.md ADVERSARIAL ADDENDUM.
 This session (2026-06-16): executed the 11-02 gap-closure plan — all 3 tasks committed atomically (ac3b3cb install X server + dbus-x11 + disable CIS 2.2.1 + fix layer gate; 54740e8 FIPS cert + SELinux relabel + sesman boot-race fix + colord .rules; a50abd1 extend RDP-13 + post-hardening X-server regression assert). All 4 CRITICAL + 3 HIGH + 3 RISK findings closed against the Xorg backend. Every task's automated verify printed PASS; hardening-stays-last grep-gate still = 1; vendored CIS default + 11-01-PLAN.md untouched. Two minor deviations (CLAUDE.md is gitignored → deviation doc on disk only; sesman comment reworded to clear the `! grep BindsTo/StopWhenUnneeded` gate).
-Stopped at: 11-02 executed; Phase 11 awaits an adversarial re-verification pass before being marked done.
-Next: re-verify Phase 11 with an adversarial pass (confirm the bake would now be GREEN-and-runnable), then `/gsd:plan-phase 12` (Terraform SG :3389 + `./run` port-forward + VNC/noVNC removal incl. revert of noVNC username fix 29de35b + RDP-14 live UAT). Operator: local main is now 20 commits ahead of origin — push pending.
+This session (2026-06-16, round 3): executed the 11-03 gap-closure plan — both tasks committed atomically (3e0de34 vendor+assert /etc/X11/xrdp/xorg.conf + idempotent semanage `xrdp_exec_t` fcontext before restorecon + `policycoreutils-python-utils` runtime dep + deterministic `tsusers` gating; d4a4eff `gnome-session` by name in the desktop role). Closes the four round-3 BAKE-FIXABLE findings from adversarial review addendum #2 (CRITICAL #2 xorg.conf, CRITICAL #1 fcontext, HIGH tsusers, RISK gnome-session). Every task's automated verify printed PASS; fcontext add ordered before restorecon (line 406 < 424); hardening-stays-last grep-gate still = 1; 11-01/11-02-PLAN.md untouched. One self-introduced deviation (reworded the gnome-session comment to avoid tripping the plan's own `-xsession`/line-length gates). Pre-existing `no-changeme` false-positive on `desktop_vnc_password != "changeme"` (line 7) tolerated — no new `changeme` introduced.
+Stopped at: 11-03 executed; Phase 11 awaits a final adversarial re-verification pass before being marked done.
+Next: re-verify Phase 11 with an adversarial pass (confirm the bake would now be GREEN-and-runnable with all three rounds of findings closed), then `/gsd:plan-phase 12` (Terraform SG :3389 + `./run` port-forward + VNC/noVNC removal incl. revert of noVNC username fix 29de35b + RDP-14 live UAT). Operator: local main is now 22 commits ahead of origin — push pending.
 
 ## Operator Next Steps
 
