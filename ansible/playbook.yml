@@ -114,9 +114,3 @@
 # not the long-term firewall design. Remove once firewalld policy is
 # managed properly (or once firewalld is removed entirely).
 - import_playbook: firewalld-docker-fix.yml
-
-# FIXME: see novnc-plain-username-fix.yml header — workaround for the stock
-# noVNC client not auto-supplying a username for VeNCrypt Plain auth. Remove
-# once the desktop role moves off SecurityTypes=Plain or noVNC gains a
-# username default.
-- import_playbook: novnc-plain-username-fix.yml

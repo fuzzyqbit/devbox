@@ -3,7 +3,7 @@
 #
 # Symptom this addresses:
 #   With firewalld active and the default zone = `public`, host services
-#   (noVNC :6080, code-server :8080) bound to 0.0.0.0 are dropped at INPUT
+#   (code-server :8080, RDP :3389) bound to 0.0.0.0 are dropped at INPUT
 #   despite the AWS SG allowing them. Setting the default zone to `docker`
 #   (target=ACCEPT) effectively makes firewalld permissive on the host
 #   while keeping it installed for CIS compliance scans.

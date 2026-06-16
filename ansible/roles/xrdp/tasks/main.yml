@@ -196,7 +196,7 @@
         dnf info xorg-x11-server-Xorg dbus-x11
     quiet: false
 
-# --- TLS cert (RDP-04) — mirrors the desktop role noVNC openssl pattern ---
+# --- TLS cert (RDP-04) — self-signed cert pattern ---
 # FIPS-safe: RSA-2048 is FIPS-acceptable; -sha256 forces a FIPS-approved digest; a
 # subjectAltName is required for a modern/FIPS-strict TLS handshake (CN-only certs are
 # rejected). creates: guards idempotency — fresh bakes have no prior cert (bake-time, not
