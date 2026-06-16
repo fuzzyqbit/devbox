@@ -112,7 +112,7 @@ the services are enabled — all with the `xrdp` role inserted **before** `harde
 
 Plans:
 - [x] 11-01-PLAN.md — xrdp config (xrdp.ini TLS :3389 + cert), sesman.ini Xorg backend, PAM → password-auth, GNOME startwm.sh + colord polkit, systemd units enabled, role wired before hardening, RDP-13 bake assert (RDP-04/05/06/07/08/13)
-- [ ] 11-02-PLAN.md — GAP CLOSURE: install xorg-x11-server-Xorg + dbus-x11; disable CIS rule 2.2.1 (documented desktop deviation); fix layer gate (layers.xrdp AND layers.desktop); FIPS-safe cert (SAN+sha256); full SELinux relabel; sesman unit boot-race fix; polkit .pkla→.rules; extend RDP-13 assert to prove /usr/libexec/Xorg + cert/key + startwm + PAM (RDP-05/07/08/13)
+- [x] 11-02-PLAN.md — GAP CLOSURE: install xorg-x11-server-Xorg + dbus-x11; disable CIS rule 2.2.1 (documented desktop deviation); fix layer gate (layers.xrdp AND layers.desktop); FIPS-safe cert (SAN+sha256); full SELinux relabel; sesman unit boot-race fix; polkit .pkla→.rules; extend RDP-13 assert to prove /usr/libexec/Xorg + cert/key + startwm + PAM (RDP-05/07/08/13)
 
 **Notes**: RDP-07 (an operator reaches the desktop session over RDP as `ec2-user` with the
 `./run secrets-show` password) is delivered by this phase's config — it reuses the existing
@@ -163,7 +163,7 @@ deferred-at-close items). The milestone is not "shipped" until RDP-14 is recorde
 | 8. Jupyter + mise AMI Layer | v3.0 | 4/4 | Complete | 2026-06-02 |
 | 9. Jupyter Operator Surface + Docs | v3.0 | 1/1 | Complete | 2026-06-02 |
 | 10. xrdp / xorgxrdp From-Source Build Role | v3.2 | 1/1 | Complete   | 2026-06-15 |
-| 11. Service Config, PAM, Session + Bake Verification | v3.2 | 1/1 | Complete | 2026-06-15 |
+| 11. Service Config, PAM, Session + Bake Verification | v3.2 | 2/2 | Complete   | 2026-06-16 |
 | 12. Network, Operator Surface + VNC/noVNC Removal | v3.2 | 0/TBD | Not started | - |
 
 ## Shipped Milestones
