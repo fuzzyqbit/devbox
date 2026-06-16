@@ -143,7 +143,7 @@ bake assertion)
 Plans:
 **Wave 1**
 - [x] 12-01-PLAN.md — Terraform SG: add :3389 ingress (gated on allowed_web_cidrs), drop :6080; outputs + variable descriptions noVNC→RDP (RDP-09)
-- [ ] 12-02-PLAN.md — Operator surface: ./run port-forward help + secrets-show RDP label, start/status scripts, CLAUDE.md §1/§2/§5/§7 native-RDP-over-SSM docs (RDP-10)
+- [x] 12-02-PLAN.md — Operator surface: ./run port-forward help + secrets-show RDP label, start/status scripts, CLAUDE.md §1/§2/§5/§7 native-RDP-over-SSM docs (RDP-10)
 
 **Wave 2** *(blocked on Wave 1 completion)*
 - [ ] 12-03-PLAN.md — Ansible removal: excise tigervnc/noVNC from the desktop role + secrets RDP-password relabel + bootstrap restart-loop swap to xrdp (RDP-11)
@@ -173,7 +173,7 @@ deferred-at-close items). The milestone is not "shipped" until RDP-14 is recorde
 | 9. Jupyter Operator Surface + Docs | v3.0 | 1/1 | Complete | 2026-06-02 |
 | 10. xrdp / xorgxrdp From-Source Build Role | v3.2 | 1/1 | Complete   | 2026-06-15 |
 | 11. Service Config, PAM, Session + Bake Verification | v3.2 | 3/3 | Complete   | 2026-06-16 |
-| 12. Network, Operator Surface + VNC/noVNC Removal | v3.2 | 1/4 | In Progress|  |
+| 12. Network, Operator Surface + VNC/noVNC Removal | v3.2 | 2/4 | In Progress|  |
 
 ## Shipped Milestones
 

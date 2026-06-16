@@ -25,7 +25,7 @@
 ### Network & Operator Surface
 
 - [x] **RDP-09**: The Terraform security group exposes `:3389` (gated on `var.allowed_web_cidrs`) and drops `:6080`; the SSM-first posture (no public `:22`) is unchanged.
-- [ ] **RDP-10**: `./run devbox-port-forward` tunnels `:3389`; operator docs (CLAUDE.md) describe connecting with a native RDP client over SSM.
+- [x] **RDP-10**: `./run devbox-port-forward` tunnels `:3389`; operator docs (CLAUDE.md) describe connecting with a native RDP client over SSM.
 
 ### Removal & Cleanup
 
@@ -64,7 +64,7 @@ Phase → requirement mapping (from `.planning/ROADMAP.md`, Phases 10-12). Every
 | RDP-08 | Phase 11 — Service config, PAM, session + bake verification | Complete |
 | RDP-13 | Phase 11 — Service config, PAM, session + bake verification | Complete |
 | RDP-09 | Phase 12 — Network, operator surface + VNC/noVNC removal | Complete |
-| RDP-10 | Phase 12 — Network, operator surface + VNC/noVNC removal | Pending |
+| RDP-10 | Phase 12 — Network, operator surface + VNC/noVNC removal | Complete |
 | RDP-11 | Phase 12 — Network, operator surface + VNC/noVNC removal | Pending |
 | RDP-12 | Phase 12 — Network, operator surface + VNC/noVNC removal | Pending |
 | RDP-14 | Milestone-close gate (live-instance human UAT) | Pending |
