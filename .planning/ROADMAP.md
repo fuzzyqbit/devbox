@@ -138,7 +138,13 @@ bake assertion)
      `/etc/pam.d/vnc`, and the noVNC install — with no dead VNC config left in the image.
   4. The noVNC username-injection workaround (`ansible/novnc-plain-username-fix.yml`, commit
      `29de35b`) is reverted/removed.
-**Plans**: TBD
+**Plans**: 4 plans (2 waves)
+
+Plans:
+- [ ] 12-01-PLAN.md — Terraform SG: add :3389 ingress (gated on allowed_web_cidrs), drop :6080; outputs + variable descriptions noVNC→RDP (RDP-09)
+- [ ] 12-02-PLAN.md — Operator surface: ./run port-forward help + secrets-show RDP label, start/status scripts, CLAUDE.md §1/§2/§5/§7 native-RDP-over-SSM docs (RDP-10)
+- [ ] 12-03-PLAN.md — Ansible removal: excise tigervnc/noVNC from the desktop role + secrets RDP-password relabel + bootstrap restart-loop swap to xrdp (RDP-11)
+- [ ] 12-04-PLAN.md — Revert noVNC username workaround + drop its import; idempotent host-firewalld :3389 allow in the xrdp role (RDP-12, RDP-09-adjacent)
 
 **Notes**: This is the irreversible-cleanup phase, so it is ordered last by design. The
 workaround revert (RDP-12) follows the project's "kludges live in their own named playbook
@@ -164,7 +170,7 @@ deferred-at-close items). The milestone is not "shipped" until RDP-14 is recorde
 | 9. Jupyter Operator Surface + Docs | v3.0 | 1/1 | Complete | 2026-06-02 |
 | 10. xrdp / xorgxrdp From-Source Build Role | v3.2 | 1/1 | Complete   | 2026-06-15 |
 | 11. Service Config, PAM, Session + Bake Verification | v3.2 | 3/3 | Complete   | 2026-06-16 |
-| 12. Network, Operator Surface + VNC/noVNC Removal | v3.2 | 0/TBD | Not started | - |
+| 12. Network, Operator Surface + VNC/noVNC Removal | v3.2 | 0/4 | Planned | - |
 
 ## Shipped Milestones
 
