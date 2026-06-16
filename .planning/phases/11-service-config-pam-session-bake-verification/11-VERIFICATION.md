@@ -36,7 +36,16 @@ The gsd-verifier confirmed the static config matches the plan (TLS, sesman keys,
 
 **De-risked (correct):** sesman `-config xrdp/xorg.conf` relative path; daemon_reload ordering; cert perms/idempotency (key 0600, xrdp runs as root).
 
-**BLOCKED ON DECISION:** the xorgxrdp backend collides with CIS 2.2.1. Three options — (a) keep xorgxrdp, install `xorg-x11-server-Xorg`+`dbus-x11`, set `amzn2023cis_rule_2_2_1=false` (least rework); (b) pivot to xrdp-over-**Xvnc** backend (dodges CIS, discards xorgxrdp work, keeps tigervnc Xvnc); (c) reinstall X after hardening (kludge, least honest). User has NOT decided. The mechanical fixes (#3 layer gate, #4 assert, SELinux relabel, polkit .rules, dbus-x11, sesman unit) go into a gap-closure plan once the backend is chosen.
+**DECISION MADE (2026-06-15): Option (a) — keep xorgxrdp.** The xorgxrdp backend collides with CIS 2.2.1. Options were (a) keep xorgxrdp, install `xorg-x11-server-Xorg`+`dbus-x11`, set `amzn2023cis_rule_2_2_1=false`; (b) pivot to Xvnc backend; (c) reinstall X after hardening. **Operator chose (a)** — least rework, keeps Phases 10 & 11, best RDP quality; accepts one Level-2 CIS finding (rule 2.2.1) as a documented exception because this host is a desktop (X is required by purpose; NIST CM-7 "no X on a server" does not apply). The gap-closure plan must therefore implement, against the **Xorg backend**:
+
+- **CRITICAL #1** — install `xorg-x11-server-Xorg` + `dbus-x11` in the xrdp build role.
+- **CRITICAL #2** — set `amzn2023cis_rule_2_2_1: false` (CIS role default override) with an inline comment justifying the desktop exception; document it as the single accepted CIS deviation.
+- **CRITICAL #3** — gate xrdp `when: layers.xrdp and layers.desktop` (needs GNOME + the secrets-role ec2-user password).
+- **CRITICAL #4** — extend the RDP-13 bake assert to stat `/usr/libexec/Xorg`, `/etc/xrdp/{cert,key}.pem`, `/etc/xrdp/startwm.sh`, `/etc/pam.d/xrdp-sesman` — not just the role's own artifacts.
+- **HIGH** — SELinux `restorecon` over the new X server + `/usr/local` (xrdp binaries) + `/etc/xrdp`; verify the self-signed cert survives FIPS in the RDP TLS handshake (add SAN, confirm key algo/size); resolve the sesman-unit dual-enable `BindsTo`/`StopWhenUnneeded` boot race.
+- **RISK** — replace the `.pkla` colord polkit with a `.rules` file (AL2023 polkit 121+ ignores `.pkla`); confirm `dbus-x11` present (covered by #1); evaluate `pam_loginuid.so required` in the sesman PAM stack.
+
+Next: `/gsd:plan-phase 11 --gaps`.
 
 ---
 

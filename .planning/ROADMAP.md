@@ -108,10 +108,11 @@ the services are enabled — all with the `xrdp` role inserted **before** `harde
      invariant preserved, same rule as JUP-08 / CLAUDE.md §8).
   4. A bake-time assertion (RDP-13) confirms the xrdp + xorgxrdp binaries/modules are present
      and the services are enabled — the bake fails if not.
-**Plans**: 1 plan
+**Plans**: 2 plans (1 gap-closure)
 
 Plans:
 - [x] 11-01-PLAN.md — xrdp config (xrdp.ini TLS :3389 + cert), sesman.ini Xorg backend, PAM → password-auth, GNOME startwm.sh + colord polkit, systemd units enabled, role wired before hardening, RDP-13 bake assert (RDP-04/05/06/07/08/13)
+- [ ] 11-02-PLAN.md — GAP CLOSURE: install xorg-x11-server-Xorg + dbus-x11; disable CIS rule 2.2.1 (documented desktop deviation); fix layer gate (layers.xrdp AND layers.desktop); FIPS-safe cert (SAN+sha256); full SELinux relabel; sesman unit boot-race fix; polkit .pkla→.rules; extend RDP-13 assert to prove /usr/libexec/Xorg + cert/key + startwm + PAM (RDP-05/07/08/13)
 
 **Notes**: RDP-07 (an operator reaches the desktop session over RDP as `ec2-user` with the
 `./run secrets-show` password) is delivered by this phase's config — it reuses the existing

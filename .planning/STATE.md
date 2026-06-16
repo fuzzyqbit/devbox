@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v3.2
 milestone_name: XRDP Remote Desktop
-status: completed
-stopped_at: Phase 11 complete; xrdp configured as enabled TLS systemd service on :3389 with PAM + GNOME Xorg session + RDP-13 bake assert; role wired before hardening.
-last_updated: "2026-06-15T19:40:00.000Z"
-last_activity: 2026-06-15 — Executed Phase 11 (xrdp config/PAM/session/systemd + bake assert)
+status: executing
+stopped_at: xorgxrdp-vs-CIS decision resolved (a). Phase 11 NOT done — gap-closure plan pending to implement the 4 CRITICAL + HIGH + RISK fixes against the Xorg backend.
+last_updated: "2026-06-16T00:16:34.472Z"
+last_activity: 2026-06-16 -- Phase 11 planning complete
 progress:
   total_phases: 3
-  completed_phases: 2
+  completed_phases: 1
   total_plans: 3
-  completed_plans: 3
-  percent: 100
+  completed_plans: 2
+  percent: 67
 ---
 
 # Project State
@@ -27,8 +27,8 @@ See: .planning/PROJECT.md (updated 2026-06-02 after v3.0 milestone start)
 
 Phase: 11 — Service Config, PAM, Session + Bake Verification — Complete (execution)
 Plan: 11-01 (3 tasks) done — commits f30fbc7, 3a80ae6, e296d0b
-Status: Phase 11 executed; Phase 11 verification + Phase 12 next
-Last activity: 2026-06-15 — Executed Phase 11 (xrdp config/PAM/session/systemd + RDP-13 bake assert)
+Status: Ready to execute
+Last activity: 2026-06-16 -- Phase 11 planning complete
 
 ## Performance Metrics (v1.0)
 
@@ -112,9 +112,9 @@ See PROJECT.md Key Decisions table. Locked v1.0 decisions:
 
 ## Session Continuity
 
-Last session: 2026-06-15 — Phase 11 executed. xrdp configured as enabled TLS systemd service on :3389 (xrdp.ini security_layer=tls + own self-signed cert), sesman.ini Xorg backend (/usr/libexec/Xorg), PAM → password-auth, GNOME startwm.sh + colord polkit, both systemd units enabled, role wired before hardening, RDP-13 bake assert. exec f30fbc7/3a80ae6/e296d0b. Hardening grep-gate passes (returns 1).
-Stopped at: Phase 11 complete; xrdp config/PAM/session/systemd + bake assert delivered. RDP-04/05/06/07/08/13 satisfied at bake-config level (RDP-07 live login = Phase-12 RDP-14 UAT).
-Next: `/gsd:verify-phase 11` then `/gsd:plan-phase 12` — Terraform SG :3389 ingress + `./run devbox-port-forward` :3389 + VNC/noVNC removal (RDP-09…12) + RDP-14 live UAT (milestone close)
+Last session: 2026-06-15 — Resumed Phase 11. Its verification was corrected from "passed" to FAILED last session: the static gsd-verifier passed 7/7 but an adversarial (opus) review found 4 CRITICAL runtime blockers (no X server installed; CIS 2.2.1 deletes the X server xorgxrdp needs; xrdp layer-gated on `layers.xrdp` alone instead of `and layers.desktop`; RDP-13 assert blind to all of it). This session: clarified the 3 options and the operator chose **(a)** — keep xorgxrdp, install `xorg-x11-server-Xorg`+`dbus-x11`, set `amzn2023cis_rule_2_2_1=false` as a documented desktop exception. Decision recorded in 11-VERIFICATION.md ADVERSARIAL ADDENDUM.
+Stopped at: xorgxrdp-vs-CIS decision resolved (a). Phase 11 NOT done — gap-closure plan pending to implement the 4 CRITICAL + HIGH + RISK fixes against the Xorg backend.
+Next: `/gsd:plan-phase 11 --gaps` (close CRITICAL+HIGH+RISK per the addendum), execute it, re-verify with an adversarial pass, then `/gsd:plan-phase 12` (Terraform SG :3389 + `./run` port-forward + VNC/noVNC removal incl. revert of noVNC username fix 29de35b + RDP-14 live UAT). Operator: local main is 17 commits ahead of origin — push pending.
 
 ## Operator Next Steps
 
