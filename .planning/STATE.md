@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v3.2
 milestone_name: XRDP Remote Desktop
-status: executing
-stopped_at: 12-03 executed + committed (RDP-11 VNC/noVNC removal); ready for 12-04 (RDP-12 novnc-plain-username-fix revert).
-last_updated: "2026-06-16T02:26:29.793Z"
+status: verifying
+stopped_at: 12-04 executed + committed (RDP-12 revert + host-firewalld :3389 + RDP-11 repo-wide completeness gate GREEN); Phase 12 complete (4/4), milestone v3.2 ready for verification.
+last_updated: "2026-06-16T02:35:53.660Z"
 last_activity: 2026-06-16
 progress:
   total_phases: 3
-  completed_phases: 2
+  completed_phases: 3
   total_plans: 8
-  completed_plans: 7
-  percent: 88
+  completed_plans: 8
+  percent: 100
 ---
 
 # Project State
@@ -25,10 +25,10 @@ See: .planning/PROJECT.md (updated 2026-06-02 after v3.0 milestone start)
 
 ## Current Position
 
-Phase: 12 (Network, Operator Surface + VNC/noVNC Removal) — EXECUTING
-Plan: 4 of 4
-Status: 12-03 complete (RDP-11 VNC/noVNC removal); ready to execute 12-04 (RDP-12 workaround revert)
-Last activity: 2026-06-16 -- 12-03 executed + committed
+Phase: 12 (Network, Operator Surface + VNC/noVNC Removal) — COMPLETE (ready for verification)
+Plan: 4 of 4 (all complete)
+Status: Phase 12 complete — milestone v3.2 ready for verification (12-04 executed: RDP-12 revert + host-firewalld :3389 + RDP-11 completeness gate GREEN)
+Last activity: 2026-06-16
 
 ## Performance Metrics (v1.0)
 
@@ -54,6 +54,7 @@ Commits: 66 in `b0bd004..7e63829`. Files changed: 75 (+14488 / −69 LOC).
 | 06 P02 | 4min | 2 tasks | 3 files |
 | Phase 12 P01 | ~4min | 2 tasks | 3 files |
 | Phase 12 P03 | 9min | 2 tasks | 10 files |
+| Phase 12 P04 | 6min | 2 tasks | 5 files |
 
 ### v3.2 Performance Metrics
 
@@ -64,6 +65,7 @@ Commits: 66 in `b0bd004..7e63829`. Files changed: 75 (+14488 / −69 LOC).
 | 11 | 03 | ~10min | 2 | 4 |
 | 12 | 02 | ~4min | 3 | 4 |
 | 12 | 03 | ~9min | 2 | 10 |
+| 12 | 04 | ~6min | 2 | 5 |
 
 ## Accumulated Context
 
@@ -127,6 +129,13 @@ See PROJECT.md Key Decisions table. Locked v1.0 decisions:
 - Both BAKED secrets-bootstrap artifacts swapped onto the RDP path: `devbox-secrets-bootstrap.sh.j2` restart loop (S6) AND `devbox-secrets-bootstrap.service.j2` `Before=`/`Description` (S7, the plan-flagged blocker — this unit is rendered into /etc/systemd/system in the AMI) now name `code-server.service xrdp.service xrdp-sesman.service`, no dead vnc/novnc names.
 - The `vnc-password` SSM param path, the `desktop_vnc_password` fact, and the generate/publish/fetch/chpasswd credential pipeline are KEPT (relabel-not-rename — it is the RDP/PAM login password). hardening-stays-last grep-gate still = 1; xrdp role untouched (`param=/usr/libexec/Xorg` intact). RDP-12 (`novnc-plain-username-fix.yml` revert) remains for 12-04. WR-05 (bootstrap `.sh.j2` outside shellcheck glob) carried forward unchanged.
 
+**v3.2 decisions (Phase 12 plan 12-04 — RDP-12 revert + host-firewalld :3389 + RDP-11 completeness gate; FINAL plan of milestone v3.2):**
+
+- RDP-12: deleted `ansible/novnc-plain-username-fix.yml` (86-LOC noVNC VeNCrypt-Plain username-injection workaround, commit `29de35b`) + dropped its `import_playbook` + FIXME block from `playbook.yml`. The `firewalld-docker-fix.yml` import directly above it is KEPT. Reworded the `firewalld-docker-fix.yml:6` comment (noVNC :6080 → code-server :8080, RDP :3389; comment-only, body unchanged).
+- RDP-09-adjacent (host firewall, decision routed from Phase 11 11-VERIFICATION:66 / 11-03 SUMMARY): added an idempotent, firewalld-presence-guarded, command-only `:3389/tcp` allow to the DEFAULT zone INSIDE the xrdp role (after service-enable, before SELinux/hardening). `firewall-cmd --state` guard (`failed_when:false`) no-ops on a host without firewalld; `--query-port` makes it idempotent across re-bakes; adds to the default zone so it is correct under BOTH containers:true (docker zone, permissive belt-and-braces) AND containers:false (public zone, load-bearing). No community.general dependency, no new package (firewalld already installed for CIS scans). Pitfall 5 honoured — task is in xrdp (before hardening), not a new trailing role/import → hardening-stays-last gate still = 1.
+- RDP-11 W3 comment scrubs: reworded the dead provenance comments at `xrdp/tasks/main.yml:199` (noVNC openssl pattern) + `xrdp/templates/startwm.sh.j2:2` (xstartup.j2 pointer) — both pointed at files 12-03 deleted; scrubbing them (rather than allowlisting) keeps the repo-wide gate clean.
+- PHASE-LEVEL RDP-11 SIGN-OFF: the authoritative repo-wide grep over `ansible/ terraform/ run scripts/` returns NOTHING (raw AND allowlist-filtered both empty) — zero functional VNC/noVNC residue survives milestone-wide; the kept `vnc-password` credential identifiers match none of the residue tokens. This repo-wide gate is the backstop the subtree-scoped per-plan greps could not provide. RDP-11 is complete.
+
 ## Deferred / Carried Forward
 
 | Category | Item | Status | Originated |
@@ -160,8 +169,9 @@ This session (2026-06-16, round 3): executed the 11-03 gap-closure plan — both
 This session (2026-06-16): executed Phase 12 plan 12-01 (Terraform SG :3389 + noVNC scrub) — both tasks committed atomically (7a665e4 add :3389 RDP ingress gated on var.allowed_web_cidrs + drop :6080 noVNC ingress + SG header comment; ba59556 scrub noVNC from outputs.tf/variables.tf, replace novnc_url with rdp_endpoint note, relabel ssm_vnc_password_param description with path retained). Every acceptance check passed: :3389 present + gated (1), 6080/noVNC residue across main.tf/outputs.tf/variables.tf (0), :8080 + no-:22 + egress + IMDSv2 intact, vnc-password SSM path retained (fixed-string match), rdp_endpoint added, ssm_vnc_password_param key unchanged. `tofu fmt -check` rc=0 + `tofu validate` Success. No `changeme` introduced. RDP-09 (network half) complete. No deviations.
 This session (2026-06-16): executed Phase 12 plan 12-02 (operator surface + docs → native RDP over SSM, RDP-10) — Tasks 1+2 committed atomically (1393b15 relabel run port-forward help + secrets-show to RDP :3389, vnc-password SSM fetch path unchanged, no port-parser logic change per D4; 60b409c advertise RDP :3389 in devbox-start/status connection info). Task 3 edited CLAUDE.md §1/§2/§5/§7 on-disk (git-ignored → NOT committed). Every acceptance check passed: 0 6080/noVNC residue across run+scripts+CLAUDE.md; vnc-password path retained (fixed-string=2); `devbox-port-forward 3389` documented in CLAUDE.md; `shellcheck run scripts/devbox-start.sh scripts/devbox-status.sh` rc=0; `git ls-files CLAUDE.md` EMPTY (untracked); code-server/JupyterLab/§8-hardening surfaces intact; no `changeme` introduced. RDP-10 operator-surface half complete. No deviations (one harness note: executor shell runs errexit → re-ran gates with `set +e` and fixed-string grep for the `${DEVBOX_USER}` path).
 This session (2026-06-16): executed Phase 12 plan 12-03 (Ansible VNC/noVNC stack removal — RDP-11) — both tasks committed atomically (eba3017 excise the VNC/noVNC stack from the desktop role: drop tigervnc-server as a single dnf list item, delete the VNC config dir / TigerVNC PAM-password / /etc/pam.d/vnc / xstartup / vncserver-unit tasks + the entire noVNC block + the 6 VNC defaults + the dead reload-systemd handler + the D1 assert, git rm vncserver/novnc/xstartup .j2; reword the dconf lock-disable comment; keep gnome-shell/gnome-session/mesa/fonts/ffmpeg/VLC; 73761ba point both baked secrets-bootstrap artifacts at xrdp — .sh.j2 restart loop S6 + .service.j2 Before=/Description S7 swap vncserver/novnc → xrdp/xrdp-sesman, Description drops VNC; relabel publish.yml description + defaults comment + chpasswd comment VNC→RDP; KEEP the vnc-password param path + desktop_vnc_password fact + generate/publish/fetch/chpasswd pipeline). Every acceptance gate PASS: 0 functional VNC/noVNC residue in the desktop role; gnome-shell/gnome-session/mesa/dejavu/ffmpeg/VLC/lock-enabled positively present; 3 templates deleted; both baked bootstrap artifacts name xrdp.service+xrdp-sesman.service with no dead vnc/novnc names; .service.j2 Description has no "VNC"; RDP-password pipeline intact (chpasswd + vnc-password fetch + secrets_ssm_vnc_param kept). hardening-stays-last grep-gate = 1; xrdp Xorg backend (param=/usr/libexec/Xorg) intact; pre-commit hooks ran on both commits (no --no-verify) and passed. No deviations (one harness note: executor shell errexit aborts on `grep -q` rc=1 = no-match → ran removal-proofs via variable capture with `|| true`; ansible-lint rc=3 is the known-broken .ansible-lint config, CI authoritative).
-Stopped at: 12-03 executed + committed; ready for 12-04.
-Next: execute Phase 12 plan 12-04 (RDP-12 — revert ansible/novnc-plain-username-fix.yml commit 29de35b + drop its playbook.yml import). Operator: local main is now ahead of origin — push pending.
+This session (2026-06-16): executed Phase 12 plan 12-04 (RDP-12 revert + host-firewalld :3389 + phase-level RDP-11 completeness gate — FINAL plan of milestone v3.2) — both tasks committed atomically (dee1121 revert: git rm ansible/novnc-plain-username-fix.yml + drop its import_playbook/FIXME block from playbook.yml [firewalld-docker-fix import kept], reword firewalld-docker-fix.yml:6 comment noVNC :6080→code-server :8080/RDP :3389, scrub the dead noVNC openssl provenance at xrdp tasks:199 + the dead xstartup.j2 pointer at startwm.sh.j2:2; 33c757d feat: idempotent firewalld-presence-guarded command-only :3389/tcp allow to the DEFAULT zone INSIDE the xrdp role — firewall-cmd --state guard (failed_when:false) no-ops without firewalld, --query-port idempotency, --permanent+runtime add then conditional --reload; covers containers:true docker zone AND containers:false public zone; no community.general dep, no new package; Pitfall 5 honoured — task in xrdp before hardening). Every acceptance gate PASS: RDP-12 file absent + import gone (0); firewalld-docker-fix import kept (2) + comment scrubbed (0); xrdp tasks noVNC (0) + startwm xstartup (0) scrubbed; 3389 present (12) + firewall-cmd --state guard present; hardening-stays-last gate=1; xrdp Xorg backend (param=/usr/libexec/Xorg) untouched; xrdp service enables intact; YAML parses; no changeme introduced. PHASE-LEVEL RDP-11 COMPLETENESS GATE GREEN: the repo-wide grep over ansible/ terraform/ run scripts/ returns NOTHING (raw + allowlist-filtered both empty) — zero functional VNC/noVNC residue survives milestone-wide. RDP-12 + RDP-09 (host-firewall half) + RDP-11 complete. No deviations (harness notes: errexit aborts on negated-grep no-match → ran gates via grep -c + pipe-to-cat; ansible-lint rc=3 is the known-broken .ansible-lint config, CI authoritative; Task 2 commit message passed via git commit -F because the harness quoting layer choked on an apostrophe).
+Stopped at: 12-04 executed + committed; Phase 12 complete (4/4); milestone v3.2 ready for verification.
+Next: verify Phase 12 / milestone v3.2 (verifier). Operator: local main is ahead of origin — push pending.
 
 ## Operator Next Steps
 

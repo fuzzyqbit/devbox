@@ -30,7 +30,7 @@
 ### Removal & Cleanup
 
 - [x] **RDP-11**: The VNC/noVNC stack is removed — vncserver/novnc systemd services, `SecurityTypes Plain`, `/etc/pam.d/vnc`, and the noVNC install — leaving no dead VNC config in the image.
-- [ ] **RDP-12**: The noVNC username-injection workaround (`ansible/novnc-plain-username-fix.yml`, commit `29de35b`) is reverted/removed.
+- [x] **RDP-12**: The noVNC username-injection workaround (`ansible/novnc-plain-username-fix.yml`, commit `29de35b`) is reverted/removed.
 
 ### Verification (first-class — not deferred)
 
@@ -66,7 +66,7 @@ Phase → requirement mapping (from `.planning/ROADMAP.md`, Phases 10-12). Every
 | RDP-09 | Phase 12 — Network, operator surface + VNC/noVNC removal | Complete |
 | RDP-10 | Phase 12 — Network, operator surface + VNC/noVNC removal | Complete |
 | RDP-11 | Phase 12 — Network, operator surface + VNC/noVNC removal | Complete |
-| RDP-12 | Phase 12 — Network, operator surface + VNC/noVNC removal | Pending |
+| RDP-12 | Phase 12 — Network, operator surface + VNC/noVNC removal | Complete |
 | RDP-14 | Milestone-close gate (live-instance human UAT) | Pending |
 
 **Coverage:** 14/14 requirements mapped — no orphans, no duplicates.
