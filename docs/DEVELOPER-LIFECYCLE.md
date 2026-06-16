@@ -88,8 +88,20 @@ No public SSH port (`:22`) is open. Access is over **AWS SSM Session Manager**.
   # then open https://localhost:8080
   ```
 
-  noVNC (`:6080`) is not auto-forwarded — open a second port-forward session
-  manually with `portNumber=6080` if you need the desktop.
+### Graphical desktop (RDP on :3389)
+
+The GNOME desktop is served over RDP on `:3389`. Connect with a native RDP
+client (Microsoft Remote Desktop / `mstsc`, FreeRDP, Remmina) — log in as
+`ec2-user` with the desktop password from `./run secrets-show`.
+
+- **On the VPC**: point your RDP client at `<private-ip>:3389`. Your IP must be
+  inside `var.allowed_web_cidrs`.
+- **Off the VPC**: tunnel it over SSM, then connect the client to localhost:
+
+  ```bash
+  ./run devbox-port-forward 3389   # forwards :3389 → localhost:3389
+  # then point your RDP client at localhost:3389
+  ```
 
 ### JupyterLab (on demand, loopback-only)
 
@@ -118,8 +130,8 @@ Access flow:
    ```
 
    (`./run devbox-port-forward` forwards only `:8080` for code-server; the
-   `:8888` forward is run manually, the same pattern as the noVNC `:6080` note
-   above.)
+   `:8888` forward is run manually, the same SSM pattern as the RDP `:3389`
+   forward above — or use `./run devbox-port-forward 8888`.)
 
 3. **Open the token URL** in your browser:
 
@@ -131,8 +143,9 @@ Press `Ctrl-C` in the first shell to stop JupyterLab when you are done.
 
 ### Passwords
 
-code-server and noVNC each have a per-operator password stored in SSM Parameter
-Store (SecureString):
+code-server and the RDP desktop each have a per-operator password stored in SSM
+Parameter Store (SecureString). The RDP desktop logs in as `ec2-user` with the
+desktop password:
 
 ```bash
 ./run secrets-show
@@ -170,6 +183,7 @@ remain. To also wipe local Packer/Terraform caches:
 | See state + how to connect| `./run status`             |
 | Shell in                  | `./run devbox-ssm`         |
 | Browser IDE off-VPC       | `./run devbox-port-forward`|
+| RDP desktop off-VPC       | `./run devbox-port-forward 3389` |
 | Get passwords             | `./run secrets-show`       |
 | JupyterLab (on demand)    | `./run jupyter`            |
 | Tear down                 | `./run tf-destroy`         |
