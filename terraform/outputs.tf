@@ -38,9 +38,9 @@ output "ssm_code_server_password_param" {
   value       = "/devbox/${var.devbox_user}/code-server-password"
 }
 
-output "ssm_vnc_password_param" {
+output "ssm_desktop_password_param" {
   description = "SSM Parameter Store name for the RDP/desktop login password (the ec2-user PAM password)"
-  value       = "/devbox/${var.devbox_user}/vnc-password"
+  value       = "/devbox/${var.devbox_user}/desktop-password"
 }
 
 output "aws_region" {

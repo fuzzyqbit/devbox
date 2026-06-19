@@ -441,7 +441,7 @@ cmd_devbox_port_forward() {
 cmd_secrets_show() {
   _require_devbox_user
   echo "Resolving secrets for DEVBOX_USER=${DEVBOX_USER}..."
-  local cs_pwd vnc_pwd
+  local cs_pwd desktop_pwd
   local aws_err
   aws_err="$(mktemp)"
   trap 'rm -f "$aws_err"' RETURN
@@ -455,11 +455,11 @@ cmd_secrets_show() {
       rm -f "$aws_err"
       exit 1
     }
-  vnc_pwd="$(aws ssm get-parameter \
-    --name "/devbox/${DEVBOX_USER}/vnc-password" \
+  desktop_pwd="$(aws ssm get-parameter \
+    --name "/devbox/${DEVBOX_USER}/desktop-password" \
     --with-decryption --query 'Parameter.Value' --output text 2>"$aws_err")" \
     || {
-      _error "RDP login password not found at /devbox/${DEVBOX_USER}/vnc-password"
+      _error "RDP login password not found at /devbox/${DEVBOX_USER}/desktop-password"
       cat "$aws_err" >&2
       rm -f "$aws_err"
       exit 1
@@ -467,7 +467,7 @@ cmd_secrets_show() {
   rm -f "$aws_err"
   echo ""
   echo "code-server (https://<host>:8080) password:  ${cs_pwd}"
-  echo "RDP login (ec2-user @ <host>:3389) password:  ${vnc_pwd}"
+  echo "RDP login (ec2-user @ <host>:3389) password:  ${desktop_pwd}"
   echo ""
   echo "(Secrets are stored as SSM SecureStrings; rotated on every \`./run build\`.)"
 }

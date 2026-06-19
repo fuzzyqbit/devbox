@@ -6,10 +6,10 @@
 - name: Assert the dev_user PAM password was set by the secrets role
   ansible.builtin.assert:
     that:
-      - desktop_vnc_password is defined
-      - desktop_vnc_password | length > 0
+      - desktop_password is defined
+      - desktop_password | length > 0
     fail_msg: >-
-      desktop_vnc_password is not set. Did the `secrets` role run before `dcv`?
+      desktop_password is not set. Did the `secrets` role run before `dcv`?
       The dcv role uses authentication=system, which relies on the dev_user PAM
       password the secrets pipeline generates/publishes/applies. Check
       ansible/playbook.yml role ordering and the layers.desktop / layers.dcv flags.
