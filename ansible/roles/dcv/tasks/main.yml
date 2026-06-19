@@ -210,3 +210,165 @@
   loop:
     - /tmp/nice-dcv.tgz
     - /tmp/dcv-extract
+
+# ── DCV-04 bake assertion (mirrors the xrdp RDP-13 block) ──
+# Fail the bake LOUDLY if any DCV binary, config, cert/key, session unit, colord rule, or PAM
+# file is absent; if the cert/key perms are wrong; if dcv.conf lost auth=system / web-port /
+# QUIC or gained auth=none; if the cert has no subjectAltName; or if either service is not
+# enabled. Runs LAST in the role, after every asserted artifact exists, and BEFORE hardening.
+# Does NOT attempt a live DCV connect / create-session / FIPS handshake / AVC check — those are
+# the Phase-15 live UAT (DCV-11). This is static-artifact + enablement proof only.
+#
+# NOTE: the /usr/bin/dcvserver, /usr/bin/dcv, /usr/bin/Xdcv paths are [ASSUMED] from the vendor
+# RPM convention (research A2). /usr/bin/dcv is corroborated by the oneshot unit's ExecStart.
+# They are confirmed-at-first-bake — verify with `rpm -ql nice-dcv-server nice-xdcv | grep /bin/`
+# and adjust the stat paths if the vendor layout ever differs.
+
+- name: Stat the dcvserver daemon binary (DCV-04)
+  ansible.builtin.stat:
+    path: /usr/bin/dcvserver
+  register: dcv_bake_dcvserver
+
+- name: Stat the dcv CLI binary (DCV-04)
+  ansible.builtin.stat:
+    path: /usr/bin/dcv
+  register: dcv_bake_dcv
+
+- name: Stat the Xdcv virtual X server binary (DCV-04)
+  ansible.builtin.stat:
+    path: /usr/bin/Xdcv
+  register: dcv_bake_xdcv
+
+- name: Stat /etc/dcv/dcv.conf (DCV-04)
+  ansible.builtin.stat:
+    path: /etc/dcv/dcv.conf
+  register: dcv_bake_conf
+
+- name: Stat the FIPS TLS cert /etc/dcv/dcv.pem (DCV-04 / DCV-05)
+  ansible.builtin.stat:
+    path: /etc/dcv/dcv.pem
+  register: dcv_bake_cert
+
+- name: Stat the FIPS TLS key /etc/dcv/dcv.key (DCV-04 / DCV-05)
+  ansible.builtin.stat:
+    path: /etc/dcv/dcv.key
+  register: dcv_bake_key
+
+- name: Stat the virtual-session systemd unit (DCV-04)
+  ansible.builtin.stat:
+    path: /etc/systemd/system/dcv-virtual-session.service
+  register: dcv_bake_unit
+
+- name: Stat the colord polkit allow rule (DCV-04)
+  ansible.builtin.stat:
+    path: /etc/polkit-1/rules.d/45-allow-colord.rules
+  register: dcv_bake_colord
+
+- name: Stat the /etc/pam.d/dcv auth file (DCV-04)
+  ansible.builtin.stat:
+    path: /etc/pam.d/dcv
+  register: dcv_bake_pam
+
+- name: Assert all DCV artifacts (binaries, conf, cert/key, unit, colord, PAM) exist (DCV-04)
+  ansible.builtin.assert:
+    that:
+      - dcv_bake_dcvserver.stat.exists
+      - dcv_bake_dcv.stat.exists
+      - dcv_bake_xdcv.stat.exists
+      - dcv_bake_conf.stat.exists
+      - dcv_bake_cert.stat.exists
+      - dcv_bake_key.stat.exists
+      - dcv_bake_unit.stat.exists
+      - dcv_bake_colord.stat.exists
+      - dcv_bake_pam.stat.exists
+    fail_msg: >-
+      DCV-04 bake assertion FAILED. One or more required DCV artifacts are missing:
+        /usr/bin/dcvserver exists: {{ dcv_bake_dcvserver.stat.exists | default(false) }}
+        /usr/bin/dcv exists: {{ dcv_bake_dcv.stat.exists | default(false) }}
+        /usr/bin/Xdcv exists: {{ dcv_bake_xdcv.stat.exists | default(false) }}
+        /etc/dcv/dcv.conf exists: {{ dcv_bake_conf.stat.exists | default(false) }}
+        /etc/dcv/dcv.pem exists: {{ dcv_bake_cert.stat.exists | default(false) }}
+        /etc/dcv/dcv.key exists: {{ dcv_bake_key.stat.exists | default(false) }}
+        /etc/systemd/system/dcv-virtual-session.service exists: {{ dcv_bake_unit.stat.exists | default(false) }}
+        /etc/polkit-1/rules.d/45-allow-colord.rules exists: {{ dcv_bake_colord.stat.exists | default(false) }}
+        /etc/pam.d/dcv exists: {{ dcv_bake_pam.stat.exists | default(false) }}
+      If a /usr/bin/dcv* or /usr/bin/Xdcv binary is missing, the RPM install (nice-dcv-server /
+      nice-xdcv) was skipped or failed, OR the vendor binary layout differs from the [ASSUMED]
+      paths — confirm with `rpm -ql nice-dcv-server nice-xdcv | grep /bin/` and adjust the stats.
+      If a config / cert / unit / colord / PAM file is missing, the corresponding templating /
+      cert-gen / copy task above did not run — DCV cannot start a working authenticated session.
+    quiet: false
+
+- name: Assert the DCV cert + key are dcv:dcv mode 0600 (DCV-05)
+  ansible.builtin.assert:
+    that:
+      - dcv_bake_cert.stat.pw_name == "dcv"
+      - dcv_bake_cert.stat.mode == "0600"
+      - dcv_bake_key.stat.pw_name == "dcv"
+      - dcv_bake_key.stat.mode == "0600"
+    fail_msg: >-
+      DCV-04/05 bake assertion FAILED. The DCV TLS cert/key have the wrong owner or perms
+      (Pitfall A — wrong perms make DCV silently IGNORE the cert and fall back to a non-FIPS
+      auto-cert the FIPS-strict handshake rejects):
+        /etc/dcv/dcv.pem owner: {{ dcv_bake_cert.stat.pw_name | default('?') }} (want dcv)
+        /etc/dcv/dcv.pem mode:  {{ dcv_bake_cert.stat.mode | default('?') }} (want 0600)
+        /etc/dcv/dcv.key owner: {{ dcv_bake_key.stat.pw_name | default('?') }} (want dcv)
+        /etc/dcv/dcv.key mode:  {{ dcv_bake_key.stat.mode | default('?') }} (want 0600)
+    quiet: false
+
+- name: Slurp /etc/dcv/dcv.conf for the key-content assertion (DCV-02)
+  ansible.builtin.slurp:
+    src: /etc/dcv/dcv.conf
+  register: dcv_bake_conf_content
+
+- name: Assert dcv.conf has auth=system + web-port + QUIC on and NEVER auth=none (DCV-02)
+  ansible.builtin.assert:
+    that:
+      - "'authentication=\"system\"' in (dcv_bake_conf_content.content | b64decode)"
+      - "'web-port=' ~ dcv_web_port in (dcv_bake_conf_content.content | b64decode)"
+      - "'enable-quic-frontend=true' in (dcv_bake_conf_content.content | b64decode)"
+      - "'authentication=\"none\"' not in (dcv_bake_conf_content.content | b64decode)"
+    fail_msg: >-
+      DCV-02 bake assertion FAILED. /etc/dcv/dcv.conf is missing a required security/connectivity
+      key or contains the passwordless authentication="none" (EoP — passwordless desktop). It MUST
+      contain authentication="system", web-port={{ dcv_web_port }}, and enable-quic-frontend=true
+      (v4.0 direct-connect posture), and MUST NOT contain authentication="none". Re-check the
+      dcv.conf.j2 template render.
+    quiet: false
+
+- name: Read the DCV TLS cert text for the SAN check (DCV-05)
+  ansible.builtin.command:
+    cmd: openssl x509 -in /etc/dcv/dcv.pem -noout -text
+  register: dcv_bake_certtext
+  changed_when: false
+  failed_when: false
+
+- name: Assert the DCV TLS cert carries a subjectAltName=DNS:devbox (DCV-05)
+  ansible.builtin.assert:
+    that:
+      - "'Subject Alternative Name' in dcv_bake_certtext.stdout"
+      - "'DNS:devbox' in dcv_bake_certtext.stdout"
+    fail_msg: >-
+      DCV-05 bake assertion FAILED. The DCV TLS cert /etc/dcv/dcv.pem has no subjectAltName — a
+      FIPS-strict TLS handshake rejects CN-only certs (the xrdp 11-VERIFICATION HIGH finding). The
+      cert-gen task must pass -addext "subjectAltName=DNS:devbox". If the cert predates that change,
+      remove /etc/dcv/dcv.pem and re-run the bake to regenerate it.
+    quiet: false
+
+- name: Check dcvserver + dcv-virtual-session service enablement (DCV-04)
+  ansible.builtin.command:
+    cmd: systemctl is-enabled dcvserver dcv-virtual-session
+  register: dcv_bake_enabled
+  changed_when: false
+  failed_when: false
+
+- name: Assert dcvserver + dcv-virtual-session are enabled at boot (DCV-04)
+  ansible.builtin.assert:
+    that:
+      - dcv_bake_enabled.rc == 0
+    fail_msg: >-
+      DCV-04 bake assertion FAILED. dcvserver or dcv-virtual-session is not enabled at boot — DCV
+      will not start after the instance launches.
+      Output: {{ dcv_bake_enabled.stdout | default('') }}
+      Run: systemctl is-enabled dcvserver dcv-virtual-session
+    quiet: false
