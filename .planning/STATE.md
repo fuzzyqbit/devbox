@@ -1,17 +1,16 @@
 ---
 gsd_state_version: 1.0
-milestone: v3.2
-milestone_name: XRDP Remote Desktop
-status: verifying
-stopped_at: Milestone v3.2 CODE-COMPLETE. Phase 12 PASSED (4/4; RDP-09/10/11/12, adversarially CLEAR after 2 doc/comment cleanups c34bff7/ea1c0d3); 12-VERIFICATION.md written. Phases 10/11/12 all bake-config complete. SOLE remaining gate = RDP-14 live UAT (live RDP login → GNOME render on a baked instance) — needs ./run build + AWS, tracked in 11-HUMAN-UAT.md. Milestone not "shipped" until RDP-14 recorded. Operator: local main far ahead of origin — push pending.
-last_updated: "2026-06-16T02:45:00.000Z"
-last_activity: 2026-06-16 -- Phase 12 verified PASSED; v3.2 code-complete, RDP-14 live UAT outstanding
+milestone: v4.0
+milestone_name: Amazon DCV Remote Desktop
+status: planning
+last_updated: "2026-06-19T03:54:15.468Z"
+last_activity: 2026-06-19
 progress:
-  total_phases: 3
-  completed_phases: 3
-  total_plans: 8
-  completed_plans: 8
-  percent: 100
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # Project State
@@ -25,10 +24,10 @@ See: .planning/PROJECT.md (updated 2026-06-02 after v3.0 milestone start)
 
 ## Current Position
 
-Phase: 12 (Network, Operator Surface + VNC/noVNC Removal) — COMPLETE (ready for verification)
-Plan: 4 of 4 (all complete)
-Status: Phase 12 complete — milestone v3.2 ready for verification (12-04 executed: RDP-12 revert + host-firewalld :3389 + RDP-11 completeness gate GREEN)
-Last activity: 2026-06-16
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-06-19 — Milestone v4.0 started
 
 ## Performance Metrics (v1.0)
 
