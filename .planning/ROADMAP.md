@@ -151,11 +151,12 @@ in place and bake-proven; the `dcv` role fills the playbook slot xrdp vacates)
      `https://<host>:8443` or native client, within the allowed CIDR) with no `./run`
      port-forward step for DCV; the `ec2-user` SSM credential path is unchanged, labels updated
      noVNC/RDP → DCV.
-**Plans**: 4 plans (Wave 1 additive ‖ Wave 2 destructive → Wave 3 verify)
+**Plans**: 5 plans (Wave 1 additive ‖ Wave 2 destructive → Wave 3 verify)
 - [ ] 14-01-PLAN.md — direct-connect SG: :8443 TCP+UDP gated on allowed_web_cidrs, drop :3389, rdp_endpoint→dcv_endpoint + RDP→DCV var/output descs (DCV-06)
-- [ ] 14-02-PLAN.md — operator surface direct :8443 (run/scripts/firewalld-comment/CLAUDE.md) + secrets-bootstrap unit xrdp→dcvserver (CRITICAL-1) (DCV-10, DCV-07)
+- [ ] 14-02-PLAN.md — operator surface direct :8443 (run/scripts/firewalld-comment/CLAUDE.md) + secrets-bootstrap unit + secrets/defaults comment xrdp→dcvserver (CRITICAL-1) (DCV-10, DCV-07)
 - [ ] 14-03-PLAN.md — DESTRUCTIVE: remove xrdp role/wiring/toggle/test-xrdp/xorg.conf + revert CIS 2.2.1 + RETARGET post-hardening guard to /usr/bin/Xdcv (DCV-07, DCV-08)
-- [ ] 14-04-PLAN.md — repo-wide completeness gate (zero xrdp/VNC/noVNC residue, vnc-password allowlisted) + ansible-lint/terraform validate/pre-commit (DCV-09)
+- [ ] 14-04-PLAN.md — repo-wide completeness gate (zero xrdp/VNC/noVNC residue; dcv-role path-excluded + delimiter-bound port tokens; vnc-password allowlisted) + ansible-lint/terraform validate/pre-commit (DCV-09)
+- [ ] 14-05-PLAN.md — docs/ to DCV :8443 direct: rewrite DEVELOPER-LIFECYCLE.md + git mv HOWTO-ACCESS-CODE-SERVER-RDP.md→-DCV.md (BLOCKER 1) (DCV-10)
 **UI hint**: yes
 
 #### Phase 15: Live UAT Gate (milestone-close)
