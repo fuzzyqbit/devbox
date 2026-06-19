@@ -123,7 +123,7 @@ role supplies the GNOME the virtual session renders, the `secrets` role supplies
      cert + relabel recipe.
 **Plans**: 2 plans
 - [x] 13-01-PLAN.md — `dcv` role: airgap install + dcv.conf (auth=system, QUIC on, :8443) + FIPS cert + oneshot virtual session + colord/PAM + SELinux relabel (DCV-01/02/03/05)
-- [ ] 13-02-PLAN.md — playbook wiring (before hardening) + `dcv: true` toggle + RDP-13-grade bake assert (binary/conf-keys/cert path+owner+0600+SAN/units enabled) (DCV-04/05)
+- [x] 13-02-PLAN.md — playbook wiring (before hardening) + `dcv: true` toggle + RDP-13-grade bake assert (binary/conf-keys/cert path+owner+0600+SAN/units enabled) (DCV-04/05)
 **UI hint**: yes
 
 #### Phase 14: Direct-Connect SG + xrdp/VNC Removal + CIS Revert + Operator Surface
@@ -195,7 +195,7 @@ assumed.
 | 10. xrdp / xorgxrdp From-Source Build Role | v3.2 | 1/1 | Complete (superseded) | 2026-06-15 |
 | 11. Service Config, PAM, Session + Bake Verification | v3.2 | 3/3 | Complete (superseded) | 2026-06-16 |
 | 12. Network, Operator Surface + VNC/noVNC Removal | v3.2 | 4/4 | Complete (superseded) | 2026-06-16 |
-| 13. `dcv` Ansible Role | v4.0 | 1/2 | In Progress|  |
+| 13. `dcv` Ansible Role | v4.0 | 2/2 | Complete   | 2026-06-19 |
 | 14. Direct-Connect SG + xrdp/VNC Removal + CIS Revert + Operator Surface | v4.0 | 0/? | Not started | - |
 | 15. Live UAT Gate | v4.0 | 0/? | Not started | - |
 
