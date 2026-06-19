@@ -18,8 +18,6 @@ layers:
   git: true
   devtools: true
   desktop: true
-  # xrdp gates the Phase 11 config/service block; co-deploys with the GNOME desktop.
-  xrdp: true
   # dcv gates the Phase 13 install/config/service block; co-deploys with the GNOME desktop.
   dcv: true
   hardening: true

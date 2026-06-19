@@ -56,12 +56,6 @@
     - role: desktop
       when: layers.desktop | default(false)
 
-    - role: xrdp
-      when: (layers.xrdp | default(false)) and (layers.desktop | default(false))
-      # xrdp config + service (Phase 11 RDP-08); MUST stay before hardening.
-      # Gated on desktop too: xrdp needs GNOME (desktop role) + the ec2-user password
-      # (secrets role, gated on vscode OR desktop), so both must exist before xrdp configures auth.
-
     - role: dcv
       when: (layers.dcv | default(false)) and (layers.desktop | default(false))
       # dcv config + service (Phase 13 DCV-04); MUST stay before hardening (hardening-last invariant).
@@ -73,27 +67,30 @@
 
   post_tasks:
     # --- W1: regression-proof X-server guard — runs AFTER all roles, incl. hardening ---
-    # The in-role RDP-13 assert runs before hardening, so it cannot catch CIS rule 2.2.1
-    # deleting /usr/libexec/Xorg AFTER the xrdp role configured it. post_tasks run after every
-    # role, so this is the one place a CIS-deleted X server is observable. Gated on the SAME
-    # condition as the xrdp role so a no-xrdp bake does not fail on an X server it never installed.
-    - name: Stat /usr/libexec/Xorg after hardening (W1 regression guard)
+    # The in-role DCV bake-assert runs before hardening, so it cannot catch CIS rule 2.2.1
+    # deleting /usr/bin/Xdcv (DCV's bundled X server, from nice-xdcv) AFTER the dcv role
+    # configured it. post_tasks run after every role, so this is the one place a CIS-deleted
+    # X server is observable. Gated on the SAME condition as the dcv role so a no-dcv bake does
+    # not fail on an X server it never installed.
+    - name: Stat /usr/bin/Xdcv after hardening (W1 regression guard)
       stat:
-        path: /usr/libexec/Xorg
+        path: /usr/bin/Xdcv
       register: xserver_post_hardening
-      when: (layers.xrdp | default(false)) and (layers.desktop | default(false))
+      when: (layers.dcv | default(false)) and (layers.desktop | default(false))
 
     - name: Assert the X server survived the hardening role (W1 regression guard)
       ansible.builtin.assert:
         that:
           - xserver_post_hardening.stat.exists
         fail_msg: >-
-          /usr/libexec/Xorg was DELETED after the xrdp role configured it — the X server is
-          gone post-hardening. The most likely cause is CIS rule 2.2.1 being re-enabled on a
-          CIS-role bump (it removes xorg-x11-server-common, a dependency of xorg-x11-server-Xorg).
-          The fix is `amzn2023cis_rule_2_2_1: false` in ansible/roles/hardening/defaults/main.yml.
+          /usr/bin/Xdcv was DELETED after the dcv role configured it — the DCV X server is
+          gone post-hardening. Most likely cause: CIS 2.2.1 (now re-enabled) removed
+          xorg-x11-server-common, and Xdcv or the GNOME-on-Xorg virtual session depended on it.
+          If this fires, re-add amzn2023cis_rule_2_2_1: false to
+          ansible/roles/hardening/defaults/main.yml and confirm `rpm -qR nice-xdcv` /
+          `repoquery --requires nice-xdcv` at the Phase-15 UAT.
         quiet: false
-      when: (layers.xrdp | default(false)) and (layers.desktop | default(false))
+      when: (layers.dcv | default(false)) and (layers.desktop | default(false))
 
     - name: Clean dnf cache
       command: dnf clean all
