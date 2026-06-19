@@ -51,7 +51,7 @@ variable "devbox_user" {
 variable "associate_public_ip" {
   type        = bool
   default     = false
-  description = "Whether to associate a public IP address. Default false — the devbox is reached via SSM Session Manager (shell) and VPC-internal routes (code-server/RDP), so no public surface is needed."
+  description = "Whether to associate a public IP address. Default false — the devbox is reached via SSM Session Manager (shell) and VPC-internal routes (code-server/DCV), so no public surface is needed."
 }
 
 variable "extra_tags" {
@@ -63,7 +63,7 @@ variable "extra_tags" {
 variable "allowed_web_cidrs" {
   type        = list(string)
   default     = ["10.0.0.0/8"]
-  description = "CIDR blocks permitted to reach code-server (:8080) and RDP (:3389). Default 10.0.0.0/8 covers the RFC1918 private range — appropriate when the devbox lives inside a private VPC and is reached over VPC peering / Direct Connect / VPN. Operator-managed externally: narrow via a per-operator tfvars file, a `-var` flag, or `TF_VAR_allowed_web_cidrs`. Empty list refuses apply unless var.allow_open_ingress = true. SSH (:22) ingress is intentionally absent — shell access is brokered by AWS SSM Session Manager."
+  description = "CIDR blocks permitted to reach code-server (:8080) and DCV (:8443 TCP+UDP). Default 10.0.0.0/8 covers the RFC1918 private range — appropriate when the devbox lives inside a private VPC and is reached over VPC peering / Direct Connect / VPN. Operator-managed externally: narrow via a per-operator tfvars file, a `-var` flag, or `TF_VAR_allowed_web_cidrs`. Empty list refuses apply unless var.allow_open_ingress = true. SSH (:22) ingress is intentionally absent — shell access is brokered by AWS SSM Session Manager."
 
   validation {
     condition     = length(var.allowed_web_cidrs) > 0 || var.allow_open_ingress
@@ -79,5 +79,5 @@ variable "allowed_web_cidrs" {
 variable "allow_open_ingress" {
   type        = bool
   default     = false
-  description = "Escape hatch — when true, bypasses the non-empty validation on allowed_web_cidrs. Intended only for ephemeral exploration where the operator deliberately wants no public web ingress (empty list ⇒ no inbound :8080 / :3389 at all; SSM port forwarding becomes the only path — see RESEARCH.md Pattern 5 / Example 3). NEVER set this to true AND populate allowed_web_cidrs with 0.0.0.0/0 — that combination re-introduces the very finding Phase 2 closes."
+  description = "Escape hatch — when true, bypasses the non-empty validation on allowed_web_cidrs. Intended only for ephemeral exploration where the operator deliberately wants no public web ingress (empty list ⇒ no inbound :8080 / :8443 at all; SSM port forwarding becomes the only path — see RESEARCH.md Pattern 5 / Example 3). NEVER set this to true AND populate allowed_web_cidrs with 0.0.0.0/0 — that combination re-introduces the very finding Phase 2 closes."
 }
