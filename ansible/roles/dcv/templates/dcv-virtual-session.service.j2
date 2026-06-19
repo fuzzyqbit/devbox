@@ -6,7 +6,7 @@ Requires=dcvserver.service
 [Service]
 Type=oneshot
 RemainAfterExit=true
-ExecStart=/usr/bin/dcv create-session --owner {{ dev_user }} --type virtual {{ dev_user }}-session
+ExecStart=/usr/bin/dcv create-session --owner {{ dev_user }} --type virtual --init /etc/dcv/dcv-gnome-session.sh {{ dev_user }}-session
 ExecStop=/usr/bin/dcv close-session {{ dev_user }}-session
 
 [Install]

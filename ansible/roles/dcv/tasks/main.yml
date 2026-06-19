@@ -107,6 +107,34 @@
     mode: "0644"
   notify: reload systemd
 
+# --- GNOME-on-Xorg virtual-session init script (DCV-03 / CRITICAL-2 gap-closure) ---
+# A `dcv create-session --type virtual` with NO --init hands the operator a blank/Wayland
+# desktop on AL2023/GNOME 40+ (Xdcv is X11-only). This script (ported from the proven xrdp
+# startwm.sh) forces XDG_SESSION_TYPE=x11 + software render (llvmpipe, non-GPU) + gnome-session.
+# Wired into the oneshot unit's ExecStart via `--init /etc/dcv/dcv-gnome-session.sh`.
+- name: Install the GNOME-on-Xorg virtual-session init script (DCV-03)
+  ansible.builtin.copy:
+    src: dcv-gnome-session.sh
+    dest: /etc/dcv/dcv-gnome-session.sh
+    owner: root
+    group: root
+    mode: "0755"
+
+# --- Defensive Wayland-off (DCV-03) — guards the GDM default, NOT the virtual session ---
+# The virtual session uses Xdcv (X11) and never touches gdm/seat0, so this is belt-and-braces:
+# if anything ever falls back to a console/GDM path, WaylandEnable=false keeps it on Xorg
+# (GNOME 40+ defaults to Wayland, which Xdcv cannot back). Idempotent INI edit under [daemon].
+- name: Disable Wayland in the GDM default (defensive, DCV-03)
+  community.general.ini_file:
+    path: /etc/gdm/custom.conf
+    section: daemon
+    option: WaylandEnable
+    value: "false"
+    owner: root
+    group: root
+    mode: "0644"
+    create: true
+
 # --- DCV virtual session systemd unit (DCV-03) — the ONLY auto-virtual mechanism ---
 
 - name: Install DCV virtual session systemd service
@@ -259,6 +287,11 @@
     path: /etc/systemd/system/dcv-virtual-session.service
   register: dcv_bake_unit
 
+- name: Stat the GNOME-on-Xorg virtual-session init script (DCV-03 / DCV-04)
+  ansible.builtin.stat:
+    path: /etc/dcv/dcv-gnome-session.sh
+  register: dcv_bake_init
+
 - name: Stat the colord polkit allow rule (DCV-04)
   ansible.builtin.stat:
     path: /etc/polkit-1/rules.d/45-allow-colord.rules
@@ -279,6 +312,7 @@
       - dcv_bake_cert.stat.exists
       - dcv_bake_key.stat.exists
       - dcv_bake_unit.stat.exists
+      - dcv_bake_init.stat.exists
       - dcv_bake_colord.stat.exists
       - dcv_bake_pam.stat.exists
     fail_msg: >-
@@ -290,6 +324,7 @@
         /etc/dcv/dcv.pem exists: {{ dcv_bake_cert.stat.exists | default(false) }}
         /etc/dcv/dcv.key exists: {{ dcv_bake_key.stat.exists | default(false) }}
         /etc/systemd/system/dcv-virtual-session.service exists: {{ dcv_bake_unit.stat.exists | default(false) }}
+        /etc/dcv/dcv-gnome-session.sh exists: {{ dcv_bake_init.stat.exists | default(false) }}
         /etc/polkit-1/rules.d/45-allow-colord.rules exists: {{ dcv_bake_colord.stat.exists | default(false) }}
         /etc/pam.d/dcv exists: {{ dcv_bake_pam.stat.exists | default(false) }}
       If a /usr/bin/dcv* or /usr/bin/Xdcv binary is missing, the RPM install (nice-dcv-server /
@@ -297,6 +332,40 @@
       paths — confirm with `rpm -ql nice-dcv-server nice-xdcv | grep /bin/` and adjust the stats.
       If a config / cert / unit / colord / PAM file is missing, the corresponding templating /
       cert-gen / copy task above did not run — DCV cannot start a working authenticated session.
+    quiet: false
+
+- name: Assert the GNOME-on-Xorg init script is executable (DCV-03)
+  # Mode is stored as a string like "0755"; the owner-exec bit (the '7') is what `dcv
+  # create-session --init` requires — DCV exec()s the script as the session owner.
+  ansible.builtin.assert:
+    that:
+      - dcv_bake_init.stat.mode is match("07[0-9][0-9]")
+    fail_msg: >-
+      DCV-03 bake assertion FAILED. /etc/dcv/dcv-gnome-session.sh is present but NOT
+      owner-executable (mode {{ dcv_bake_init.stat.mode | default('?') }}, want 07xx). DCV
+      `create-session --init` exec()s this script to launch the GNOME-on-Xorg desktop; a
+      non-executable init yields a blank virtual session. The install task must set mode 0755.
+    quiet: false
+
+- name: Slurp the rendered virtual-session unit for the --init wiring assertion (DCV-03)
+  ansible.builtin.slurp:
+    src: /etc/systemd/system/dcv-virtual-session.service
+  register: dcv_bake_unit_content
+
+- name: Assert the virtual-session unit wires --init /etc/dcv/dcv-gnome-session.sh (DCV-03)
+  # A `dcv create-session --type virtual` WITHOUT this --init renders a blank/Wayland desktop
+  # (CRITICAL-2). Prove the rendered ExecStart references both the --init flag AND the script
+  # path so a regression that drops the wiring fails the bake loudly.
+  ansible.builtin.assert:
+    that:
+      - "'--init' in (dcv_bake_unit_content.content | b64decode)"
+      - "'/etc/dcv/dcv-gnome-session.sh' in (dcv_bake_unit_content.content | b64decode)"
+    fail_msg: >-
+      DCV-03 bake assertion FAILED. The rendered dcv-virtual-session.service ExecStart does NOT
+      wire `--init /etc/dcv/dcv-gnome-session.sh`. Without it, `dcv create-session --type virtual`
+      starts the DCV default init and hands the operator a blank/Wayland desktop (CRITICAL-2).
+      Re-check templates/dcv-virtual-session.service.j2 — the ExecStart must contain
+      `--init /etc/dcv/dcv-gnome-session.sh`.
     quiet: false
 
 - name: Assert the DCV cert + key are dcv:dcv mode 0600 (DCV-05)
