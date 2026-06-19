@@ -1,0 +1,129 @@
+---
+# Amazon DCV role — install (airgap) + dcv.conf + FIPS cert + oneshot virtual session +
+# colord/PAM + SELinux relabel. Ported from git 51c5f1f with v4.0 hardening deltas.
+# Wires before `hardening` (Phase 14); the bake assert is plan 13-02.
+
+- name: Assert the dev_user PAM password was set by the secrets role
+  ansible.builtin.assert:
+    that:
+      - desktop_vnc_password is defined
+      - desktop_vnc_password | length > 0
+    fail_msg: >-
+      desktop_vnc_password is not set. Did the `secrets` role run before `dcv`?
+      The dcv role uses authentication=system, which relies on the dev_user PAM
+      password the secrets pipeline generates/publishes/applies. Check
+      ansible/playbook.yml role ordering and the layers.desktop / layers.dcv flags.
+    quiet: true
+  no_log: true
+
+# --- NICE GPG key — import BEFORE any RPM install (airgap integrity gate, DCV-01) ---
+
+- name: Import NICE GPG key
+  ansible.builtin.rpm_key:
+    key: https://d1uj6qtbmh3dt5.cloudfront.net/NICE-GPG-KEY
+    state: present
+
+# --- Download + extract the pinned DCV tarball (CloudFront, DCV-01) ---
+
+- name: Download Amazon DCV tarball
+  # Dual-task pattern: this checksum-gated task runs only once dcv_tarball_sha256 is filled
+  # (deferred-pin posture, CLAUDE.md §9). Until then the GPG signature is the integrity gate.
+  ansible.builtin.get_url:
+    url: "https://d1uj6qtbmh3dt5.cloudfront.net/{{ dcv_version }}/Servers/nice-dcv-{{ dcv_version }}-{{ dcv_build_server }}-amzn2023-x86_64.tgz"
+    dest: /tmp/nice-dcv.tgz
+    mode: "0644"
+    checksum: "{% if dcv_tarball_sha256 | length > 0 %}sha256:{{ dcv_tarball_sha256 }}{% else %}{% endif %}"
+  when: dcv_tarball_sha256 | length > 0
+
+- name: Download Amazon DCV tarball (no checksum — deferred-pin)
+  ansible.builtin.get_url:
+    url: "https://d1uj6qtbmh3dt5.cloudfront.net/{{ dcv_version }}/Servers/nice-dcv-{{ dcv_version }}-{{ dcv_build_server }}-amzn2023-x86_64.tgz"
+    dest: /tmp/nice-dcv.tgz
+    mode: "0644"
+  when: not (dcv_tarball_sha256 | length > 0)
+
+- name: Create DCV extract directory
+  ansible.builtin.file:
+    path: /tmp/dcv-extract
+    state: directory
+    mode: "0755"
+
+- name: Extract DCV tarball
+  ansible.builtin.unarchive:
+    src: /tmp/nice-dcv.tgz
+    dest: /tmp/dcv-extract
+    remote_src: true
+    extra_opts:
+      - "--strip-components=1"
+
+# --- Install the three non-GPU DCV RPMs from the extracted tarball (DCV-01) ---
+# Glob by name (not hardcoded build) so the xdcv build skew (688 != 20103) is handled.
+
+- name: Find nice-dcv-server RPM
+  ansible.builtin.find:
+    paths: /tmp/dcv-extract
+    patterns: "nice-dcv-server-*.rpm"
+    file_type: file
+  register: dcv_server_rpm
+
+- name: Find nice-xdcv RPM
+  ansible.builtin.find:
+    paths: /tmp/dcv-extract
+    patterns: "nice-xdcv-*.rpm"
+    file_type: file
+  register: dcv_xdcv_rpm
+
+- name: Find nice-dcv-web-viewer RPM
+  ansible.builtin.find:
+    paths: /tmp/dcv-extract
+    patterns: "nice-dcv-web-viewer-*.rpm"
+    file_type: file
+  register: dcv_webviewer_rpm
+
+- name: Install DCV RPMs (nice-dcv-server, nice-xdcv, nice-dcv-web-viewer)
+  # disable_gpg_check stays false — the NICE GPG key imported above verifies the signature.
+  # NEVER add --nogpgcheck (CLAUDE.md §8 / airgap §2).
+  ansible.builtin.dnf:
+    name:
+      - "{{ dcv_server_rpm.files[0].path }}"
+      - "{{ dcv_xdcv_rpm.files[0].path }}"
+      - "{{ dcv_webviewer_rpm.files[0].path }}"
+    state: present
+    disable_gpg_check: false
+
+- name: Install DCV runtime dependencies from the AL2023 core repo (DCV-05)
+  # policycoreutils-python-utils provides `semanage`; it is NOT a DCV dep, so add it
+  # explicitly. AL2023 core repo (distro GPG), airgap-safe — no get_url.
+  ansible.builtin.dnf:
+    name: "{{ dcv_runtime_deps }}"
+    state: present
+
+# --- Configure DCV (DCV-02) ---
+
+- name: Install DCV configuration file
+  ansible.builtin.template:
+    src: dcv.conf.j2
+    dest: /etc/dcv/dcv.conf
+    mode: "0644"
+  notify: reload systemd
+
+# --- DCV virtual session systemd unit (DCV-03) — the ONLY auto-virtual mechanism ---
+
+- name: Install DCV virtual session systemd service
+  ansible.builtin.template:
+    src: dcv-virtual-session.service.j2
+    dest: /etc/systemd/system/dcv-virtual-session.service
+    mode: "0644"
+  notify: reload systemd
+
+- name: Enable dcvserver service
+  ansible.builtin.systemd:
+    name: dcvserver
+    enabled: true
+    daemon_reload: true
+
+- name: Enable DCV virtual session service
+  ansible.builtin.systemd:
+    name: dcv-virtual-session
+    enabled: true
+    daemon_reload: true
