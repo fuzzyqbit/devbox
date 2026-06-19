@@ -21,11 +21,11 @@
 
 ### DCV Server (Ansible role)
 
-- [ ] **DCV-01**: A new `dcv` role installs the **non-GPU** DCV server package set for AL2023 x86_64 — `nice-dcv-server`, `nice-dcv-web-viewer`, `nice-xdcv` — via a version-pinned `get_url` from the AWS DCV download host (CloudFront) with the `NICE-GPG-KEY` imported and a sha256 checksum verified. No `nice-dcv-gl` / GPU packages. Airgap-compliant: no S3-for-install, no private mirror, no `--nogpgcheck`.
-- [ ] **DCV-02**: `dcv.conf` is configured — `authentication=system` (PAM), TLS on (self-signed cert), **QUIC enabled** (`enable-quic-frontend=true`), `web-port=8443`, session owner `ec2-user`.
-- [ ] **DCV-03**: A DCV **virtual** session (`nice-xdcv` / Xdcv) is created at boot rendering the GNOME desktop owned by `ec2-user` (DCV does not auto-create — configured via dcv.conf auto-session and/or a oneshot unit). No GPU/GL — software rendering.
+- [x] **DCV-01**: A new `dcv` role installs the **non-GPU** DCV server package set for AL2023 x86_64 — `nice-dcv-server`, `nice-dcv-web-viewer`, `nice-xdcv` — via a version-pinned `get_url` from the AWS DCV download host (CloudFront) with the `NICE-GPG-KEY` imported and a sha256 checksum verified. No `nice-dcv-gl` / GPU packages. Airgap-compliant: no S3-for-install, no private mirror, no `--nogpgcheck`.
+- [x] **DCV-02**: `dcv.conf` is configured — `authentication=system` (PAM), TLS on (self-signed cert), **QUIC enabled** (`enable-quic-frontend=true`), `web-port=8443`, session owner `ec2-user`.
+- [x] **DCV-03**: A DCV **virtual** session (`nice-xdcv` / Xdcv) is created at boot rendering the GNOME desktop owned by `ec2-user` (DCV does not auto-create — configured via dcv.conf auto-session and/or a oneshot unit). No GPU/GL — software rendering.
 - [ ] **DCV-04**: `dcvserver` is an enabled systemd service; the `dcv` role is wired into `ansible/playbook.yml` strictly **before** `hardening` (hardening-stays-last invariant preserved); a bake-time assertion proves the DCV binaries + session config are present.
-- [ ] **DCV-05**: DCV survives the hardened baseline — SELinux relabel (+ AVC-clean) and a FIPS-safe self-signed TLS cert (RSA-2048 / sha256 / SAN), reusing the v3.2 cert + relabel recipe.
+- [x] **DCV-05**: DCV survives the hardened baseline — SELinux relabel (+ AVC-clean) and a FIPS-safe self-signed TLS cert (RSA-2048 / sha256 / SAN), reusing the v3.2 cert + relabel recipe.
 
 ### Network / Security Group (direct connect)
 
@@ -66,11 +66,11 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| DCV-01 | Phase 13 | Pending |
-| DCV-02 | Phase 13 | Pending |
-| DCV-03 | Phase 13 | Pending |
+| DCV-01 | Phase 13 | Complete |
+| DCV-02 | Phase 13 | Complete |
+| DCV-03 | Phase 13 | Complete |
 | DCV-04 | Phase 13 | Pending |
-| DCV-05 | Phase 13 | Pending |
+| DCV-05 | Phase 13 | Complete |
 | DCV-06 | Phase 14 | Pending |
 | DCV-07 | Phase 14 | Pending |
 | DCV-08 | Phase 14 | Pending |
