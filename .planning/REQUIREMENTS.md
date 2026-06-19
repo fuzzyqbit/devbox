@@ -29,17 +29,17 @@
 
 ### Network / Security Group (direct connect)
 
-- [ ] **DCV-06**: The security group exposes `:8443` **TCP and UDP** gated on `var.allowed_web_cidrs` (UDP required for QUIC; direct connect, no SSM tunnel); the xrdp `:3389` ingress is dropped; `:22` absence, IMDSv2-only metadata, and egress are unchanged.
+- [x] **DCV-06**: The security group exposes `:8443` **TCP and UDP** gated on `var.allowed_web_cidrs` (UDP required for QUIC; direct connect, no SSM tunnel); the xrdp `:3389` ingress is dropped; `:22` absence, IMDSv2-only metadata, and egress are unchanged.
 
 ### Removal (xrdp + VNC)
 
-- [ ] **DCV-07**: The `xrdp`/`xorgxrdp` role, its `playbook.yml` wiring + layer toggle, the post-hardening Xorg `post_task` guard, `ansible/test-xrdp.yml`, and the vendored `xorg.conf` are removed.
-- [ ] **DCV-08**: The CIS 2.2.1 X-server exception (`amzn2023cis_rule_2_2_1: false` in `hardening/defaults`) is reverted — DCV virtual sessions use `Xdcv`, not the system Xorg — confirmed safe at the live UAT.
-- [ ] **DCV-09**: All VNC/noVNC and xrdp remnants are removed across ansible/terraform/run/scripts — no dead remote-desktop config in the image (repo-wide completeness check).
+- [x] **DCV-07**: The `xrdp`/`xorgxrdp` role, its `playbook.yml` wiring + layer toggle, the post-hardening Xorg `post_task` guard, `ansible/test-xrdp.yml`, and the vendored `xorg.conf` are removed.
+- [x] **DCV-08**: The CIS 2.2.1 X-server exception (`amzn2023cis_rule_2_2_1: false` in `hardening/defaults`) is reverted — DCV virtual sessions use `Xdcv`, not the system Xorg — confirmed safe at the live UAT.
+- [x] **DCV-09**: All VNC/noVNC and xrdp remnants are removed across ansible/terraform/run/scripts — no dead remote-desktop config in the image (repo-wide completeness check).
 
 ### Operator Surface
 
-- [ ] **DCV-10**: `secrets-show` + operator docs target **direct DCV `:8443` connect** (browser at `https://<host>:8443` or native client, within the allowed CIDR) — no `./run` port-forward step for DCV. The `ec2-user` SSM credential is kept (path unchanged), labels updated noVNC/RDP→DCV.
+- [x] **DCV-10**: `secrets-show` + operator docs target **direct DCV `:8443` connect** (browser at `https://<host>:8443` or native client, within the allowed CIDR) — no `./run` port-forward step for DCV. The `ec2-user` SSM credential is kept (path unchanged), labels updated noVNC/RDP→DCV.
 
 ### Live UAT (milestone-close gate)
 
@@ -71,11 +71,11 @@
 | DCV-03 | Phase 13 | Complete |
 | DCV-04 | Phase 13 | Complete |
 | DCV-05 | Phase 13 | Complete |
-| DCV-06 | Phase 14 | Pending |
-| DCV-07 | Phase 14 | Pending |
-| DCV-08 | Phase 14 | Pending |
-| DCV-09 | Phase 14 | Pending |
-| DCV-10 | Phase 14 | Pending |
+| DCV-06 | Phase 14 | Complete |
+| DCV-07 | Phase 14 | Complete |
+| DCV-08 | Phase 14 | Complete |
+| DCV-09 | Phase 14 | Complete |
+| DCV-10 | Phase 14 | Complete |
 | DCV-11 | Phase 15 | Pending |
 
 **Coverage:** 11/11 v4.0 requirements mapped, each to exactly one phase. No orphans, no duplicates.
