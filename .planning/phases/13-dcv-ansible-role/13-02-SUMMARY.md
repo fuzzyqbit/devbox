@@ -116,6 +116,31 @@ No new security surface beyond the plan's `<threat_model>`. This plan only wires
 - Both task commits present in history: `2b98793` (Task 1), `e0f698a` (Task 2).
 
 ---
+
+## Addendum — 13-03 gap-closure: GNOME-on-Xorg `--init` (CRITICAL-2)
+
+**Date:** 2026-06-19 · **Commit:** `c13ad6d` · **Branch:** `feat/dcv`
+
+Adversarial review surfaced **CRITICAL-2**: the virtual-session unit ran `dcv create-session --type virtual` with **no `--init`**, so on AL2023/GNOME 40+ the operator would have been handed a blank screen or a Wayland session `Xdcv` (X11-only) cannot back — a green-but-DCV-dead AMI. The original 13-RESEARCH Pattern 4 ("rely on the AL2023 default desktop, add `--init` only if Phase-15 UAT shows a wrong desktop") was deferred; this gap-closure makes the GNOME-on-Xorg launcher explicit at bake instead of risking a blank live session.
+
+**Changes (atomic, hooks ran — no `--no-verify`):**
+
+- **New `ansible/roles/dcv/files/dcv-gnome-session.sh` (0755)** — ports the proven xrdp `startwm.sh.j2` body: exports `XDG_SESSION_TYPE=x11`, `GDK_BACKEND=x11`, `XDG_CURRENT_DESKTOP=GNOME`, software-render vars (`LIBGL_ALWAYS_SOFTWARE=1`, `GALLIUM_DRIVER=llvmpipe` — non-GPU instance), sources `/etc/profile`, ensures `XDG_RUNTIME_DIR`, then `exec dbus-launch --exit-with-session gnome-session`. shellcheck-clean (SC2155 split-declared).
+- **Installed** to `/etc/dcv/dcv-gnome-session.sh` root:root 0755 (new `copy` task, before the unit install + bake assert).
+- **Wired `--init`** into `templates/dcv-virtual-session.service.j2` ExecStart: `dcv create-session --owner {{ dev_user }} --type virtual --init /etc/dcv/dcv-gnome-session.sh {{ dev_user }}-session` (Type=oneshot / RemainAfterExit / After+Requires=dcvserver.service all unchanged).
+- **Defensive Wayland-off** — `community.general.ini_file` ensures `WaylandEnable=false` under `[daemon]` in `/etc/gdm/custom.conf` (idempotent, `create: true`). Belt-and-braces for any GDM/console fallback; the virtual session itself never touches gdm/seat0.
+- **Extended the DCV-04 bake assert** — stat `/etc/dcv/dcv-gnome-session.sh` (added to the existence assert), a new assert that its mode matches `07xx` (owner-executable — DCV exec()s the init), and a slurp+grep of the **rendered** unit proving the ExecStart contains both `--init` and the script path. A regression dropping the wiring now fails the bake loudly.
+
+**Verification (pre-commit):** `ansible-playbook --syntax-check ansible/playbook.yml` rc=0; YAML parses; `shellcheck` rc=0; init script grep confirms `XDG_SESSION_TYPE=x11` + `exec … gnome-session`; unit grep confirms `--init /etc/dcv/dcv-gnome-session.sh`; tasks grep confirms `dcv_bake_init` (5 refs) + `WaylandEnable` (2 refs); hardening-last grep-gate = 1; no `changeme` in changed files.
+
+**Scope fence honored:** playbook role order, SG, xrdp/CIS, and the operator surface untouched. Live render/AVC/FIPS/QUIC remain Phase-15 UAT.
+
+### Self-Check (addendum): PASSED
+
+- `ansible/roles/dcv/files/dcv-gnome-session.sh` exists on disk, committed mode `100755`.
+- Commit `c13ad6d` present in history (`git rev-parse --short c13ad6d`).
+
+---
 *Phase: 13-dcv-ansible-role*
 *Completed: 2026-06-19*
 </content>
