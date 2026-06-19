@@ -127,3 +127,86 @@
     name: dcv-virtual-session
     enabled: true
     daemon_reload: true
+
+# --- FIPS-safe TLS cert (DCV-05) — ported from the xrdp cert recipe, retargeted paths ---
+# DCV reads the cert from the HARDCODED names /etc/dcv/dcv.pem + /etc/dcv/dcv.key (there is
+# no dcv.conf cert key). FIPS-safe: RSA-2048 is FIPS-acceptable; -sha256 forces a FIPS digest;
+# a subjectAltName is required (a FIPS-strict TLS handshake rejects CN-only certs). creates:
+# guards idempotency. Runs AFTER the RPM install so the `dcv` user + /etc/dcv exist.
+- name: Generate FIPS-safe self-signed TLS cert for DCV (DCV-05)
+  ansible.builtin.command:
+    cmd: >
+      openssl req -x509 -nodes -newkey rsa:2048 -sha256
+      -keyout /etc/dcv/dcv.key
+      -out /etc/dcv/dcv.pem
+      -days 3650 -subj '/CN=devbox'
+      -addext "subjectAltName=DNS:devbox"
+  args:
+    creates: /etc/dcv/dcv.pem
+
+- name: Set DCV TLS cert/key ownership + perms (DCV-05) — dcv:dcv 0600 (AWS-mandated)
+  # AWS requires the cert + key be owned by the `dcv` user (auto-created by nice-dcv-server)
+  # and mode 0600 (NOT 0644). Wrong perms/owner → DCV ignores the cert and may fall back to a
+  # non-FIPS auto-cert that the FIPS handshake rejects.
+  ansible.builtin.file:
+    path: "{{ item }}"
+    owner: dcv
+    group: dcv
+    mode: "0600"
+  loop:
+    - /etc/dcv/dcv.pem
+    - /etc/dcv/dcv.key
+
+# --- colord polkit rule (DCV-03 / Pitfall) — avoid the color-manager auth hang ---
+# AL2023 ships polkit 121+, which IGNORES /etc/polkit-1/localauthority .pkla files. The
+# allow-rule MUST be a JavaScript .rules file under /etc/polkit-1/rules.d/.
+- name: Ensure polkit rules.d directory exists
+  ansible.builtin.file:
+    path: /etc/polkit-1/rules.d
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Allow colord without an auth prompt for GNOME-over-DCV sessions
+  ansible.builtin.copy:
+    src: 45-allow-colord.rules
+    dest: /etc/polkit-1/rules.d/45-allow-colord.rules
+    owner: root
+    group: root
+    mode: "0644"
+
+# --- PAM delegation (DCV-02) — /etc/pam.d/dcv (default pam-service-name) ---
+# Delegates to password-auth so DCV logins inherit the CIS faillock + pwquality stack.
+- name: Install /etc/pam.d/dcv delegating to password-auth (DCV-02)
+  ansible.builtin.copy:
+    src: dcv.pam
+    dest: /etc/pam.d/dcv
+    owner: root
+    group: root
+    mode: "0644"
+
+# --- SELinux relabel (DCV-05) — restorecon over DCV install paths, BEFORE hardening ---
+# Done at bake while SELinux is still permissive (hardening, the last role, flips enforcing
+# and reboots). DCV is a vendor RPM landing in distro paths (/usr/bin, /usr/lib64) with sane
+# default labels, so no custom fcontext type is invented (unlike xrdp's /usr/local/sbin).
+# changed_when:false + failed_when:false tolerate paths absent on a given build (e.g.
+# /var/run/dcv pre-first-start). AVC-clean under enforcing is proven only at the Phase-15 live
+# UAT; a scoped audit2allow module is the escalation if denials appear. Never `setenforce 0`.
+# NOTE: DCV binary paths (/usr/bin/dcvserver, /usr/bin/Xdcv) are confirmed-at-bake — confirm
+# with `rpm -ql nice-dcv-server nice-xdcv | grep /bin/` if they ever change.
+- name: SELinux relabel DCV install paths + config (DCV-05)
+  ansible.builtin.command:
+    cmd: restorecon -RvF /usr/bin/dcv* /usr/lib64/dcv* /etc/dcv /var/lib/dcv /var/run/dcv
+  changed_when: false
+  failed_when: false
+
+# --- Cleanup ---
+
+- name: Clean up DCV temporary files
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - /tmp/nice-dcv.tgz
+    - /tmp/dcv-extract
