@@ -62,6 +62,12 @@
       # Gated on desktop too: xrdp needs GNOME (desktop role) + the ec2-user password
       # (secrets role, gated on vscode OR desktop), so both must exist before xrdp configures auth.
 
+    - role: dcv
+      when: (layers.dcv | default(false)) and (layers.desktop | default(false))
+      # dcv config + service (Phase 13 DCV-04); MUST stay before hardening (hardening-last invariant).
+      # Gated on desktop too: DCV needs GNOME (desktop role) + the ec2-user PAM password
+      # (secrets role, gated on vscode OR desktop), so both must exist before dcv configures auth.
+
     - role: hardening  # MUST remain last — invariant (JUP-08 / CLAUDE.md §8)
       when: layers.hardening | default(false)
 
