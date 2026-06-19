@@ -66,4 +66,16 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| _(filled by roadmap)_ | | |
+| DCV-01 | Phase 13 | Pending |
+| DCV-02 | Phase 13 | Pending |
+| DCV-03 | Phase 13 | Pending |
+| DCV-04 | Phase 13 | Pending |
+| DCV-05 | Phase 13 | Pending |
+| DCV-06 | Phase 14 | Pending |
+| DCV-07 | Phase 14 | Pending |
+| DCV-08 | Phase 14 | Pending |
+| DCV-09 | Phase 14 | Pending |
+| DCV-10 | Phase 14 | Pending |
+| DCV-11 | Phase 15 | Pending |
+
+**Coverage:** 11/11 v4.0 requirements mapped, each to exactly one phase. No orphans, no duplicates.
