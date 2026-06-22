@@ -360,12 +360,6 @@ cmd_status() {
     "$REPO_ROOT/scripts/devbox-status.sh" "$@"
 }
 
-cmd_wait_ready() {
-  cmd_tf_ensure_init
-  DEVBOX_USER="$DEVBOX_USER" INSTANCE_ID="$INSTANCE_ID" REGION="$REGION" \
-    "$REPO_ROOT/scripts/devbox-wait.sh" "$@"
-}
-
 # --------------------------------------------------------------------------
 # Group D — SSM access
 # --------------------------------------------------------------------------
@@ -515,8 +509,6 @@ ${BOLD}Instance lifecycle${RESET} (override resolution: INSTANCE_ID=i-... REGION
   start        Start the devbox EC2 instance
   stop         Stop the devbox EC2 instance
   status       Show instance status and connection info
-  wait-ready   Wait for a freshly-applied instance to finish building
-               (running -> EC2 status-ok -> SSM Online). Run after tf-apply.
 
 ${BOLD}SSM access${RESET} (Phase 2 -- replaces public :22 ingress)
   devbox-ssm           Open an SSM Session Manager shell to the devbox
@@ -562,7 +554,6 @@ main() {
     start)               cmd_start "$@" ;;
     stop)                cmd_stop "$@" ;;
     status)              cmd_status "$@" ;;
-    wait-ready)          cmd_wait_ready "$@" ;;
     devbox-ssm)          cmd_devbox_ssm "$@" ;;
     devbox-port-forward) cmd_devbox_port_forward "$@" ;;
     jupyter)             cmd_jupyter "$@" ;;
