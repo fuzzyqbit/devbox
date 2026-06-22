@@ -1,17 +1,17 @@
 ---
 gsd_state_version: 1.0
 milestone: v4.0
-milestone_name: Amazon DCV Remote Desktop
+milestone_name: — Amazon DCV Remote Desktop
 status: verifying
-stopped_at: 13-01 complete; 13-02 next (playbook wiring + bake assert)
-last_updated: "2026-06-19T20:37:20.750Z"
+stopped_at: context exhaustion at 75% (2026-06-22)
+last_updated: "2026-06-22T12:17:17.792Z"
 last_activity: 2026-06-19
 progress:
   total_phases: 3
   completed_phases: 2
   total_plans: 7
   completed_plans: 7
-  percent: 100
+  percent: 67
 ---
 
 # Project State
@@ -135,14 +135,14 @@ See PROJECT.md Key Decisions table.
 
 ## Session Continuity
 
-Last session: 2026-06-19T20:37:20.746Z
+Last session: 2026-06-22T12:17:17.784Z
 
 - Derived 3 phases (coarse granularity) from DCV-01..11: Phase 13 = `dcv` role bake-time (DCV-01…05); Phase 14 = direct-connect SG + xrdp/VNC removal + CIS revert + operator surface (DCV-06…10); Phase 15 = live UAT gate (DCV-11, human-run milestone-close).
 - 11/11 requirements mapped, each to exactly one phase. Coverage validated, no orphans.
 - Wrote ROADMAP.md (v4.0 section appended, shipped-milestone history + Progress table retained), STATE.md, REQUIREMENTS.md traceability table.
 - Key scope guard recorded: license infra is OUT of scope (assumed external) — NO Terraform license phase; residual risk verified at DCV-11. Direct-connect posture (QUIC-ON, UDP+TCP :8443) supersedes the research's SSM/QUIC-OFF recommendation.
 
-Stopped at: 13-01 complete; 13-02 next (playbook wiring + bake assert)
+Stopped at: context exhaustion at 75% (2026-06-22)
 Next: `/gsd:plan-phase 13` — decompose the `dcv` role into executable plans.
 
 ## Operator Next Steps
