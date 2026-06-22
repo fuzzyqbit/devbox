@@ -1,3 +1,7 @@
 ---
 dev_user: ec2-user
 dev_home: /home/ec2-user
+
+# Visual Studio Code desktop editor (for the DCV GNOME session). Pinned for reproducible
+# bakes — bump deliberately (latest stable: https://update.code.visualstudio.com/api/releases/stable).
+vscode_desktop_version: "1.125.1"
