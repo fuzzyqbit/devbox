@@ -128,25 +128,28 @@
 # RPM: import the MS GPG key and install with signature verification ON (disable_gpg_check: false,
 # unlike the unsigned code-server RPM). Public vendor download (redirects to the MS CDN) — airgap
 # policy is github/vendor downloads, no S3, no private mirror. /usr/bin/code is the installed binary.
+# Toggle with layers.vscode_desktop (layer_config.yml); defaults on when the desktop layer is built.
+- name: Install Visual Studio Code desktop editor
+  when: layers.vscode_desktop | default(true)
+  block:
+    - name: Import Microsoft GPG key (VS Code)
+      rpm_key:
+        key: https://packages.microsoft.com/keys/microsoft.asc
+        state: present
 
-- name: Import Microsoft GPG key (VS Code)
-  rpm_key:
-    key: https://packages.microsoft.com/keys/microsoft.asc
-    state: present
+    - name: Download Visual Studio Code RPM (pinned)
+      get_url:
+        url: "https://update.code.visualstudio.com/{{ vscode_desktop_version }}/linux-rpm-x64/stable"
+        dest: /tmp/vscode.rpm
+        mode: "0644"
 
-- name: Download Visual Studio Code RPM (pinned)
-  get_url:
-    url: "https://update.code.visualstudio.com/{{ vscode_desktop_version }}/linux-rpm-x64/stable"
-    dest: /tmp/vscode.rpm
-    mode: "0644"
+    - name: Install Visual Studio Code
+      dnf:
+        name: /tmp/vscode.rpm
+        state: present
+        disable_gpg_check: false
 
-- name: Install Visual Studio Code
-  dnf:
-    name: /tmp/vscode.rpm
-    state: present
-    disable_gpg_check: false
-
-- name: Clean up VS Code RPM
-  file:
-    path: /tmp/vscode.rpm
-    state: absent
+    - name: Clean up VS Code RPM
+      file:
+        path: /tmp/vscode.rpm
+        state: absent
