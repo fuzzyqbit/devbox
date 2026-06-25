@@ -1,0 +1,31 @@
+---
+# persistent-home role — installs the boot-time mount of the separate /home EBS volume.
+# The mount itself happens at RUNTIME (a boot oneshot), not at bake — this role only drops
+# the script + unit and enables it. The volume is provisioned by Terraform
+# (aws_ebs_volume.home, attached at /dev/sdf); see SEED-001 for the full design.
+#
+# Wired into playbook.yml BEFORE hardening (hardening-stays-last invariant). Runtime mount
+# ordering (mount before code-server/dcv) is handled by the unit's Before= directive.
+
+- name: Install the persistent /home mount script
+  ansible.builtin.copy:
+    src: devbox-home-mount.sh
+    dest: /usr/local/sbin/devbox-home-mount.sh
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Install the persistent /home mount systemd unit
+  ansible.builtin.template:
+    src: devbox-home-mount.service.j2
+    dest: /etc/systemd/system/devbox-home-mount.service
+    owner: root
+    group: root
+    mode: "0644"
+  notify: reload systemd
+
+- name: Enable the persistent /home mount unit (runs at instance boot, not at bake)
+  ansible.builtin.systemd:
+    name: devbox-home-mount
+    enabled: true
+    daemon_reload: true

@@ -1,0 +1,14 @@
+[Unit]
+Description=Mount the persistent /home/{{ dev_user }} EBS volume
+After=cloud-init.service local-fs.target
+# Mount /home before anything that reads it. Before= is one-sided ordering; listing
+# units that may be absent (their layer is off) is harmless — systemd ignores them.
+Before=code-server.service dcvserver.service dcv-virtual-session.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=true
+ExecStart=/usr/local/sbin/devbox-home-mount.sh
+
+[Install]
+WantedBy=multi-user.target

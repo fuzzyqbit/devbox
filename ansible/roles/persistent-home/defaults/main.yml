@@ -1,0 +1,6 @@
+---
+# The OS user whose /home is persisted onto the separate EBS volume. The mount script
+# (files/devbox-home-mount.sh) hard-codes the matching path /home/ec2-user and the
+# DEVHOME filesystem label / /dev/sdf attach device (contract with Terraform's
+# aws_volume_attachment.device_name) — keep them in sync if dev_user ever changes.
+dev_user: ec2-user
