@@ -1,6 +1,8 @@
 [Unit]
 Description=code-server
 After=network.target
+# When the persistent-home layer is enabled, that role drops in a 10-require-home.conf that
+# adds Requires=/After=devbox-home-mount.service (fail-closed on the persistent /home mount).
 
 [Service]
 Type=simple

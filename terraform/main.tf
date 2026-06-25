@@ -203,6 +203,14 @@ resource "aws_ebs_volume" "home" {
     Backup = "devbox-home" # targeted by the DLM snapshot policy below
   })
 
+  # prevent_destroy keeps the volume (and its data) across `tofu destroy`. NOTE: this aborts
+  # the ENTIRE destroy plan, so `./run tf-destroy` will NOT tear down the instance either until
+  # the volume is orphaned first:
+  #     cd terraform && tofu state rm aws_ebs_volume.home   # volume stays in AWS, leaves state
+  #     ./run tf-destroy                                    # now destroys instance/SG/IAM
+  # AZ caveat: the volume is AZ-pinned (EBS can't cross AZs). Changing var.subnet_id to a
+  # different AZ needs replacement, which prevent_destroy blocks — moving AZ is a deliberate
+  # snapshot -> create-volume-in-new-AZ -> `tofu state mv` procedure, not a plain apply.
   lifecycle {
     prevent_destroy = true
   }

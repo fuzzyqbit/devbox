@@ -29,3 +29,30 @@
     name: devbox-home-mount
     enabled: true
     daemon_reload: true
+
+# Fail-closed coupling: make the /home-consuming services Require + start after the mount, so
+# they never serve on the disposable root volume. Done as drop-ins (not edits to the consumers'
+# base units) so the coupling exists only when this layer is built. A drop-in for a unit that
+# is not installed (its layer is off) is harmless — systemd ignores it.
+- name: Ensure systemd drop-in dirs for the /home-consuming services
+  ansible.builtin.file:
+    path: "/etc/systemd/system/{{ item }}.service.d"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  loop:
+    - code-server
+    - dcv-virtual-session
+
+- name: Make the /home-consuming services require the persistent-home mount (fail-closed)
+  ansible.builtin.copy:
+    src: require-home.conf
+    dest: "/etc/systemd/system/{{ item }}.service.d/10-require-home.conf"
+    owner: root
+    group: root
+    mode: "0644"
+  loop:
+    - code-server
+    - dcv-virtual-session
+  notify: reload systemd
