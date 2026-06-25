@@ -43,6 +43,7 @@
     mode: "0755"
   loop:
     - code-server
+    - dcvserver
     - dcv-virtual-session
 
 - name: Make the /home-consuming services require the persistent-home mount (fail-closed)
@@ -54,5 +55,6 @@
     mode: "0644"
   loop:
     - code-server
+    - dcvserver
     - dcv-virtual-session
   notify: reload systemd
