@@ -30,6 +30,12 @@ locals {
 data "aws_caller_identity" "current" {}
 data "aws_region" "current" {}
 
+# The persistent /home EBS volume must live in the SAME AZ as the instance.
+# Derive the AZ from the instance's subnet rather than hard-coding it.
+data "aws_subnet" "this" {
+  id = var.subnet_id
+}
+
 resource "aws_iam_role" "devbox" {
   name_prefix = "${local.name_prefix}-"
   description = "EC2 role granting ${var.devbox_user}'s devbox read access to its own SSM secrets"
@@ -176,4 +182,107 @@ resource "aws_instance" "devbox" {
   tags = merge(local.common_tags, {
     Name = local.name_prefix
   })
+}
+
+# --- Persistent /home data volume ----------------------------------------------
+# Holds /home/ec2-user OFF the (disposable) root volume. Lifecycle is independent
+# of the instance: an AMI swap replaces the instance, the attachment detaches and
+# re-attaches to the new instance, and the volume itself is untouched — so user
+# data survives. prevent_destroy keeps it (and its data) across `tofu destroy`;
+# removal must be deliberate. Mounted at /home/ec2-user by the AMI's
+# persistent-home role (mount by LABEL=DEVHOME, see ansible/roles/persistent-home).
+
+resource "aws_ebs_volume" "home" {
+  availability_zone = data.aws_subnet.this.availability_zone # MUST match the instance AZ
+  size              = var.home_volume_size
+  type              = "gp3"
+  encrypted         = true
+
+  tags = merge(local.common_tags, {
+    Name   = "${local.name_prefix}-home"
+    Backup = "devbox-home" # targeted by the DLM snapshot policy below
+  })
+
+  # prevent_destroy keeps the volume (and its data) across `tofu destroy`. NOTE: this aborts
+  # the ENTIRE destroy plan, so `./run tf-destroy` will NOT tear down the instance either until
+  # the volume is orphaned first:
+  #     cd terraform && tofu state rm aws_ebs_volume.home   # volume stays in AWS, leaves state
+  #     ./run tf-destroy                                    # now destroys instance/SG/IAM
+  # AZ caveat: the volume is AZ-pinned (EBS can't cross AZs). Changing var.subnet_id to a
+  # different AZ needs replacement, which prevent_destroy blocks — moving AZ is a deliberate
+  # snapshot -> create-volume-in-new-AZ -> `tofu state mv` procedure, not a plain apply.
+  lifecycle {
+    prevent_destroy = true
+  }
+}
+
+resource "aws_volume_attachment" "home" {
+  device_name = "/dev/sdf"
+  volume_id   = aws_ebs_volume.home.id
+  instance_id = aws_instance.devbox.id
+
+  # On an AMI swap the instance is replaced; stop it first so the volume detaches
+  # cleanly (the OS still has /home mounted) before the old instance is destroyed.
+  stop_instance_before_detaching = true
+}
+
+# --- DLM: daily snapshots of the /home volume (backup / DR layer) ---------------
+# Scheduled EBS snapshots of the persistent volume, retained N days. This is the
+# disaster-recovery / rollback layer ONLY — the everyday "data survives an update"
+# guarantee comes from the volume re-attaching, not from restoring a snapshot.
+
+resource "aws_iam_role" "dlm" {
+  name_prefix = "${local.name_prefix}-dlm-"
+  description = "Data Lifecycle Manager role for ${var.devbox_user}'s devbox /home snapshots"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect    = "Allow"
+      Principal = { Service = "dlm.amazonaws.com" }
+      Action    = "sts:AssumeRole"
+    }]
+  })
+
+  tags = local.common_tags
+}
+
+resource "aws_iam_role_policy_attachment" "dlm" {
+  role       = aws_iam_role.dlm.name
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSDataLifecycleManagerServiceRole"
+}
+
+resource "aws_dlm_lifecycle_policy" "home" {
+  description        = "${local.name_prefix} /home daily snapshots"
+  execution_role_arn = aws_iam_role.dlm.arn
+  state              = "ENABLED"
+
+  policy_details {
+    resource_types = ["VOLUME"]
+    target_tags = {
+      Backup = "devbox-home"
+    }
+
+    schedule {
+      name = "daily"
+
+      create_rule {
+        interval      = 24
+        interval_unit = "HOURS"
+        times         = ["03:00"]
+      }
+
+      retain_rule {
+        count = var.home_snapshot_retain_count
+      }
+
+      tags_to_add = {
+        SnapshotType = "devbox-home-daily"
+      }
+
+      copy_tags = true
+    }
+  }
+
+  tags = local.common_tags
 }

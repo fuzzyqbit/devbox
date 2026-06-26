@@ -4,6 +4,10 @@
 
 layers:
   base: true
+  # persistent_home installs the boot-time mount of the separate /home EBS volume
+  # (Terraform aws_ebs_volume.home) so user data survives AMI swaps. Pair with the
+  # Terraform volume — leaving one without the other is a no-op / ephemeral-home warning.
+  persistent_home: true
   certs: true
   python: true
   # secrets role is auto-gated by vscode/desktop; this flag is informational.

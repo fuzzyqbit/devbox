@@ -15,6 +15,12 @@
     - role: base
       when: layers.base | default(true)
 
+    - role: persistent-home
+      when: layers.persistent_home | default(true)
+      # Installs the boot-time mount of the separate /home EBS volume so user data
+      # survives AMI swaps (Terraform aws_ebs_volume.home). Bake-time install only;
+      # the mount runs at instance boot. Must stay before hardening (invariant).
+
     - role: certs
       when: layers.certs | default(true)
 

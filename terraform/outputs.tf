@@ -28,6 +28,11 @@ output "security_group_id" {
   value       = aws_security_group.devbox.id
 }
 
+output "home_volume_id" {
+  description = "Persistent /home EBS volume ID (survives AMI swaps + tofu destroy; snapshotted daily by DLM). Use for manual snapshot/restore ops."
+  value       = aws_ebs_volume.home.id
+}
+
 output "iam_instance_profile" {
   description = "IAM instance profile attached to the instance"
   value       = aws_iam_instance_profile.devbox.name

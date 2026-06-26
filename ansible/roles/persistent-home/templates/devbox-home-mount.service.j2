@@ -1,0 +1,19 @@
+[Unit]
+Description=Mount the persistent /home/{{ dev_user }} EBS volume
+After=cloud-init.service local-fs.target network-online.target
+Wants=network-online.target
+# Mount /home before anything that writes it. The secrets bootstrap writes
+# ~/.config/code-server/config.yaml + sets the PAM password — it MUST run after the
+# real /home is mounted, else it writes onto the disposable root that this then shadows.
+# code-server / dcv-virtual-session additionally Requires= this unit (fail-closed).
+Before=devbox-secrets-bootstrap.service code-server.service dcvserver.service dcv-virtual-session.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=true
+# Must exceed the script's WAIT_SECS (300) device-attach poll, or systemd kills it early.
+TimeoutStartSec=360
+ExecStart=/usr/local/sbin/devbox-home-mount.sh
+
+[Install]
+WantedBy=multi-user.target
