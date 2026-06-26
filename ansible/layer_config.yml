@@ -18,6 +18,9 @@ layers:
   git: true
   devtools: true
   desktop: true
-  # xrdp gates the Phase 11 config/service block; co-deploys with the GNOME desktop.
-  xrdp: true
+  # vscode_desktop gates the Microsoft VS Code editor block inside the desktop role
+  # (distinct from `vscode`, which is the browser code-server). Only applies when desktop is on.
+  vscode_desktop: true
+  # dcv gates the Phase 13 install/config/service block; co-deploys with the GNOME desktop.
+  dcv: true
   hardening: true

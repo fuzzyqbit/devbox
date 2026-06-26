@@ -4,7 +4,7 @@ output "instance_id" {
 }
 
 output "private_ip" {
-  description = "Private IP address. Devbox is private-only — reached over VPC-internal routes for code-server/RDP and via SSM Session Manager for shell."
+  description = "Private IP address. Devbox is private-only — reached over VPC-internal routes for code-server/DCV and via SSM Session Manager for shell."
   value       = aws_instance.devbox.private_ip
 }
 
@@ -18,9 +18,9 @@ output "code_server_url" {
   value       = "https://${aws_instance.devbox.private_ip}:8080"
 }
 
-output "rdp_endpoint" {
-  description = "RDP desktop endpoint (xrdp/TLS :3389) — native RDP client only; not a browser URL"
-  value       = "${aws_instance.devbox.private_ip}:3389 — connect with a native RDP client (mstsc / FreeRDP / Remmina), or `./run devbox-port-forward 3389` then localhost:3389"
+output "dcv_endpoint" {
+  description = "Amazon DCV endpoint (TLS :8443, TCP+UDP/QUIC) — direct connect within var.allowed_web_cidrs; browser web client or native DCV client"
+  value       = "https://${aws_instance.devbox.private_ip}:8443 — Amazon DCV web client (browser) or native DCV client, within the allowed CIDR"
 }
 
 output "security_group_id" {
@@ -38,9 +38,9 @@ output "ssm_code_server_password_param" {
   value       = "/devbox/${var.devbox_user}/code-server-password"
 }
 
-output "ssm_vnc_password_param" {
-  description = "SSM Parameter Store name for the RDP/desktop login password (the ec2-user PAM password)"
-  value       = "/devbox/${var.devbox_user}/vnc-password"
+output "ssm_desktop_password_param" {
+  description = "SSM Parameter Store name for the DCV/desktop login password (the ec2-user PAM password)"
+  value       = "/devbox/${var.devbox_user}/desktop-password"
 }
 
 output "aws_region" {

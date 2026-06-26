@@ -1,0 +1,10 @@
+#%PAM-1.0
+# /etc/pam.d/dcv — the default pam-service-name for DCV authentication=system.
+# Delegates auth/account/session/password to password-auth so the CIS-hardened faillock
+# + pwquality stack applies to DCV logins. Modeled on the xrdp-sesman PAM file.
+auth        include     password-auth
+account     include     password-auth
+session     required    pam_loginuid.so
+session     optional    pam_lastlog.so quiet
+session     include     password-auth
+password    include     password-auth

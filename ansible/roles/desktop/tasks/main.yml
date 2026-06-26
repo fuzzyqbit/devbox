@@ -10,9 +10,9 @@
   dnf:
     name:
       - gnome-shell
-      # gnome-session provides /usr/bin/gnome-session, the binary startwm.sh execs to render
-      # the GNOME-over-RDP session (RDP-07); AL2023-core (the Debian "-xsession" variant
-      # does not exist here).
+      # gnome-session provides /usr/bin/gnome-session, the binary the DCV session launcher
+      # execs to render the GNOME desktop over Amazon DCV; AL2023-core (the Debian "-xsession"
+      # variant does not exist here).
       - gnome-session
       - dejavu-sans-fonts
       - dejavu-sans-mono-fonts
@@ -20,7 +20,7 @@
     state: present
 
 # --- GNOME screensaver: disable lock screen (a locked GNOME session is unusable over a
-# headless RDP connection — the operator has no local console to unlock it) ---
+# headless Amazon DCV connection — the operator has no local console to unlock it) ---
 
 - name: Create dconf local profile directory
   file:
@@ -121,3 +121,35 @@
   command: flatpak install --system -y flathub org.videolan.VLC
   args:
     creates: /var/lib/flatpak/app/org.videolan.VLC
+
+# --- Visual Studio Code (desktop editor for the DCV GNOME session) ---
+# Pinned versioned RPM via get_url (reproducible) — NOT the packages.microsoft.com yum repo,
+# which has autorefresh=1 and would pull a different VS Code on every bake. Microsoft signs the
+# RPM: import the MS GPG key and install with signature verification ON (disable_gpg_check: false,
+# unlike the unsigned code-server RPM). Public vendor download (redirects to the MS CDN) — airgap
+# policy is github/vendor downloads, no S3, no private mirror. /usr/bin/code is the installed binary.
+# Toggle with layers.vscode_desktop (layer_config.yml); defaults on when the desktop layer is built.
+- name: Install Visual Studio Code desktop editor
+  when: layers.vscode_desktop | default(true)
+  block:
+    - name: Import Microsoft GPG key (VS Code)
+      rpm_key:
+        key: https://packages.microsoft.com/keys/microsoft.asc
+        state: present
+
+    - name: Download Visual Studio Code RPM (pinned)
+      get_url:
+        url: "https://update.code.visualstudio.com/{{ vscode_desktop_version }}/linux-rpm-x64/stable"
+        dest: /tmp/vscode.rpm
+        mode: "0644"
+
+    - name: Install Visual Studio Code
+      dnf:
+        name: /tmp/vscode.rpm
+        state: present
+        disable_gpg_check: false
+
+    - name: Clean up VS Code RPM
+      file:
+        path: /tmp/vscode.rpm
+        state: absent

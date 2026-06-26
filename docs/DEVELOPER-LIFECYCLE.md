@@ -88,20 +88,16 @@ No public SSH port (`:22`) is open. Access is over **AWS SSM Session Manager**.
   # then open https://localhost:8080
   ```
 
-### Graphical desktop (RDP on :3389)
+### Graphical desktop (Amazon DCV on :8443)
 
-The GNOME desktop is served over RDP on `:3389`. Connect with a native RDP
-client (Microsoft Remote Desktop / `mstsc`, FreeRDP, Remmina) — log in as
-`ec2-user` with the desktop password from `./run secrets-show`.
+The GNOME desktop is served over Amazon DCV on `:8443` (TLS). Connect with the
+DCV browser web client (`https://<private-ip>:8443`) or a native DCV client —
+log in as `ec2-user` with the desktop password from `./run secrets-show`. Your
+source IP must be inside `var.allowed_web_cidrs`.
 
-- **On the VPC**: point your RDP client at `<private-ip>:3389`. Your IP must be
-  inside `var.allowed_web_cidrs`.
-- **Off the VPC**: tunnel it over SSM, then connect the client to localhost:
-
-  ```bash
-  ./run devbox-port-forward 3389   # forwards :3389 → localhost:3389
-  # then point your RDP client at localhost:3389
-  ```
+DCV is **direct connect** (TCP + UDP/QUIC) within the allowed CIDR — there is
+**no `./run devbox-port-forward` step for the desktop**. Browse straight to
+`https://<private-ip>:8443`, or point a native DCV client at the same host.
 
 ### JupyterLab (on demand, loopback-only)
 
@@ -130,8 +126,8 @@ Access flow:
    ```
 
    (`./run devbox-port-forward` forwards only `:8080` for code-server; the
-   `:8888` forward is run manually, the same SSM pattern as the RDP `:3389`
-   forward above — or use `./run devbox-port-forward 8888`.)
+   `:8888` forward is run manually, the same SSM pattern as the code-server
+   `:8080` forward above — or use `./run devbox-port-forward 8888`.)
 
 3. **Open the token URL** in your browser:
 
@@ -143,9 +139,9 @@ Press `Ctrl-C` in the first shell to stop JupyterLab when you are done.
 
 ### Passwords
 
-code-server and the RDP desktop each have a per-operator password stored in SSM
-Parameter Store (SecureString). The RDP desktop logs in as `ec2-user` with the
-desktop password:
+code-server and the Amazon DCV desktop each have a per-operator password stored
+in SSM Parameter Store (SecureString). The DCV desktop logs in as `ec2-user`
+with the desktop password:
 
 ```bash
 ./run secrets-show
@@ -183,7 +179,7 @@ remain. To also wipe local Packer/Terraform caches:
 | See state + how to connect| `./run status`             |
 | Shell in                  | `./run devbox-ssm`         |
 | Browser IDE off-VPC       | `./run devbox-port-forward`|
-| RDP desktop off-VPC       | `./run devbox-port-forward 3389` |
+| DCV desktop (in-CIDR)     | `https://<private-ip>:8443` (browser or native DCV client) |
 | Get passwords             | `./run secrets-show`       |
 | JupyterLab (on demand)    | `./run jupyter`            |
 | Tear down                 | `./run tf-destroy`         |

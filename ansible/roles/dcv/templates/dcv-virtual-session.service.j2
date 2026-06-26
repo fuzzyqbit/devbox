@@ -1,0 +1,19 @@
+[Unit]
+Description=Amazon DCV virtual session for {{ dev_user }}
+After=dcvserver.service
+Requires=dcvserver.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=true
+# Readiness gate: dcvserver reports "active" (main process up) BEFORE its management API is
+# ready to accept create-session (license/agent-socket warm-up). After=/Requires= only wait for
+# "activated", not "ready" — so at boot the session is created too early and comes up unusable
+# (the tell: a later `systemctl restart dcv-virtual-session` works). Poll `dcv list-sessions`
+# (returns 0 only once the server is actually serving) before creating. Up to 60s, then fail loud.
+ExecStartPre=/bin/bash -c 'for i in $(seq 1 30); do /usr/bin/dcv list-sessions >/dev/null 2>&1 && exit 0; sleep 2; done; echo "dcvserver management API not ready after 60s" >&2; exit 1'
+ExecStart=/usr/bin/dcv create-session --owner {{ dev_user }} --type virtual --init /etc/dcv/dcv-gnome-session.sh {{ dev_user }}-session
+ExecStop=/usr/bin/dcv close-session {{ dev_user }}-session
+
+[Install]
+WantedBy=multi-user.target

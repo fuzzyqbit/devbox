@@ -1,0 +1,443 @@
+---
+# Amazon DCV role — install (airgap) + dcv.conf + FIPS cert + oneshot virtual session +
+# colord/PAM + SELinux relabel. Ported from git 51c5f1f with v4.0 hardening deltas.
+# Wires before `hardening` (Phase 14); the bake assert is plan 13-02.
+
+- name: Assert the dev_user PAM password was set by the secrets role
+  ansible.builtin.assert:
+    that:
+      - desktop_password is defined
+      - desktop_password | length > 0
+    fail_msg: >-
+      desktop_password is not set. Did the `secrets` role run before `dcv`?
+      The dcv role uses authentication=system, which relies on the dev_user PAM
+      password the secrets pipeline generates/publishes/applies. Check
+      ansible/playbook.yml role ordering and the layers.desktop / layers.dcv flags.
+    quiet: true
+  no_log: true
+
+# --- NICE GPG key — import BEFORE any RPM install (airgap integrity gate, DCV-01) ---
+
+- name: Import NICE GPG key
+  ansible.builtin.rpm_key:
+    key: https://d1uj6qtbmh3dt5.cloudfront.net/NICE-GPG-KEY
+    state: present
+
+# --- Download + extract the pinned DCV tarball (CloudFront, DCV-01) ---
+
+- name: Download Amazon DCV tarball
+  # Dual-task pattern: this checksum-gated task runs only once dcv_tarball_sha256 is filled
+  # (deferred-pin posture, CLAUDE.md §9). Until then the GPG signature is the integrity gate.
+  ansible.builtin.get_url:
+    url: "https://d1uj6qtbmh3dt5.cloudfront.net/{{ dcv_version }}/Servers/nice-dcv-{{ dcv_version }}-{{ dcv_build_server }}-amzn2023-x86_64.tgz"
+    dest: /tmp/nice-dcv.tgz
+    mode: "0644"
+    checksum: "{% if dcv_tarball_sha256 | length > 0 %}sha256:{{ dcv_tarball_sha256 }}{% else %}{% endif %}"
+  when: dcv_tarball_sha256 | length > 0
+
+- name: Download Amazon DCV tarball (no checksum — deferred-pin)
+  ansible.builtin.get_url:
+    url: "https://d1uj6qtbmh3dt5.cloudfront.net/{{ dcv_version }}/Servers/nice-dcv-{{ dcv_version }}-{{ dcv_build_server }}-amzn2023-x86_64.tgz"
+    dest: /tmp/nice-dcv.tgz
+    mode: "0644"
+  when: not (dcv_tarball_sha256 | length > 0)
+
+- name: Create DCV extract directory
+  ansible.builtin.file:
+    path: /tmp/dcv-extract
+    state: directory
+    mode: "0755"
+
+- name: Extract DCV tarball
+  ansible.builtin.unarchive:
+    src: /tmp/nice-dcv.tgz
+    dest: /tmp/dcv-extract
+    remote_src: true
+    extra_opts:
+      - "--strip-components=1"
+
+# --- Install the three non-GPU DCV RPMs from the extracted tarball (DCV-01) ---
+# Glob by name (not hardcoded build) so the xdcv build skew (688 != 20103) is handled.
+
+- name: Find nice-dcv-server RPM
+  ansible.builtin.find:
+    paths: /tmp/dcv-extract
+    patterns: "nice-dcv-server-*.rpm"
+    file_type: file
+  register: dcv_server_rpm
+
+- name: Find nice-xdcv RPM
+  ansible.builtin.find:
+    paths: /tmp/dcv-extract
+    patterns: "nice-xdcv-*.rpm"
+    file_type: file
+  register: dcv_xdcv_rpm
+
+- name: Find nice-dcv-web-viewer RPM
+  ansible.builtin.find:
+    paths: /tmp/dcv-extract
+    patterns: "nice-dcv-web-viewer-*.rpm"
+    file_type: file
+  register: dcv_webviewer_rpm
+
+- name: Install DCV RPMs (nice-dcv-server, nice-xdcv, nice-dcv-web-viewer)
+  # disable_gpg_check stays false — the NICE GPG key imported above verifies the signature.
+  # NEVER add --nogpgcheck (CLAUDE.md §8 / airgap §2).
+  ansible.builtin.dnf:
+    name:
+      - "{{ dcv_server_rpm.files[0].path }}"
+      - "{{ dcv_xdcv_rpm.files[0].path }}"
+      - "{{ dcv_webviewer_rpm.files[0].path }}"
+    state: present
+    disable_gpg_check: false
+
+- name: Install DCV runtime dependencies from the AL2023 core repo (DCV-05)
+  # policycoreutils-python-utils provides `semanage`; it is NOT a DCV dep, so add it
+  # explicitly. AL2023 core repo (distro GPG), airgap-safe — no get_url.
+  ansible.builtin.dnf:
+    name: "{{ dcv_runtime_deps }}"
+    state: present
+
+# --- Configure DCV (DCV-02) ---
+
+- name: Install DCV configuration file
+  ansible.builtin.template:
+    src: dcv.conf.j2
+    dest: /etc/dcv/dcv.conf
+    mode: "0644"
+  notify: reload systemd
+
+# --- GNOME-on-Xorg virtual-session init script (DCV-03 / CRITICAL-2 gap-closure) ---
+# A `dcv create-session --type virtual` with NO --init hands the operator a blank/Wayland
+# desktop on AL2023/GNOME 40+ (Xdcv is X11-only). This script (ported from the proven xrdp
+# startwm.sh) forces XDG_SESSION_TYPE=x11 + software render (llvmpipe, non-GPU) + gnome-session.
+# Wired into the oneshot unit's ExecStart via `--init /etc/dcv/dcv-gnome-session.sh`.
+- name: Install the GNOME-on-Xorg virtual-session init script (DCV-03)
+  ansible.builtin.copy:
+    src: dcv-gnome-session.sh
+    dest: /etc/dcv/dcv-gnome-session.sh
+    owner: root
+    group: root
+    mode: "0755"
+
+# --- Defensive Wayland-off (DCV-03) — guards the GDM default, NOT the virtual session ---
+# The virtual session uses Xdcv (X11) and never touches gdm/seat0, so this is belt-and-braces:
+# if anything ever falls back to a console/GDM path, WaylandEnable=false keeps it on Xorg
+# (GNOME 40+ defaults to Wayland, which Xdcv cannot back). Idempotent INI edit under [daemon].
+- name: Disable Wayland in the GDM default (defensive, DCV-03)
+  community.general.ini_file:
+    path: /etc/gdm/custom.conf
+    section: daemon
+    option: WaylandEnable
+    value: "false"
+    owner: root
+    group: root
+    mode: "0644"
+    create: true
+
+# --- DCV virtual session systemd unit (DCV-03) — the ONLY auto-virtual mechanism ---
+
+- name: Install DCV virtual session systemd service
+  ansible.builtin.template:
+    src: dcv-virtual-session.service.j2
+    dest: /etc/systemd/system/dcv-virtual-session.service
+    mode: "0644"
+  notify: reload systemd
+
+- name: Enable dcvserver service
+  ansible.builtin.systemd:
+    name: dcvserver
+    enabled: true
+    daemon_reload: true
+
+- name: Enable DCV virtual session service
+  ansible.builtin.systemd:
+    name: dcv-virtual-session
+    enabled: true
+    daemon_reload: true
+
+# --- FIPS-safe TLS cert (DCV-05) — ported from the xrdp cert recipe, retargeted paths ---
+# DCV reads the cert from the HARDCODED names /etc/dcv/dcv.pem + /etc/dcv/dcv.key (there is
+# no dcv.conf cert key). FIPS-safe: RSA-2048 is FIPS-acceptable; -sha256 forces a FIPS digest;
+# a subjectAltName is required (a FIPS-strict TLS handshake rejects CN-only certs). creates:
+# guards idempotency. Runs AFTER the RPM install so the `dcv` user + /etc/dcv exist.
+- name: Generate FIPS-safe self-signed TLS cert for DCV (DCV-05)
+  ansible.builtin.command:
+    cmd: >
+      openssl req -x509 -nodes -newkey rsa:2048 -sha256
+      -keyout /etc/dcv/dcv.key
+      -out /etc/dcv/dcv.pem
+      -days 3650 -subj '/CN=devbox'
+      -addext "subjectAltName=DNS:devbox"
+  args:
+    creates: /etc/dcv/dcv.pem
+
+- name: Set DCV TLS cert/key ownership + perms (DCV-05) — dcv:dcv 0600 (AWS-mandated)
+  # AWS requires the cert + key be owned by the `dcv` user (auto-created by nice-dcv-server)
+  # and mode 0600 (NOT 0644). Wrong perms/owner → DCV ignores the cert and may fall back to a
+  # non-FIPS auto-cert that the FIPS handshake rejects.
+  ansible.builtin.file:
+    path: "{{ item }}"
+    owner: dcv
+    group: dcv
+    mode: "0600"
+  loop:
+    - /etc/dcv/dcv.pem
+    - /etc/dcv/dcv.key
+
+# --- colord polkit rule (DCV-03 / Pitfall) — avoid the color-manager auth hang ---
+# AL2023 ships polkit 121+, which IGNORES /etc/polkit-1/localauthority .pkla files. The
+# allow-rule MUST be a JavaScript .rules file under /etc/polkit-1/rules.d/.
+- name: Ensure polkit rules.d directory exists
+  ansible.builtin.file:
+    path: /etc/polkit-1/rules.d
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Allow colord without an auth prompt for GNOME-over-DCV sessions
+  ansible.builtin.copy:
+    src: 45-allow-colord.rules
+    dest: /etc/polkit-1/rules.d/45-allow-colord.rules
+    owner: root
+    group: root
+    mode: "0644"
+
+# --- PAM delegation (DCV-02) — /etc/pam.d/dcv (default pam-service-name) ---
+# Delegates to password-auth so DCV logins inherit the CIS faillock + pwquality stack.
+- name: Install /etc/pam.d/dcv delegating to password-auth (DCV-02)
+  ansible.builtin.copy:
+    src: dcv.pam
+    dest: /etc/pam.d/dcv
+    owner: root
+    group: root
+    mode: "0644"
+
+# --- SELinux relabel (DCV-05) — restorecon over DCV install paths, BEFORE hardening ---
+# Done at bake while SELinux is still permissive (hardening, the last role, flips enforcing
+# and reboots). DCV is a vendor RPM landing in distro paths (/usr/bin, /usr/lib64) with sane
+# default labels, so no custom fcontext type is invented (unlike xrdp's /usr/local/sbin).
+# changed_when:false + failed_when:false tolerate paths absent on a given build (e.g.
+# /var/run/dcv pre-first-start). AVC-clean under enforcing is proven only at the Phase-15 live
+# UAT; a scoped audit2allow module is the escalation if denials appear. Never `setenforce 0`.
+# NOTE: DCV binary paths (/usr/bin/dcvserver, /usr/bin/Xdcv) are confirmed-at-bake — confirm
+# with `rpm -ql nice-dcv-server nice-xdcv | grep /bin/` if they ever change.
+- name: SELinux relabel DCV install paths + config (DCV-05)
+  ansible.builtin.command:
+    cmd: restorecon -RvF /usr/bin/dcv* /usr/lib64/dcv* /etc/dcv /var/lib/dcv /var/run/dcv
+  changed_when: false
+  failed_when: false
+
+# --- Cleanup ---
+
+- name: Clean up DCV temporary files
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - /tmp/nice-dcv.tgz
+    - /tmp/dcv-extract
+
+# ── DCV-04 bake assertion (mirrors the xrdp RDP-13 block) ──
+# Fail the bake LOUDLY if any DCV binary, config, cert/key, session unit, colord rule, or PAM
+# file is absent; if the cert/key perms are wrong; if dcv.conf lost auth=system / web-port /
+# QUIC or gained auth=none; if the cert has no subjectAltName; or if either service is not
+# enabled. Runs LAST in the role, after every asserted artifact exists, and BEFORE hardening.
+# Does NOT attempt a live DCV connect / create-session / FIPS handshake / AVC check — those are
+# the Phase-15 live UAT (DCV-11). This is static-artifact + enablement proof only.
+#
+# NOTE: the /usr/bin/dcvserver, /usr/bin/dcv, /usr/bin/Xdcv paths are [ASSUMED] from the vendor
+# RPM convention (research A2). /usr/bin/dcv is corroborated by the oneshot unit's ExecStart.
+# They are confirmed-at-first-bake — verify with `rpm -ql nice-dcv-server nice-xdcv | grep /bin/`
+# and adjust the stat paths if the vendor layout ever differs.
+
+- name: Stat the dcvserver daemon binary (DCV-04)
+  ansible.builtin.stat:
+    path: /usr/bin/dcvserver
+  register: dcv_bake_dcvserver
+
+- name: Stat the dcv CLI binary (DCV-04)
+  ansible.builtin.stat:
+    path: /usr/bin/dcv
+  register: dcv_bake_dcv
+
+- name: Stat the Xdcv virtual X server binary (DCV-04)
+  ansible.builtin.stat:
+    path: /usr/bin/Xdcv
+  register: dcv_bake_xdcv
+
+- name: Stat /etc/dcv/dcv.conf (DCV-04)
+  ansible.builtin.stat:
+    path: /etc/dcv/dcv.conf
+  register: dcv_bake_conf
+
+- name: Stat the FIPS TLS cert /etc/dcv/dcv.pem (DCV-04 / DCV-05)
+  ansible.builtin.stat:
+    path: /etc/dcv/dcv.pem
+  register: dcv_bake_cert
+
+- name: Stat the FIPS TLS key /etc/dcv/dcv.key (DCV-04 / DCV-05)
+  ansible.builtin.stat:
+    path: /etc/dcv/dcv.key
+  register: dcv_bake_key
+
+- name: Stat the virtual-session systemd unit (DCV-04)
+  ansible.builtin.stat:
+    path: /etc/systemd/system/dcv-virtual-session.service
+  register: dcv_bake_unit
+
+- name: Stat the GNOME-on-Xorg virtual-session init script (DCV-03 / DCV-04)
+  ansible.builtin.stat:
+    path: /etc/dcv/dcv-gnome-session.sh
+  register: dcv_bake_init
+
+- name: Stat the colord polkit allow rule (DCV-04)
+  ansible.builtin.stat:
+    path: /etc/polkit-1/rules.d/45-allow-colord.rules
+  register: dcv_bake_colord
+
+- name: Stat the /etc/pam.d/dcv auth file (DCV-04)
+  ansible.builtin.stat:
+    path: /etc/pam.d/dcv
+  register: dcv_bake_pam
+
+- name: Assert all DCV artifacts (binaries, conf, cert/key, unit, colord, PAM) exist (DCV-04)
+  ansible.builtin.assert:
+    that:
+      - dcv_bake_dcvserver.stat.exists
+      - dcv_bake_dcv.stat.exists
+      - dcv_bake_xdcv.stat.exists
+      - dcv_bake_conf.stat.exists
+      - dcv_bake_cert.stat.exists
+      - dcv_bake_key.stat.exists
+      - dcv_bake_unit.stat.exists
+      - dcv_bake_init.stat.exists
+      - dcv_bake_colord.stat.exists
+      - dcv_bake_pam.stat.exists
+    fail_msg: >-
+      DCV-04 bake assertion FAILED. One or more required DCV artifacts are missing:
+        /usr/bin/dcvserver exists: {{ dcv_bake_dcvserver.stat.exists | default(false) }}
+        /usr/bin/dcv exists: {{ dcv_bake_dcv.stat.exists | default(false) }}
+        /usr/bin/Xdcv exists: {{ dcv_bake_xdcv.stat.exists | default(false) }}
+        /etc/dcv/dcv.conf exists: {{ dcv_bake_conf.stat.exists | default(false) }}
+        /etc/dcv/dcv.pem exists: {{ dcv_bake_cert.stat.exists | default(false) }}
+        /etc/dcv/dcv.key exists: {{ dcv_bake_key.stat.exists | default(false) }}
+        /etc/systemd/system/dcv-virtual-session.service exists: {{ dcv_bake_unit.stat.exists | default(false) }}
+        /etc/dcv/dcv-gnome-session.sh exists: {{ dcv_bake_init.stat.exists | default(false) }}
+        /etc/polkit-1/rules.d/45-allow-colord.rules exists: {{ dcv_bake_colord.stat.exists | default(false) }}
+        /etc/pam.d/dcv exists: {{ dcv_bake_pam.stat.exists | default(false) }}
+      If a /usr/bin/dcv* or /usr/bin/Xdcv binary is missing, the RPM install (nice-dcv-server /
+      nice-xdcv) was skipped or failed, OR the vendor binary layout differs from the [ASSUMED]
+      paths — confirm with `rpm -ql nice-dcv-server nice-xdcv | grep /bin/` and adjust the stats.
+      If a config / cert / unit / colord / PAM file is missing, the corresponding templating /
+      cert-gen / copy task above did not run — DCV cannot start a working authenticated session.
+    quiet: false
+
+- name: Assert the GNOME-on-Xorg init script is executable (DCV-03)
+  # Mode is stored as a string like "0755"; the owner-exec bit (the '7') is what `dcv
+  # create-session --init` requires — DCV exec()s the script as the session owner.
+  ansible.builtin.assert:
+    that:
+      - dcv_bake_init.stat.mode is match("07[0-9][0-9]")
+    fail_msg: >-
+      DCV-03 bake assertion FAILED. /etc/dcv/dcv-gnome-session.sh is present but NOT
+      owner-executable (mode {{ dcv_bake_init.stat.mode | default('?') }}, want 07xx). DCV
+      `create-session --init` exec()s this script to launch the GNOME-on-Xorg desktop; a
+      non-executable init yields a blank virtual session. The install task must set mode 0755.
+    quiet: false
+
+- name: Slurp the rendered virtual-session unit for the --init wiring assertion (DCV-03)
+  ansible.builtin.slurp:
+    src: /etc/systemd/system/dcv-virtual-session.service
+  register: dcv_bake_unit_content
+
+- name: Assert the virtual-session unit wires --init /etc/dcv/dcv-gnome-session.sh (DCV-03)
+  # A `dcv create-session --type virtual` WITHOUT this --init renders a blank/Wayland desktop
+  # (CRITICAL-2). Prove the rendered ExecStart references both the --init flag AND the script
+  # path so a regression that drops the wiring fails the bake loudly.
+  ansible.builtin.assert:
+    that:
+      - "'--init' in (dcv_bake_unit_content.content | b64decode)"
+      - "'/etc/dcv/dcv-gnome-session.sh' in (dcv_bake_unit_content.content | b64decode)"
+    fail_msg: >-
+      DCV-03 bake assertion FAILED. The rendered dcv-virtual-session.service ExecStart does NOT
+      wire `--init /etc/dcv/dcv-gnome-session.sh`. Without it, `dcv create-session --type virtual`
+      starts the DCV default init and hands the operator a blank/Wayland desktop (CRITICAL-2).
+      Re-check templates/dcv-virtual-session.service.j2 — the ExecStart must contain
+      `--init /etc/dcv/dcv-gnome-session.sh`.
+    quiet: false
+
+- name: Assert the DCV cert + key are dcv:dcv mode 0600 (DCV-05)
+  ansible.builtin.assert:
+    that:
+      - dcv_bake_cert.stat.pw_name == "dcv"
+      - dcv_bake_cert.stat.mode == "0600"
+      - dcv_bake_key.stat.pw_name == "dcv"
+      - dcv_bake_key.stat.mode == "0600"
+    fail_msg: >-
+      DCV-04/05 bake assertion FAILED. The DCV TLS cert/key have the wrong owner or perms
+      (Pitfall A — wrong perms make DCV silently IGNORE the cert and fall back to a non-FIPS
+      auto-cert the FIPS-strict handshake rejects):
+        /etc/dcv/dcv.pem owner: {{ dcv_bake_cert.stat.pw_name | default('?') }} (want dcv)
+        /etc/dcv/dcv.pem mode:  {{ dcv_bake_cert.stat.mode | default('?') }} (want 0600)
+        /etc/dcv/dcv.key owner: {{ dcv_bake_key.stat.pw_name | default('?') }} (want dcv)
+        /etc/dcv/dcv.key mode:  {{ dcv_bake_key.stat.mode | default('?') }} (want 0600)
+    quiet: false
+
+- name: Slurp /etc/dcv/dcv.conf for the key-content assertion (DCV-02)
+  ansible.builtin.slurp:
+    src: /etc/dcv/dcv.conf
+  register: dcv_bake_conf_content
+
+- name: Assert dcv.conf has auth=system + web-port + QUIC on and NEVER auth=none (DCV-02)
+  ansible.builtin.assert:
+    that:
+      - "'authentication=\"system\"' in (dcv_bake_conf_content.content | b64decode)"
+      - "'web-port=' ~ dcv_web_port in (dcv_bake_conf_content.content | b64decode)"
+      - "'enable-quic-frontend=true' in (dcv_bake_conf_content.content | b64decode)"
+      - "'authentication=\"none\"' not in (dcv_bake_conf_content.content | b64decode)"
+    fail_msg: >-
+      DCV-02 bake assertion FAILED. /etc/dcv/dcv.conf is missing a required security/connectivity
+      key or contains the passwordless authentication="none" (EoP — passwordless desktop). It MUST
+      contain authentication="system", web-port={{ dcv_web_port }}, and enable-quic-frontend=true
+      (v4.0 direct-connect posture), and MUST NOT contain authentication="none". Re-check the
+      dcv.conf.j2 template render.
+    quiet: false
+
+- name: Read the DCV TLS cert text for the SAN check (DCV-05)
+  ansible.builtin.command:
+    cmd: openssl x509 -in /etc/dcv/dcv.pem -noout -text
+  register: dcv_bake_certtext
+  changed_when: false
+  failed_when: false
+
+- name: Assert the DCV TLS cert carries a subjectAltName=DNS:devbox (DCV-05)
+  ansible.builtin.assert:
+    that:
+      - "'Subject Alternative Name' in dcv_bake_certtext.stdout"
+      - "'DNS:devbox' in dcv_bake_certtext.stdout"
+    fail_msg: >-
+      DCV-05 bake assertion FAILED. The DCV TLS cert /etc/dcv/dcv.pem has no subjectAltName — a
+      FIPS-strict TLS handshake rejects CN-only certs (the xrdp 11-VERIFICATION HIGH finding). The
+      cert-gen task must pass -addext "subjectAltName=DNS:devbox". If the cert predates that change,
+      remove /etc/dcv/dcv.pem and re-run the bake to regenerate it.
+    quiet: false
+
+- name: Check dcvserver + dcv-virtual-session service enablement (DCV-04)
+  ansible.builtin.command:
+    cmd: systemctl is-enabled dcvserver dcv-virtual-session
+  register: dcv_bake_enabled
+  changed_when: false
+  failed_when: false
+
+- name: Assert dcvserver + dcv-virtual-session are enabled at boot (DCV-04)
+  ansible.builtin.assert:
+    that:
+      - dcv_bake_enabled.rc == 0
+    fail_msg: >-
+      DCV-04 bake assertion FAILED. dcvserver or dcv-virtual-session is not enabled at boot — DCV
+      will not start after the instance launches.
+      Output: {{ dcv_bake_enabled.stdout | default('') }}
+      Run: systemctl is-enabled dcvserver dcv-virtual-session
+    quiet: false

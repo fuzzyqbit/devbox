@@ -390,9 +390,8 @@ cmd_devbox_port_forward() {
 
   # Port specs: PORT or REMOTE:LOCAL, zero or more. No args = code-server :8080.
   # e.g.  ./run devbox-port-forward            -> 8080
-  #       ./run devbox-port-forward 3389       -> RDP (native RDP client)
-  #       ./run devbox-port-forward 8080 3389  -> both, one SSM session each
   #       ./run devbox-port-forward 8888:18888 -> remote 8888 on localhost:18888
+  # (Amazon DCV :8443 is direct connect within the allowed CIDR — not forwarded.)
   local specs=("$@")
   [ ${#specs[@]} -eq 0 ] && specs=("$DEVBOX_FORWARD_DEFAULT_PORT")
 
@@ -401,7 +400,7 @@ cmd_devbox_port_forward() {
     remote="${spec%%:*}"
     local_port="${spec##*:}"
     if [[ ! "$remote" =~ ^[0-9]+$ ]] || [[ ! "$local_port" =~ ^[0-9]+$ ]]; then
-      _error "invalid port spec '${spec}' (expected PORT or REMOTE:LOCAL, e.g. 3389 or 8888:18888)"
+      _error "invalid port spec '${spec}' (expected PORT or REMOTE:LOCAL, e.g. 8080 or 8888:18888)"
       exit 1
     fi
     remote_ports+=("$remote")
@@ -441,7 +440,7 @@ cmd_devbox_port_forward() {
 cmd_secrets_show() {
   _require_devbox_user
   echo "Resolving secrets for DEVBOX_USER=${DEVBOX_USER}..."
-  local cs_pwd vnc_pwd
+  local cs_pwd desktop_pwd
   local aws_err
   aws_err="$(mktemp)"
   trap 'rm -f "$aws_err"' RETURN
@@ -455,11 +454,11 @@ cmd_secrets_show() {
       rm -f "$aws_err"
       exit 1
     }
-  vnc_pwd="$(aws ssm get-parameter \
-    --name "/devbox/${DEVBOX_USER}/vnc-password" \
+  desktop_pwd="$(aws ssm get-parameter \
+    --name "/devbox/${DEVBOX_USER}/desktop-password" \
     --with-decryption --query 'Parameter.Value' --output text 2>"$aws_err")" \
     || {
-      _error "RDP login password not found at /devbox/${DEVBOX_USER}/vnc-password"
+      _error "DCV login password not found at /devbox/${DEVBOX_USER}/desktop-password"
       cat "$aws_err" >&2
       rm -f "$aws_err"
       exit 1
@@ -467,7 +466,7 @@ cmd_secrets_show() {
   rm -f "$aws_err"
   echo ""
   echo "code-server (https://<host>:8080) password:  ${cs_pwd}"
-  echo "RDP login (ec2-user @ <host>:3389) password:  ${vnc_pwd}"
+  echo "DCV login (ec2-user @ <host>:8443) password:  ${desktop_pwd}"
   echo ""
   echo "(Secrets are stored as SSM SecureStrings; rotated on every \`./run build\`.)"
 }
@@ -515,11 +514,11 @@ ${BOLD}SSM access${RESET} (Phase 2 -- replaces public :22 ingress)
   devbox-ssm           Open an SSM Session Manager shell to the devbox
   devbox-port-forward  Forward ports from the devbox over SSM (default :8080).
                        Args: PORT or REMOTE:LOCAL, repeatable.
-                       e.g. ./run devbox-port-forward 8080 3389 8888:18888
+                       e.g. ./run devbox-port-forward 8080 8888:18888
   jupyter              Launch JupyterLab on demand (127.0.0.1:8888, loopback-only) over SSM
 
 ${BOLD}Secrets${RESET}
-  secrets-show   Print the operator's code-server and RDP login passwords from SSM
+  secrets-show   Print the operator's code-server and DCV login passwords from SSM
 
 ${BOLD}Diagnostics${RESET}
   doctor       Check required dependencies and report missing/version issues

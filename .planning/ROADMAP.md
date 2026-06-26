@@ -5,7 +5,8 @@
 - ✅ **v1.0 — Security hardening + CI baseline** — Phases 1-4 (shipped 2026-05-14)
 - ✅ **v2.0 — Run Script + GitLab CI Integration** — Phases 5-7 (shipped 2026-06-02)
 - ✅ **v3.0 — Jupyter + mise** — Phases 8-9 (shipped 2026-06-02)
-- 🚧 **v3.2 — XRDP Remote Desktop** — Phases 10-12 (active)
+- 🪦 **v3.2 — XRDP Remote Desktop** — Phases 10-12 (code-complete; superseded by v4.0 before RDP-14 UAT ran)
+- 🚧 **v4.0 — Amazon DCV Remote Desktop** — Phases 13-15 (active, branch `feat/dcv`)
 
 ## Phases
 
@@ -45,121 +46,146 @@ Full detail: [milestones/v3.0-ROADMAP.md](milestones/v3.0-ROADMAP.md) · [milest
 
 </details>
 
-### 🚧 v3.2 — XRDP Remote Desktop (Active)
+<details>
+<summary>🪦 v3.2 — XRDP Remote Desktop (Phases 10-12) — CODE-COMPLETE, SUPERSEDED by v4.0</summary>
 
-**Milestone Goal:** Replace the VNC/noVNC desktop stack with **xrdp built from vendored,
-sha256-pinned source** (airgap-safe), authenticating via **PAM**, so operators connect with
-a native RDP client and a full-length system password. The VNC scheme failed because
-full-length password auth was structurally impossible (VeNCrypt `Plain` username problem,
-`VncAuth` 8-char DES cap) and verification was deferred until it was too late — so this
-milestone makes verification **first-class** and removes the VNC stack only **after** xrdp
-is proven working.
+Replaced the VNC/noVNC stack with xrdp built from vendored, sha256-pinned source (PAM auth,
+native RDP client). Shipped code-complete 2026-06-16 (phases 10-12, adversarially verified);
+**RDP-14 live UAT was the only open gate and never ran** — DCV was re-validated as the
+preferred path and v4.0 supersedes this milestone, removing the xrdp/xorgxrdp role and its
+SG/operator-surface wiring. v3.2 planning records retained below + under `.planning/phases/10–12/`.
 
-**Build order (dependency spine):** install build toolchain + Xorg SDK from the AL2023
-mirror → build/install xrdp → build/install xorgxrdp against the running Xorg ABI →
-configure (`xrdp.ini` TLS, `sesman.ini` Xorg backend, `/etc/pam.d/xrdp-sesman`) → enable
-systemd units → assert at bake → integrate network/operator surface → remove VNC → confirm
-with a live RDP-login UAT. Each phase strictly depends on the prior one.
+- [x] Phase 10: xrdp / xorgxrdp From-Source Build Role (1/1 plan) — Requirements: RDP-01, RDP-02, RDP-03
+- [x] Phase 11: Service Config, PAM, Session + Bake Verification (3/3 plans) — Requirements: RDP-04…08, RDP-13
+- [x] Phase 12: Network, Operator Surface + VNC/noVNC Removal (4/4 plans) — Requirements: RDP-09…12
+- ⏭️ RDP-14 (live RDP-login UAT) — never ran; superseded by v4.0 DCV-11. Not re-run (xrdp retired).
 
-**Airgap invariant:** no network fetch at bake. xrdp + xorgxrdp source is vendored and
-sha256-pinned (RDP-01, matching the repo's existing pinning convention); build dependencies
-come from the AL2023 mirror only.
+</details>
 
-#### Phase 10: xrdp / xorgxrdp From-Source Build Role
-**Goal**: A new `xrdp` Ansible role builds and installs xrdp and the xorgxrdp Xorg backend
-from vendored, pinned source at bake — entirely offline — failing loudly if the Xorg SDK is
-missing rather than producing a half-installed image.
-**Depends on**: Phase 9 (v3.0 baked AMI layer is the foundation this role joins)
-**Requirements**: RDP-01, RDP-02, RDP-03
+### 🚧 v4.0 — Amazon DCV Remote Desktop (Active)
+
+**Milestone Goal:** Replace the remote-desktop stack with **Amazon DCV**. A new `dcv` Ansible
+role installs/configures `dcvserver` on AL2023 (non-GPU, virtual session rendering GNOME);
+**xrdp/xorgxrdp and any VNC/noVNC remnants are removed entirely**. DCV is reached by **direct
+connect** — TCP **and** UDP `:8443` gated on `var.allowed_web_cidrs` (QUIC enabled, viable
+because access is direct, not SSM-tunneled); `:22` stays absent and the CIDR allowlist is the
+perimeter. Reverses v3.2.
+
+**Branch:** `feat/dcv`
+
+**Build order (dependency spine):** the `dcv` role is the foundation everything builds on
+(it ports the proven prior role at git `51c5f1f`/`67faeb3`/`8538ef3` + adds the gaps the prior
+attempt missed — QUIC-on, FIPS-safe cert, SELinux relabel, virtual-session auto-create, bake
+assert) → then the direct-connect SG + irreversible xrdp/VNC removal + CIS 2.2.1 revert +
+operator surface (done after the new role exists so removal frees the old role slot the new
+one fills) → then the live UAT, which is the only place that can prove license-resolves,
+GNOME-renders, AVC-clean-under-enforcing, FIPS-handshake, QUIC-works, and that the CIS revert
+is safe.
+
+**Credential model (unchanged):** the DCV login is the existing `ec2-user` PAM password the
+`secrets` role generates per build, publishes to SSM (`/devbox/<user>/vnc-password`, path
+unchanged — relabelled only), and the boot bootstrap applies via `chpasswd`. DCV
+`authentication=system` validates it through PAM. No new secret.
+
+**Out of scope (assumed external — see REQUIREMENTS.md Assumptions):** the DCV license path
+(S3 VPC endpoint + IAM `s3:GetObject` on `dcv-license.<region>`) is assumed reachable from the
+target environment. This milestone does **NOT** provision it. The residual licensing risk is
+verified — not silently assumed — at the live UAT (DCV-11): if licensing does not resolve, the
+endpoint + IAM become a documented follow-up.
+
+**Invariants preserved:** `hardening` stays the last role in `ansible/playbook.yml`; the
+`vnc-password` SSM param path is never renamed; install stays airgap-compliant (pinned
+`get_url` + NICE GPG key + sha256, no S3-for-install, no `--nogpgcheck`).
+
+#### Phase 13: `dcv` Ansible Role (install + config + session + SELinux/FIPS + bake assert)
+**Goal**: A new `dcv` role bakes an AMI that installs the non-GPU Amazon DCV server package set,
+configures `dcv.conf` (PAM auth, TLS, QUIC enabled, `:8443`, owner `ec2-user`), auto-creates a
+virtual GNOME session at boot, survives the CIS-hardened baseline (SELinux relabel + FIPS-safe
+cert), enables `dcvserver` before `hardening`, and proves it all with a bake-time assertion.
+**Depends on**: Phase 12 (v3.2 baked AMI layer is the foundation this role joins; the `desktop`
+role supplies the GNOME the virtual session renders, the `secrets` role supplies the PAM password)
+**Requirements**: DCV-01, DCV-02, DCV-03, DCV-04, DCV-05
 **Success Criteria** (what must be TRUE):
-  1. The bake completes with no network fetch from EPEL or upstream — xrdp and xorgxrdp
-     source tarballs are vendored in-repo and verified against pinned version + sha256.
-  2. The `xrdp` role installs the build toolchain + Xorg SDK from the AL2023 mirror, then
-     compiles and installs xrdp and xorgxrdp against the running Xorg ABI.
-  3. If a required build dependency — especially `xorg-x11-server-devel` — is unavailable,
-     the bake fails with an explicit assertion (hard gate) instead of continuing.
-**Plans**: 1 plan
+  1. The bake installs `nice-dcv-server`, `nice-dcv-web-viewer`, and `nice-xdcv` (no
+     `nice-dcv-gl` / GPU packages) via a version-pinned `get_url` from the AWS DCV CloudFront
+     host with the `NICE-GPG-KEY` imported and a sha256 checksum verified — airgap-compliant,
+     no S3-for-install, no `--nogpgcheck`.
+  2. `dcv.conf` is configured with `authentication=system` (PAM), TLS on, **QUIC enabled**
+     (`enable-quic-frontend=true`), `web-port=8443`, and session owner `ec2-user`.
+  3. After boot, a DCV **virtual** session (`Xdcv`, software render) exists rendering the GNOME
+     desktop owned by `ec2-user` — DCV does not auto-create one, so the role wires a oneshot
+     unit and/or `dcv.conf` auto-session.
+  4. `dcvserver` is an enabled systemd service, the `dcv` role is wired into `playbook.yml`
+     strictly **before** `hardening` (hardening-stays-last invariant = 1), and a bake-time
+     assertion confirms the DCV binaries + session config are present (bake fails if not).
+  5. DCV survives the hardened baseline: SELinux relabel leaves the install AVC-clean-capable
+     and the self-signed TLS cert is FIPS-safe (RSA-2048 / sha256 / SAN), reusing the v3.2
+     cert + relabel recipe.
+**Plans**: 2 plans
+- [x] 13-01-PLAN.md — `dcv` role: airgap install + dcv.conf (auth=system, QUIC on, :8443) + FIPS cert + oneshot virtual session + colord/PAM + SELinux relabel (DCV-01/02/03/05)
+- [x] 13-02-PLAN.md — playbook wiring (before hardening) + `dcv: true` toggle + RDP-13-grade bake assert (binary/conf-keys/cert path+owner+0600+SAN/units enabled) (DCV-04/05)
+**UI hint**: yes
 
-Plans:
-- [x] 10-01-PLAN.md — `xrdp` role: pinned defaults + AL2023 build-dep install + RDP-03 hard-gate assert + sha256-verified xrdp & xorgxrdp build/install (RDP-01/02/03)
-
-**Notes**: `xorgxrdp` links the running Xorg server ABI, so `xorg-x11-server-devel`
-availability (RDP-03) is a hard gate — the build must abort, not skip. The role's source
-vendoring + sha256 pin (RDP-01) follows the same convention as the `mise` and Packer-source
-pins already in the repo. Single cohesive plan: the build is a strict linear spine
-(defaults → deps+assert → xrdp → xorgxrdp, all in one `tasks/main.yml`), so a wave split
-would only chain file-conflicting plans; 3 tasks fit within one ~50%-context plan.
-
-#### Phase 11: Service Config, PAM, Session + Bake Verification
-**Goal**: xrdp runs as an enabled, TLS-protected systemd service on `:3389`, authenticates
-`ec2-user` against the CIS-hardened PAM stack, launches the desktop session via the Xorg
-(xorgxrdp) backend, and a bake-time assertion proves the binaries/modules are present and
-the services are enabled — all with the `xrdp` role inserted **before** `hardening`.
-**Depends on**: Phase 10 (binaries must exist before they can be configured + verified)
-**Requirements**: RDP-04, RDP-05, RDP-06, RDP-07, RDP-08, RDP-13
+#### Phase 14: Direct-Connect SG + xrdp/VNC Removal + CIS Revert + Operator Surface
+**Goal**: The operator reaches DCV by direct connect — the SG opens `:8443` TCP **and** UDP
+gated on `var.allowed_web_cidrs` and the xrdp `:3389` ingress is dropped — while the obsolete
+xrdp/xorgxrdp role and every VNC/noVNC remnant are removed, the CIS 2.2.1 X-server exception is
+reverted (virtual sessions use `Xdcv`, not system Xorg), and `secrets-show` + operator docs are
+relabelled to direct DCV `:8443` connect. Removal happens after the `dcv` role exists.
+**Depends on**: Phase 13 (do not remove the old remote-desktop path until the new `dcv` role is
+in place and bake-proven; the `dcv` role fills the playbook slot xrdp vacates)
+**Requirements**: DCV-06, DCV-07, DCV-08, DCV-09, DCV-10
 **Success Criteria** (what must be TRUE):
-  1. xrdp listens on `:3389` with TLS enabled (`security_layer` / `certificate` / `key_file`),
-     reusing the existing self-signed cert pattern.
-  2. `sesman.ini` is configured for the xorgxrdp (Xorg) backend — no Xvnc/VNC backend — and
-     `/etc/pam.d/xrdp-sesman` delegates to `password-auth` so RDP logins inherit pwquality +
-     faillock from the CIS PAM stack.
-  3. xrdp + xrdp-sesman are enabled systemd services that start on boot, and the `xrdp` role
-     is positioned **before** `hardening` in `ansible/playbook.yml` (hardening-stays-last
-     invariant preserved, same rule as JUP-08 / CLAUDE.md §8).
-  4. A bake-time assertion (RDP-13) confirms the xrdp + xorgxrdp binaries/modules are present
-     and the services are enabled — the bake fails if not.
-**Plans**: 2 plans (1 gap-closure)
+  1. The Terraform security group exposes `:8443` **TCP and UDP** gated on
+     `var.allowed_web_cidrs` (UDP required for QUIC; direct connect, no SSM tunnel); the xrdp
+     `:3389` ingress is dropped; `:22` absence, IMDSv2-only metadata, and egress are unchanged.
+  2. The `xrdp`/`xorgxrdp` role, its `playbook.yml` wiring + layer toggle, the post-hardening
+     Xorg `post_task` guard, `ansible/test-xrdp.yml`, and the vendored `xorg.conf` are removed.
+  3. The CIS 2.2.1 X-server exception (`amzn2023cis_rule_2_2_1: false`) is reverted — committed
+     pending the Phase 15 UAT confirming `Xdcv` renders without system Xorg (documented fallback
+     if not).
+  4. All VNC/noVNC and xrdp remnants are removed across ansible/terraform/run/scripts — a
+     repo-wide completeness check returns no dead remote-desktop config (the kept `vnc-password`
+     credential path is the only intentional residue).
+  5. `secrets-show` + operator docs target **direct DCV `:8443` connect** (browser at
+     `https://<host>:8443` or native client, within the allowed CIDR) with no `./run`
+     port-forward step for DCV; the `ec2-user` SSM credential path is unchanged, labels updated
+     noVNC/RDP → DCV.
+**Plans**: 5 plans (Wave 1 additive ‖ Wave 2 destructive → Wave 3 verify)
+- [x] 14-01-PLAN.md — direct-connect SG: :8443 TCP+UDP gated on allowed_web_cidrs, drop :3389, rdp_endpoint→dcv_endpoint + RDP→DCV var/output descs (DCV-06)
+- [x] 14-02-PLAN.md — operator surface direct :8443 (run/scripts/firewalld-comment/CLAUDE.md) + secrets-bootstrap unit + secrets/defaults comment xrdp→dcvserver (CRITICAL-1) (DCV-10, DCV-07)
+- [x] 14-03-PLAN.md — DESTRUCTIVE: remove xrdp role/wiring/toggle/test-xrdp/xorg.conf + revert CIS 2.2.1 + RETARGET post-hardening guard to /usr/bin/Xdcv (DCV-07, DCV-08)
+- [x] 14-04-PLAN.md — repo-wide completeness gate (zero xrdp/VNC/noVNC residue; dcv-role path-excluded + delimiter-bound port tokens; vnc-password allowlisted) + ansible-lint/terraform validate/pre-commit (DCV-09)
+- [x] 14-05-PLAN.md — docs/ to DCV :8443 direct: rewrite DEVELOPER-LIFECYCLE.md + git mv HOWTO-ACCESS-CODE-SERVER-RDP.md→-DCV.md (BLOCKER 1) (DCV-10)
+**UI hint**: yes
 
-Plans:
-- [x] 11-01-PLAN.md — xrdp config (xrdp.ini TLS :3389 + cert), sesman.ini Xorg backend, PAM → password-auth, GNOME startwm.sh + colord polkit, systemd units enabled, role wired before hardening, RDP-13 bake assert (RDP-04/05/06/07/08/13)
-- [x] 11-02-PLAN.md — GAP CLOSURE: install xorg-x11-server-Xorg + dbus-x11; disable CIS rule 2.2.1 (documented desktop deviation); fix layer gate (layers.xrdp AND layers.desktop); FIPS-safe cert (SAN+sha256); full SELinux relabel; sesman unit boot-race fix; polkit .pkla→.rules; extend RDP-13 assert to prove /usr/libexec/Xorg + cert/key + startwm + PAM (RDP-05/07/08/13)
-
-**Notes**: RDP-07 (an operator reaches the desktop session over RDP as `ec2-user` with the
-`./run secrets-show` password) is delivered by this phase's config — it reuses the existing
-`ec2-user` PAM password the `secrets` role already sets from SSM; **no new secret**. The
-hardening-stays-last invariant is the same one enforced by the `grep-gates` hook + CI: the
-`xrdp` role MUST be inserted before `hardening`, never after.
-
-#### Phase 12: Network, Operator Surface + VNC/noVNC Removal
-**Goal**: The operator reaches the new RDP desktop through the SG `:3389` ingress and a
-`./run` SSM port-forward, and the obsolete VNC/noVNC stack — services, config, PAM file,
-install, and the username-injection workaround — is fully removed, leaving no dead VNC
-artifacts in the image. Removal happens last, only after xrdp is verified working in
-Phase 11.
-**Depends on**: Phase 11 (do not remove the working VNC path until xrdp is proven by the
-bake assertion)
-**Requirements**: RDP-09, RDP-10, RDP-11, RDP-12
+#### Phase 15: Live UAT Gate (milestone-close)
+**Goal**: DCV is proven end-to-end on a live private instance — the gate the prior DCV attempt
+and the v3.2 RDP-14 UAT never cleared. This is a documented human-run runtime UAT, not a
+bake-time deliverable; it confirms the properties only a live FIPS/SELinux-enforcing instance
+can demonstrate, including the residual licensing risk left out of scope.
+**Depends on**: Phase 14 (the SG must open `:8443` TCP+UDP and the removal/CIS-revert must be in
+the AMI under test before the live connect can validate them)
+**Requirements**: DCV-11
 **Success Criteria** (what must be TRUE):
-  1. The Terraform security group exposes `:3389` (gated on `var.allowed_web_cidrs`) and drops
-     `:6080`; the SSM-first posture (no public `:22`) is unchanged.
-  2. `./run devbox-port-forward` tunnels `:3389`, and CLAUDE.md documents connecting with a
-     native RDP client over SSM.
-  3. The VNC/noVNC stack is removed — vncserver/novnc systemd services, `SecurityTypes Plain`,
-     `/etc/pam.d/vnc`, and the noVNC install — with no dead VNC config left in the image.
-  4. The noVNC username-injection workaround (`ansible/novnc-plain-username-fix.yml`, commit
-     `29de35b`) is reverted/removed.
-**Plans**: 4 plans (2 waves)
+  1. Operator bakes → applies → connects **directly** (TCP+UDP `:8443`, within the allowed CIDR)
+     as `ec2-user` with the `./run secrets-show` password, and the GNOME virtual session renders.
+  2. The DCV license resolves — `dcv create-session` succeeds and the server log shows no
+     `ORIGIN_OBJECT_MISSING` past first connect (confirming the externally-assumed license path
+     is in fact reachable; if not, the S3 endpoint + IAM are recorded as a follow-up).
+  3. The instance is SELinux AVC-clean under enforcing (`ausearch -m AVC -ts boot` shows no
+     DCV/Xorg denials after first connect), the FIPS TLS handshake completes on `:8443`, and the
+     QUIC (UDP) data path works.
+  4. The CIS 2.2.1 revert is confirmed safe — `Xdcv` renders the GNOME virtual session without
+     the system Xorg installed — and the result is recorded before the milestone closes.
+**Plans**: TBD (human UAT gate — recorded, not coded)
+**UI hint**: yes
 
-Plans:
-**Wave 1**
-- [x] 12-01-PLAN.md — Terraform SG: add :3389 ingress (gated on allowed_web_cidrs), drop :6080; outputs + variable descriptions noVNC→RDP (RDP-09)
-- [x] 12-02-PLAN.md — Operator surface: ./run port-forward help + secrets-show RDP label, start/status scripts, CLAUDE.md §1/§2/§5/§7 native-RDP-over-SSM docs (RDP-10)
-
-**Wave 2** *(blocked on Wave 1 completion)*
-- [x] 12-03-PLAN.md — Ansible removal: excise tigervnc/noVNC from the desktop role + secrets RDP-password relabel + bootstrap restart-loop swap to xrdp (RDP-11)
-- [x] 12-04-PLAN.md — Revert noVNC username workaround + drop its import; idempotent host-firewalld :3389 allow in the xrdp role (RDP-12, RDP-09-adjacent)
-
-**Notes**: This is the irreversible-cleanup phase, so it is ordered last by design. The
-workaround revert (RDP-12) follows the project's "kludges live in their own named playbook
-imported by the main one" convention in reverse — the standalone fix playbook is removed and
-its import dropped.
-
-**Milestone-close gate — RDP-14 (human UAT):**
-RDP-14 — a documented runtime UAT confirming a real RDP client authenticates via PAM and
-renders the desktop on a **live instance** — requires a real AMI bake + AWS and so cannot be
-verified at bake time. It is tracked as a **human-UAT gate that must be recorded before the
-milestone closes**, consistent with prior milestones' deferred live-AWS UATs (v2.0's
-deferred-at-close items). The milestone is not "shipped" until RDP-14 is recorded.
+**Notes**: DCV-11 is the milestone-close gate, modelled as a human-UAT gate (like v3.2's
+RDP-14), not a bake-time deliverable — it requires a real AMI bake + live AWS. The milestone is
+not "shipped" until DCV-11 is recorded. Because the license infra is out of scope (assumed
+external), this UAT is also where the residual licensing risk is verified rather than silently
+assumed.
 
 ## Progress
 
@@ -171,9 +197,12 @@ deferred-at-close items). The milestone is not "shipped" until RDP-14 is recorde
 | 7. Docs + Cleanup | v2.0 | 1/1 | Complete | 2026-06-02 |
 | 8. Jupyter + mise AMI Layer | v3.0 | 4/4 | Complete | 2026-06-02 |
 | 9. Jupyter Operator Surface + Docs | v3.0 | 1/1 | Complete | 2026-06-02 |
-| 10. xrdp / xorgxrdp From-Source Build Role | v3.2 | 1/1 | Complete   | 2026-06-15 |
-| 11. Service Config, PAM, Session + Bake Verification | v3.2 | 3/3 | Complete   | 2026-06-16 |
-| 12. Network, Operator Surface + VNC/noVNC Removal | v3.2 | 4/4 | Complete   | 2026-06-16 |
+| 10. xrdp / xorgxrdp From-Source Build Role | v3.2 | 1/1 | Complete (superseded) | 2026-06-15 |
+| 11. Service Config, PAM, Session + Bake Verification | v3.2 | 3/3 | Complete (superseded) | 2026-06-16 |
+| 12. Network, Operator Surface + VNC/noVNC Removal | v3.2 | 4/4 | Complete (superseded) | 2026-06-16 |
+| 13. `dcv` Ansible Role | v4.0 | 2/2 | Complete   | 2026-06-19 |
+| 14. Direct-Connect SG + xrdp/VNC Removal + CIS Revert + Operator Surface | v4.0 | 5/5 | Complete   | 2026-06-19 |
+| 15. Live UAT Gate | v4.0 | 0/? | Not started | - |
 
 ## Shipped Milestones
 
@@ -182,6 +211,7 @@ deferred-at-close items). The milestone is not "shipped" until RDP-14 is recorde
 | v1.0 — Security hardening + CI baseline | 2026-05-14 | 4 | 10 | 23/23 | [v1-ROADMAP.md](milestones/v1-ROADMAP.md) · [v1-REQUIREMENTS.md](milestones/v1-REQUIREMENTS.md) |
 | v2.0 — Run Script + GitLab CI Integration | 2026-06-02 | 3 | 4 | DOC/RUN/CI/POL | [v2.0-ROADMAP.md](milestones/v2.0-ROADMAP.md) · [v2.0-REQUIREMENTS.md](milestones/v2.0-REQUIREMENTS.md) |
 | v3.0 — Jupyter + mise | 2026-06-02 | 2 | 5 | 6 delivered / 5 superseded | [v3.0-ROADMAP.md](milestones/v3.0-ROADMAP.md) · [v3.0-REQUIREMENTS.md](milestones/v3.0-REQUIREMENTS.md) |
+| v3.2 — XRDP Remote Desktop | code-complete 2026-06-16; **superseded by v4.0** (RDP-14 UAT never ran) | 3 | 8 | RDP-01…13 (RDP-14 superseded) | `.planning/phases/10–12/` + git history (`main` through `5ad3309`) |
 
 ## Pending (Deferred)
 
@@ -191,3 +221,5 @@ Carried from prior milestones; pick up in a future cycle:
 - **Lifecycle** (v3): Idle auto-stop + scheduled nightly stop
 - **Image lifecycle** (v3): Old AMI deregistration + inventory
 - **Reproducibility follow-up** (v3): Pin Packer SSM parameter `:NN` version suffix (requires AWS creds)
+- **DCV license infra in-repo** (v4.0): provision the S3 gateway VPC endpoint + scoped IAM `s3:GetObject` on `dcv-license.<region>` if the target environment stops providing it (assumed external in v4.0; verified at DCV-11)
+- **DCV v4.x** (deferred): GPU acceleration (`nice-dcv-gl`), native-client packaging/docs, file transfer, multi-monitor, custom CA TLS cert, optional SSM port-forward fallback for `:8443` TCP

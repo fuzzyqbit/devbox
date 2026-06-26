@@ -1,0 +1,24 @@
+# /etc/dcv/dcv.conf — templated by the dcv role (mode 0644).
+# Every key + default verified against the AWS DCV config-param reference
+# (docs.aws.amazon.com/dcv/latest/adminguide/config-param-ref.html).
+
+[security]
+# authentication default IS already "system" (PAM via /etc/pam.d/dcv) — set explicit so a
+# bake-assert / grep-gate can prove it is never "none" (passwordless). NEVER "none".
+authentication="system"
+# NOTE: there is NO certificate / certificate-key key in dcv.conf. DCV reads the FIPS cert
+# from the HARDCODED paths /etc/dcv/dcv.pem (cert) + /etc/dcv/dcv.key (key), owned dcv:dcv
+# mode 0600. The cert is delivered as files by tasks/main.yml, not configured here.
+# pam-service-name defaults to "dcv" → /etc/pam.d/dcv (shipped by this role).
+
+[connectivity]
+web-port={{ dcv_web_port }}
+# QUIC ON — v4.0 direct-connect posture (DCV-02). Default on Linux is already true; set
+# explicit so it cannot silently flip. quic-port defaults to {{ dcv_web_port }} (UDP);
+# UDP :{{ dcv_web_port }} SG ingress is opened in Phase 14 (Terraform), not in this role.
+enable-quic-frontend=true
+
+# [session-management]
+# Deliberately NOT setting create-session=true here. create-session creates a CONSOLE
+# session only ("Amazon DCV doesn't support automatic virtual sessions"). The VIRTUAL
+# session is created by the oneshot dcv-virtual-session.service unit instead.

@@ -10,19 +10,26 @@ noVNC HTTPS-only enforcement shipped as quick task `260609-dif` (2026-06-09) —
 
 **Deferred to a later cycle:** observability (CloudWatch metrics + login events), lifecycle automation (idle auto-stop, scheduled stop), image lifecycle (old AMI deregistration + inventory), Packer SSM `:NN` version pin (requires AWS creds).
 
-## Current Milestone: v3.2 XRDP Remote Desktop
+## Current Milestone: v4.0 Amazon DCV Remote Desktop
 
-**Goal:** Replace the VNC/noVNC desktop stack with **xrdp built from source** (airgap-safe), authenticating via **PAM**, so operators connect with a native RDP client and a full-length system password.
+**Branch:** `feat/dcv`
 
-**Context:** The VNC/noVNC path proved fundamentally mismatched with full-length password auth — VeNCrypt `Plain` needs a username the stock noVNC browser client won't supply, dropping `~/.vnc/passwd` broke the `vncserver` wrapper, and Xvnc hit PAM-service-name traps; `VncAuth` is browser-native but 8-char DES-capped. RDP is the clean fix: xrdp authenticates the system user against PAM (full length) and every RDP client prompts username+password natively. xrdp is not packaged for AL2023 (EPEL/source only) and the environment is **airgapped** — the same wall that scrapped DCV — so xrdp + xorgxrdp are built from vendored, sha256-pinned source at bake.
+**Goal:** Replace the remote-desktop stack with **Amazon DCV**. New `dcv` Ansible role installs/configures `dcvserver` on AL2023; **remove vncserver, noVNC, and xrdp/xorgxrdp entirely** — DCV is all that's needed.
+
+**Context:** DCV was scrapped once (`d3bd9a0`, "license unobtainable in airgap") and replaced by from-source xrdp (v3.2, code-complete, RDP-14 live UAT pending). DCV was then re-validated working on a live instance this session — the blocker was the regional S3 license bucket (`ORIGIN_OBJECT_MISSING`), reachable once an S3 VPC endpoint + IAM `s3:GetObject` are in place. v4.0 adopts DCV with that license path as first-class scope and retires xrdp.
 
 **Target features:**
-- New `xrdp` role: build + install xrdp and the `xorgxrdp` Xorg backend from pinned source; configure `xrdp.ini` (TLS, `:3389`), `sesman.ini` (Xorg backend), `/etc/pam.d/xrdp-sesman`; systemd units; DE session startup
-- Remove the VNC/noVNC stack (vncserver/novnc services, `SecurityTypes Plain`, `/etc/pam.d/vnc`); revert the noVNC username-injection workaround (`29de35b`)
-- Terraform SG `:3389` ingress (replacing `:6080`); `run` port-forward → `:3389`
-- Bake-time + runtime **verification gate**: build/services asserted at bake; RDP login with the `secrets-show` PAM password confirmed on a live instance
+- New `dcv` role: install + configure `dcvserver` on AL2023 (airgap download — github/vendor, **no S3-for-install**, no private mirror); GNOME desktop; a created console/virtual session (DCV does not auto-create one)
+- **Airgap license path (make-or-break):** S3 gateway VPC endpoint + IAM `s3:GetObject` on `dcv-license.<region>` so the baked AMI licenses at runtime
+- Terraform SG `:8443` TCP (+UDP if QUIC kept) gated on `var.allowed_web_cidrs`; **drop xrdp `:3389`**; SSM-first / no-public-`:22` unchanged; `hardening`-stays-last preserved
+- Operator surface: `./run` port-forward `:8443` + secrets + docs (client over SSM)
+- **Full removal** of xrdp/xorgxrdp + any VNC/noVNC remnants — no dead remote-desktop config in the image
 
-**Decision:** Build-from-source chosen (vs vendored RPMs / EPEL) because the airgap blocks package installs and from-source is the most self-contained path. `xorgxrdp` backend chosen (vs xrdp-over-Xvnc) to drop the VNC stack entirely. Credential reuses the `ec2-user` PAM password the `secrets` bootstrap already sets from SSM.
+**Decision:** DCV chosen over the from-source xrdp stack (re-validated working live). Airgap install stays download-based (consistent with the from-source/get_url approach); the licensing dependency on S3 is solved via a VPC gateway endpoint + scoped IAM rather than abandoned. Reverses v3.2.
+
+## Superseded: v3.2 XRDP Remote Desktop
+
+Shipped code-complete (2026-06-16; phases 10–12, adversarially verified; RDP-14 live UAT was the only open gate). Superseded by v4.0 (Amazon DCV) before RDP-14 ran — DCV was re-validated as the preferred path. The xrdp/xorgxrdp role and its SG/operator-surface wiring are removed in v4.0. v3.2 planning records retained under `.planning/phases/10–12/` and the git history (`main` through `5ad3309`).
 
 ## Abandoned: v3.1 noVNC HTTPS-Only (nginx milestone)
 

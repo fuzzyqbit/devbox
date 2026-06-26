@@ -1,0 +1,28 @@
+---
+# Amazon DCV version pins (REP posture — update after bake verification).
+# Matches the deferred-pin pattern in CLAUDE.md §9 (Packer SSM :NN follow-up).
+dcv_version: "2025.0"
+
+# Per-component build numbers differ — do NOT reuse one for the other.
+# nice-dcv-server / nice-dcv-web-viewer share build 20103; nice-xdcv is build 688.
+# Only dcv_build_server drives the tarball URL; the RPM install globs by name so the
+# xdcv build skew is handled automatically. dcv_build_xdcv is documentation-only.
+dcv_build_server: "20103"   # nice-dcv-server / nice-dcv-web-viewer build (tarball URL)
+dcv_build_xdcv: "688"       # nice-xdcv build — DIFFERENT number; glob installs it
+
+# Web port DCV listens on (direct-connect :8443, TCP web + UDP QUIC share this port).
+dcv_web_port: 8443
+
+# SHA-256 checksum of the DCV tarball. Leave empty until pinned after first bake.
+# When non-empty, get_url verifies the download against this value. Until filled, the
+# NICE-GPG-KEY RPM signature is the integrity gate (disable_gpg_check stays false).
+# To pin: run `sha256sum nice-dcv-<version>-<build>-amzn2023-x86_64.tgz` after first bake.
+dcv_tarball_sha256: ""
+
+# Runtime dependencies pulled from the AL2023 core dnf repo (NOT DCV deps; airgap-safe).
+# policycoreutils-python-utils provides `semanage` for any SELinux fcontext work.
+dcv_runtime_deps:
+  - policycoreutils-python-utils
+
+dev_user: ec2-user
+dev_home: /home/ec2-user

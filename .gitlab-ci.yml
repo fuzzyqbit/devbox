@@ -440,6 +440,8 @@ deploy:tofu-apply:
   script:
     - ./run tf-init
     - ./run tf-auto-apply
+    # Give the freshly-created EC2 time to build before the job ends.
+    - sleep 120
   rules:
     - if: $CI_PIPELINE_SOURCE == "web" && $PIPELINE_KIND == "deploy" && $CI_COMMIT_REF_PROTECTED == "true"
       when: manual
