@@ -60,6 +60,11 @@ if [ "$existing_label" != "$LABEL" ]; then
   seed=$(mktemp -d)
   mount "$dev" "$seed"
   cp -a "$HOME_DIR"/. "$seed"/    # baked home incl. dotfiles -> new volume
+  # mkfs makes the volume root root:root, and cp -a preserves any root-owned baked dotfiles
+  # (e.g. a .local created by a root bake task). The home + everything in it must belong to the
+  # dev user, or login/GNOME/code-server hit permission errors. Normalize ownership + home mode.
+  chown -R ec2-user:ec2-user "$seed"
+  chmod 0700 "$seed"
   umount "$seed"
   rmdir "$seed"
 fi
