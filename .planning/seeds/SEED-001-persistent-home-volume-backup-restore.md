@@ -21,7 +21,11 @@ everything not baked into the image (home, projects, dotfiles, code-server/VS Co
 **Separate persistent EBS volume holding `/home/ec2-user` + DLM snapshots. Snapshots are the
 DR/rollback layer, NOT the everyday mechanism.** Decisions locked:
 - **Persist scope:** the whole **`/home/ec2-user`** lives on the volume.
-- **Backup tool:** **DLM** (`aws_dlm_lifecycle_policy`), tag-targeted daily snapshots + retention.
+- **Backup tool:** **NONE** (revised 2026-06-26). DLM is blocked by org policy, and the stated
+  requirement — "/home survives an AMI update" — needs no snapshots at all (the volume re-attaches).
+  A daily-snapshot schedule across every dev's volume is also unwanted spend. The DLM resources
+  were removed. The volume keeps a `Backup=devbox-home` tag as a selector IF a minimal AWS Backup
+  plan (available, unlike DLM) is added later — weekly/retain-1, not daily/7.
 - **Destroy policy:** `lifecycle { prevent_destroy = true }` — volume + snapshots survive `tofu destroy`; removal is deliberate.
 - **Why this over the alternatives** (see below): zero-touch on every update, no data-loss window, keeps the immutable-AMI model.
 
@@ -69,25 +73,13 @@ oneshot `devbox-home-mount.service`: `After=cloud-init.service`,
 `Before=code-server.service dcvserver.service dcv-virtual-session.service devbox-secrets-bootstrap.service`,
 `Type=oneshot RemainAfterExit=true`, `WantedBy=multi-user.target`. Everything reading `/home` gets `After=` it.
 
-### Layer 2 — DLM snapshots (DR / rollback only)
-```hcl
-resource "aws_dlm_lifecycle_policy" "home" {
-  description        = "devbox /home daily snapshots"
-  execution_role_arn = aws_iam_role.dlm.arn
-  state              = "ENABLED"
-  policy_details {
-    resource_types = ["VOLUME"]
-    target_tags    = { Backup = "devbox-home" }
-    schedule {
-      name        = "daily"
-      create_rule { interval = 24, interval_unit = "HOURS", times = ["03:00"] }
-      retain_rule { count = 7 }
-    }
-  }
-}
-```
-\+ IAM role for `dlm.amazonaws.com` (managed `AWSDataLifecycleManagerServiceRole`).
-**Restore (DR only):** `aws_ebs_volume.home { snapshot_id = <latest> }` (or CLI create-volume → attach). Optional `./run restore` helper later.
+### Layer 2 — backups (REMOVED 2026-06-26)
+Originally a DLM daily-snapshot policy. Removed: DLM is blocked by org policy AND the stated
+requirement (survive an AMI update) needs no snapshots — the volume re-attaches. Cost across N
+devs also argued against a daily schedule. The `Backup=devbox-home` tag stays on the volume as
+the selector if a **minimal AWS Backup** plan (available here) is ever wanted — weekly/retain-1.
+**DR if a volume is genuinely lost** (no automated backups): rebuild `/home` from scratch, or
+restore from an AWS Backup recovery point if that plan is later added.
 
 ## Make-or-break details (the actual work)
 1. **AZ match** — volume AZ = instance subnet AZ (`data.aws_subnet`).
