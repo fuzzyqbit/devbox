@@ -200,7 +200,7 @@ resource "aws_ebs_volume" "home" {
 
   tags = merge(local.common_tags, {
     Name   = "${local.name_prefix}-home"
-    Backup = "devbox-home" # targeted by the DLM snapshot policy below
+    Backup = "devbox-home" # reserved as the selector if an AWS Backup plan is added later; no scheduled backups today
   })
 
   # prevent_destroy keeps the volume (and its data) across `tofu destroy`. NOTE: this aborts
@@ -226,63 +226,11 @@ resource "aws_volume_attachment" "home" {
   stop_instance_before_detaching = true
 }
 
-# --- DLM: daily snapshots of the /home volume (backup / DR layer) ---------------
-# Scheduled EBS snapshots of the persistent volume, retained N days. This is the
-# disaster-recovery / rollback layer ONLY — the everyday "data survives an update"
-# guarantee comes from the volume re-attaching, not from restoring a snapshot.
-
-resource "aws_iam_role" "dlm" {
-  name_prefix = "${local.name_prefix}-dlm-"
-  description = "Data Lifecycle Manager role for ${var.devbox_user}'s devbox /home snapshots"
-
-  assume_role_policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [{
-      Effect    = "Allow"
-      Principal = { Service = "dlm.amazonaws.com" }
-      Action    = "sts:AssumeRole"
-    }]
-  })
-
-  tags = local.common_tags
-}
-
-resource "aws_iam_role_policy_attachment" "dlm" {
-  role       = aws_iam_role.dlm.name
-  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSDataLifecycleManagerServiceRole"
-}
-
-resource "aws_dlm_lifecycle_policy" "home" {
-  description        = "${local.name_prefix} /home daily snapshots"
-  execution_role_arn = aws_iam_role.dlm.arn
-  state              = "ENABLED"
-
-  policy_details {
-    resource_types = ["VOLUME"]
-    target_tags = {
-      Backup = "devbox-home"
-    }
-
-    schedule {
-      name = "daily"
-
-      create_rule {
-        interval      = 24
-        interval_unit = "HOURS"
-        times         = ["03:00"]
-      }
-
-      retain_rule {
-        count = var.home_snapshot_retain_count
-      }
-
-      tags_to_add = {
-        SnapshotType = "devbox-home-daily"
-      }
-
-      copy_tags = true
-    }
-  }
-
-  tags = local.common_tags
-}
+# --- Backups: intentionally none -----------------------------------------------
+# No scheduled snapshots. The requirement is "/home survives an AMI update", which the
+# persistent prevent_destroy volume above delivers on its own — it re-attaches to the
+# replacement instance, so no restore is involved. EBS is AZ-replicated for durability.
+# DLM is blocked by org policy here, and a daily-snapshot schedule across every dev's volume
+# is unwanted spend. If point-in-time DR is ever needed, add a minimal AWS Backup plan
+# selecting tag Backup=devbox-home (kept on the volume above) with tight retention
+# (e.g. weekly, retain 1) — cost scales with churn x retention x number of volumes.

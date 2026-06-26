@@ -40,13 +40,7 @@ variable "root_volume_size" {
 variable "home_volume_size" {
   type        = number
   default     = 50
-  description = "Persistent /home/ec2-user EBS volume size in GB. This volume is separate from the (disposable) root volume and survives AMI swaps + tofu destroy (prevent_destroy), so user data is not lost when the instance is replaced with a new image. Snapshotted by the DLM policy."
-}
-
-variable "home_snapshot_retain_count" {
-  type        = number
-  default     = 7
-  description = "Number of daily DLM snapshots of the /home volume to retain."
+  description = "Persistent /home/ec2-user EBS volume size in GB. This volume is separate from the (disposable) root volume and survives AMI swaps + tofu destroy (prevent_destroy), so user data is not lost when the instance is replaced with a new image. No scheduled backups — see the 'Backups: intentionally none' note in main.tf."
 }
 
 variable "instance_name" {
