@@ -11,8 +11,12 @@ Before=devbox-secrets-bootstrap.service code-server.service dcvserver.service dc
 [Service]
 Type=oneshot
 RemainAfterExit=true
-# Must exceed the script's WAIT_SECS (300) device-attach poll, or systemd kills it early.
-TimeoutStartSec=360
+# Must exceed WAIT_SECS (300, device-attach poll) PLUS the one-time fresh-volume seed:
+# mkfs + cp -a of the baked /home (includes code-server extensions — can be hundreds of MB
+# to GBs) + SELinux relabel. 360 was too tight and killed the unit mid-seed (-> failed ->
+# consumers that Requires= it never start). The no-device case is bounded by the script's own
+# 300s poll (exits 1), so a large start-timeout here is safe.
+TimeoutStartSec=1800
 ExecStart=/usr/local/sbin/devbox-home-mount.sh
 
 [Install]
