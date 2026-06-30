@@ -1,0 +1,15 @@
+[Unit]
+Description=Mount the persistent /data EBS volume (holds /home backups for {{ dev_user }})
+After=local-fs.target
+# No Before=/Requires= on code-server/dcv: /data is NON-CRITICAL to boot. /home lives on the
+# root and works without /data; only `./run save-home`/`restore-home` use /data.
+
+[Service]
+Type=oneshot
+RemainAfterExit=true
+# Covers the device-attach poll (120s) + a one-time mkfs on a fresh volume. No home seed here.
+TimeoutStartSec=300
+ExecStart=/usr/local/sbin/devbox-data-mount.sh
+
+[Install]
+WantedBy=multi-user.target

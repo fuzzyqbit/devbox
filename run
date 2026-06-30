@@ -360,6 +360,18 @@ cmd_status() {
     "$REPO_ROOT/scripts/devbox-status.sh" "$@"
 }
 
+cmd_save_home() {
+  cmd_tf_ensure_init
+  DEVBOX_USER="$DEVBOX_USER" INSTANCE_ID="$INSTANCE_ID" REGION="$REGION" \
+    "$REPO_ROOT/scripts/devbox-save-home.sh" "$@"
+}
+
+cmd_restore_home() {
+  cmd_tf_ensure_init
+  DEVBOX_USER="$DEVBOX_USER" INSTANCE_ID="$INSTANCE_ID" REGION="$REGION" \
+    "$REPO_ROOT/scripts/devbox-restore-home.sh" "$@"
+}
+
 # --------------------------------------------------------------------------
 # Group D — SSM access
 # --------------------------------------------------------------------------
@@ -509,6 +521,8 @@ ${BOLD}Instance lifecycle${RESET} (override resolution: INSTANCE_ID=i-... REGION
   start        Start the devbox EC2 instance
   stop         Stop the devbox EC2 instance
   status       Show instance status and connection info
+  save-home    Save /home/ec2-user -> /data (persistent volume) over SSM. Run BEFORE an AMI refresh.
+  restore-home Restore /data -> /home/ec2-user over SSM. Run AFTER the new instance is up.
 
 ${BOLD}SSM access${RESET} (Phase 2 -- replaces public :22 ingress)
   devbox-ssm           Open an SSM Session Manager shell to the devbox
@@ -554,6 +568,8 @@ main() {
     start)               cmd_start "$@" ;;
     stop)                cmd_stop "$@" ;;
     status)              cmd_status "$@" ;;
+    save-home)           cmd_save_home "$@" ;;
+    restore-home)        cmd_restore_home "$@" ;;
     devbox-ssm)          cmd_devbox_ssm "$@" ;;
     devbox-port-forward) cmd_devbox_port_forward "$@" ;;
     jupyter)             cmd_jupyter "$@" ;;

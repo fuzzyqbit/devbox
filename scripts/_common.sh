@@ -77,3 +77,42 @@ init_devbox() {
   echo "Region:   $REGION"
   echo ""
 }
+
+# Run a one-shot shell command on the devbox over SSM (AWS-RunShellScript), wait for it to
+# finish, print its stdout/stderr, and return its exit status. Uses INSTANCE_ID + REGION.
+# Needs ssm:SendCommand + ssm:GetCommandInvocation on the operator's creds (no
+# session-manager-plugin required — this is a pure API call, unlike `devbox-ssm`).
+# Args: $1 = command string to run as root on the instance.
+ssm_run_shell() {
+  local cmd="$1" cmd_id status out err
+  cmd_id="$(aws ssm send-command \
+    --instance-ids "$INSTANCE_ID" \
+    --region "$REGION" \
+    --document-name "AWS-RunShellScript" \
+    --comment "devbox $(basename "$0")" \
+    --parameters "commands=[$(printf '%s' "$cmd" | jq -Rs '.')]" \
+    --query 'Command.CommandId' --output text)" || {
+    echo "ERROR: ssm send-command failed (check ssm:SendCommand perms + SSM agent Online)" >&2
+    return 1
+  }
+  echo "SSM command $cmd_id dispatched; waiting for completion..." >&2
+  while true; do
+    status="$(aws ssm get-command-invocation \
+      --command-id "$cmd_id" --instance-id "$INSTANCE_ID" --region "$REGION" \
+      --query 'Status' --output text 2>/dev/null || echo Pending)"
+    case "$status" in
+      Success | Failed | Cancelled | TimedOut) break ;;
+      *) sleep 3 ;;
+    esac
+  done
+  out="$(aws ssm get-command-invocation --command-id "$cmd_id" \
+    --instance-id "$INSTANCE_ID" --region "$REGION" \
+    --query 'StandardOutputContent' --output text)"
+  err="$(aws ssm get-command-invocation --command-id "$cmd_id" \
+    --instance-id "$INSTANCE_ID" --region "$REGION" \
+    --query 'StandardErrorContent' --output text)"
+  [[ -n "$out" ]] && printf '%s\n' "$out"
+  [[ -n "$err" ]] && printf '%s\n' "$err" >&2
+  echo "SSM command $status" >&2
+  [[ "$status" == "Success" ]]
+}

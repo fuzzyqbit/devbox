@@ -1,60 +1,53 @@
 ---
-# persistent-home role — installs the boot-time mount of the separate /home EBS volume.
-# The mount itself happens at RUNTIME (a boot oneshot), not at bake — this role only drops
-# the script + unit and enables it. The volume is provisioned by Terraform
-# (aws_ebs_volume.home, attached at /dev/sdf); see SEED-001 for the full design.
-#
-# Wired into playbook.yml BEFORE hardening (hardening-stays-last invariant). Runtime mount
-# ordering (mount before code-server/dcv) is handled by the unit's Before= directive.
+# persistent-home role — provisions the persistent /data backup volume + the MANUAL home
+# save/restore scripts. /home persistence is via `./run save-home`/`restore-home` (manual rsync
+# to/from the persistent /data volume), NOT a live mount over /home. This deliberately replaces
+# the old mount-over-/home + first-boot seed design (which caused shadowing/seed/ownership traps).
+# Wired into playbook.yml BEFORE hardening (hardening-stays-last invariant).
 
-- name: Install the persistent /home mount script
-  ansible.builtin.copy:
-    src: devbox-home-mount.sh
-    dest: /usr/local/sbin/devbox-home-mount.sh
-    owner: root
-    group: root
-    mode: "0755"
+- name: Install rsync (used by the home save/restore scripts)
+  ansible.builtin.dnf:
+    name: rsync
+    state: present
 
-- name: Install the persistent /home mount systemd unit
-  ansible.builtin.template:
-    src: devbox-home-mount.service.j2
-    dest: /etc/systemd/system/devbox-home-mount.service
-    owner: root
-    group: root
-    mode: "0644"
-  notify: reload systemd
-
-- name: Enable the persistent /home mount unit (runs at instance boot, not at bake)
-  ansible.builtin.systemd:
-    name: devbox-home-mount
-    enabled: true
-    daemon_reload: true
-
-# Fail-closed coupling: make the /home-consuming services Require + start after the mount, so
-# they never serve on the disposable root volume. Done as drop-ins (not edits to the consumers'
-# base units) so the coupling exists only when this layer is built. A drop-in for a unit that
-# is not installed (its layer is off) is harmless — systemd ignores it.
-- name: Ensure systemd drop-in dirs for the /home-consuming services
+- name: Create the /data mountpoint
   ansible.builtin.file:
-    path: "/etc/systemd/system/{{ item }}.service.d"
+    path: /data
     state: directory
     owner: root
     group: root
     mode: "0755"
-  loop:
-    - code-server
-    - dcvserver
-    - dcv-virtual-session
 
-- name: Make the /home-consuming services require the persistent-home mount (fail-closed)
+- name: Install the /data mount script
   ansible.builtin.copy:
-    src: require-home.conf
-    dest: "/etc/systemd/system/{{ item }}.service.d/10-require-home.conf"
+    src: devbox-data-mount.sh
+    dest: /usr/local/sbin/devbox-data-mount.sh
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Install the home save + restore scripts (run on the instance via ./run save-home/restore-home)
+  ansible.builtin.copy:
+    src: "{{ item }}"
+    dest: "/usr/local/sbin/{{ item }}"
+    owner: root
+    group: root
+    mode: "0755"
+  loop:
+    - devbox-home-save.sh
+    - devbox-home-restore.sh
+
+- name: Install the /data mount systemd unit
+  ansible.builtin.template:
+    src: devbox-data-mount.service.j2
+    dest: /etc/systemd/system/devbox-data-mount.service
     owner: root
     group: root
     mode: "0644"
-  loop:
-    - code-server
-    - dcvserver
-    - dcv-virtual-session
   notify: reload systemd
+
+- name: Enable the /data mount unit (runs at instance boot, not at bake)
+  ansible.builtin.systemd:
+    name: devbox-data-mount
+    enabled: true
+    daemon_reload: true
