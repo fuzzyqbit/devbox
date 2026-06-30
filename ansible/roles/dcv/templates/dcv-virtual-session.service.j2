@@ -2,8 +2,6 @@
 Description=Amazon DCV virtual session for {{ dev_user }}
 After=dcvserver.service
 Requires=dcvserver.service
-# When the persistent-home layer is enabled, that role drops in a 10-require-home.conf that
-# adds Requires=/After=devbox-home-mount.service (fail-closed on the persistent /home mount).
 
 [Service]
 Type=oneshot
