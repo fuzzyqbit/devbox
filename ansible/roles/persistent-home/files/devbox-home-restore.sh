@@ -8,8 +8,12 @@ set -euo pipefail
 SRC="/data/home"
 DST="/home/ec2-user"
 
-if ! mountpoint -q /data; then
+data_dev="$(findmnt -no SOURCE /data 2>/dev/null)" || {
   echo "ERROR: /data is not mounted (persistent volume absent) — cannot restore" >&2
+  exit 1
+}
+if [ "$(blkid -o value -s LABEL "$data_dev" 2>/dev/null)" != "DEVDATA" ]; then
+  echo "ERROR: /data is not the DEVDATA persistent volume (device: $data_dev) — refusing to restore" >&2
   exit 1
 fi
 if [ ! -d "$SRC" ]; then
@@ -17,6 +21,12 @@ if [ ! -d "$SRC" ]; then
   exit 1
 fi
 
-rsync -aHAX "$SRC"/ "$DST"/
-chown -R ec2-user:ec2-user "$DST"
+# Quiesce the home consumers so rsync doesn't overwrite open files; restart after. --chown
+# sets ownership on transferred files (no blanket chown -R that could clobber unrelated paths).
+services="code-server.service dcvserver.service dcv-virtual-session.service"
+# shellcheck disable=SC2086
+systemctl stop $services 2>/dev/null || true
+rsync -aHAX --chown=ec2-user:ec2-user "$SRC"/ "$DST"/
+# shellcheck disable=SC2086
+systemctl start $services 2>/dev/null || true
 echo "restored $SRC -> $DST"

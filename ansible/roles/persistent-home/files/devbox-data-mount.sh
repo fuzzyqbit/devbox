@@ -8,7 +8,9 @@
 # deliberate replacement for the old mount-over-/home + seed design (shadowing/seed/fail-closed).
 set -euo pipefail
 
-LABEL="DEVHOME"        # kept for continuity with already-provisioned volumes (label is just an id)
+LABEL="DEVDATA"        # a pre-existing DEVHOME volume (old mount-over-/home layout) hits the
+                       # foreign-fs guard below and fails LOUD rather than silently mounting a
+                       # mismatched layout at /data — wipefs it to re-init (test volumes only).
 ATTACH_DEV="/dev/sdf"  # contract: Terraform aws_volume_attachment.device_name
 MOUNT_DIR="/data"
 WAIT_SECS=120

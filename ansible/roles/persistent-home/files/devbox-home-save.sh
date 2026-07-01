@@ -7,8 +7,12 @@ set -euo pipefail
 SRC="/home/ec2-user"
 DST="/data/home"
 
-if ! mountpoint -q /data; then
+data_dev="$(findmnt -no SOURCE /data 2>/dev/null)" || {
   echo "ERROR: /data is not mounted (persistent volume absent) — cannot save" >&2
+  exit 1
+}
+if [ "$(blkid -o value -s LABEL "$data_dev" 2>/dev/null)" != "DEVDATA" ]; then
+  echo "ERROR: /data is not the DEVDATA persistent volume (device: $data_dev) — refusing to --delete" >&2
   exit 1
 fi
 

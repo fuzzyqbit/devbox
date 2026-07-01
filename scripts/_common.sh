@@ -90,19 +90,27 @@ ssm_run_shell() {
     --region "$REGION" \
     --document-name "AWS-RunShellScript" \
     --comment "devbox $(basename "$0")" \
-    --parameters "commands=[$(printf '%s' "$cmd" | jq -Rs '.')]" \
+    --parameters "$(jq -n --arg c "$cmd" '{commands: [$c]}')" \
     --query 'Command.CommandId' --output text)" || {
     echo "ERROR: ssm send-command failed (check ssm:SendCommand perms + SSM agent Online)" >&2
     return 1
   }
   echo "SSM command $cmd_id dispatched; waiting for completion..." >&2
+  local waited=0
   while true; do
     status="$(aws ssm get-command-invocation \
       --command-id "$cmd_id" --instance-id "$INSTANCE_ID" --region "$REGION" \
       --query 'Status' --output text 2>/dev/null || echo Pending)"
     case "$status" in
       Success | Failed | Cancelled | TimedOut) break ;;
-      *) sleep 3 ;;
+      *)
+        sleep 3
+        waited=$((waited + 3))
+        if [[ "$waited" -ge 300 ]]; then
+          echo "ERROR: SSM command never reached a terminal state within 300s — is the instance running and the SSM agent Online? Check: aws ssm describe-instance-information" >&2
+          return 1
+        fi
+        ;;
     esac
   done
   out="$(aws ssm get-command-invocation --command-id "$cmd_id" \
