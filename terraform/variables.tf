@@ -69,7 +69,7 @@ variable "extra_tags" {
 variable "allowed_web_cidrs" {
   type        = list(string)
   default     = ["10.0.0.0/8"]
-  description = "CIDR blocks permitted to reach code-server (:8080) and DCV (:8443 TCP+UDP). Default 10.0.0.0/8 covers the RFC1918 private range — appropriate when the devbox lives inside a private VPC and is reached over VPC peering / Direct Connect / VPN. Operator-managed externally: narrow via a per-operator tfvars file, a `-var` flag, or `TF_VAR_allowed_web_cidrs`. Empty list refuses apply unless var.allow_open_ingress = true. SSH (:22) ingress is intentionally absent — shell access is brokered by AWS SSM Session Manager."
+  description = "CIDR blocks permitted to reach code-server (:8080), DCV (:8443 TCP+UDP), and xrdp (:3389 TCP). Default 10.0.0.0/8 covers the RFC1918 private range — appropriate when the devbox lives inside a private VPC and is reached over VPC peering / Direct Connect / VPN. Operator-managed externally: narrow via a per-operator tfvars file, a `-var` flag, or `TF_VAR_allowed_web_cidrs`. Empty list refuses apply unless var.allow_open_ingress = true. SSH (:22) ingress is intentionally absent — shell access is brokered by AWS SSM Session Manager."
 
   validation {
     condition     = length(var.allowed_web_cidrs) > 0 || var.allow_open_ingress
