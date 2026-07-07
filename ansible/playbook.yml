@@ -68,6 +68,13 @@
       # Gated on desktop too: DCV needs GNOME (desktop role) + the ec2-user PAM password
       # (secrets role, gated on vscode OR desktop), so both must exist before dcv configures auth.
 
+    - role: xrdp
+      when: (layers.xrdp | default(false)) and (layers.desktop | default(false))
+      # xrdp (RDP :3389) from SPAL — a second, WebGL-free remote-desktop path, ADDITIVE to dcv
+      # (quick-task 260707-o7s). MUST stay before hardening (hardening-last invariant). Gated on
+      # desktop too: xrdp needs GNOME (desktop role) + the ec2-user PAM password (secrets role,
+      # gated on vscode OR desktop), so both must exist before xrdp configures PAM auth.
+
     - role: hardening  # MUST remain last — invariant (JUP-08 / CLAUDE.md §8)
       when: layers.hardening | default(false)
 

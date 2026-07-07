@@ -27,4 +27,7 @@ layers:
   vscode_desktop: true
   # dcv gates the Phase 13 install/config/service block; co-deploys with the GNOME desktop.
   dcv: true
+  # xrdp gates the SPAL xrdp install/config/service block (RDP :3389); co-deploys with the
+  # GNOME desktop; ADDITIVE to dcv (a second, WebGL-free remote-desktop path).
+  xrdp: true
   hardening: true
