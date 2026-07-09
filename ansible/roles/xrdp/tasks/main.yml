@@ -180,7 +180,8 @@
     - { option: "lib", value: "libxup.so" }
     - { option: "username", value: "ask" }
     - { option: "password", value: "ask" }
-    - { option: "ip", value: "127.0.0.1" }
+    # No `ip=` — the Xorg backend reaches sesman over a local socket keyed by the
+    # display (port=-1 + code=20); `ip` is vestigial (only TCP backends like Xvnc used it).
     - { option: "port", value: "-1" }
     - { option: "code", value: "20" }
 
