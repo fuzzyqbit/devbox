@@ -149,6 +149,36 @@
     - { option: "certificate", value: "/etc/xrdp/cert.pem" }
     - { option: "key_file", value: "/etc/xrdp/key.pem" }
 
+# --- Session backend (XRDP render) — force the Xorg (xorgxrdp) backend, drop Xvnc ---
+# The SPAL xrdp.ini ships both an [Xorg] (xorgxrdp, code=20) and an [Xvnc] session section.
+# We install xorgxrdp but NOT a Xvnc/tigervnc server, so any connection that lands on Xvnc
+# dies. Pin the [Xorg] backend explicitly and remove [Xvnc] so RDP always uses Xorg.
+- name: Pin the [Xorg] (xorgxrdp) session backend in xrdp.ini (XRDP render)
+  community.general.ini_file:
+    path: /etc/xrdp/xrdp.ini
+    section: Xorg
+    option: "{{ item.option }}"
+    value: "{{ item.value }}"
+    owner: root
+    group: root
+    mode: "0644"
+    create: false
+    no_extra_spaces: true
+  loop:
+    - { option: "name", value: "Xorg" }
+    - { option: "lib", value: "libxup.so" }
+    - { option: "username", value: "ask" }
+    - { option: "password", value: "ask" }
+    - { option: "ip", value: "127.0.0.1" }
+    - { option: "port", value: "-1" }
+    - { option: "code", value: "20" }
+
+- name: Remove the [Xvnc] session backend from xrdp.ini (no Xvnc/tigervnc server installed)
+  community.general.ini_file:
+    path: /etc/xrdp/xrdp.ini
+    section: Xvnc
+    state: absent
+
 # --- Service enable (XRDP-01) — enable both, no start needed at bake ---
 
 - name: Enable xrdp + xrdp-sesman at boot (XRDP-01)
