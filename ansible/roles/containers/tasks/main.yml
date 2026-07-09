@@ -16,6 +16,31 @@
     enabled: true
     state: started
 
+# --- docker compose v2 CLI plugin (invoked as `docker compose`) ---
+# AL2023's Amazon repos don't ship docker-compose-plugin, so install the pinned
+# upstream binary into docker's system cli-plugins dir (same GitHub-release +
+# version-pin pattern as fixuid, plus a sha256 checksum per the SHA-pin invariant).
+- name: Ensure docker cli-plugins directory exists
+  file:
+    path: /usr/libexec/docker/cli-plugins
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Install docker compose {{ docker_compose_version }} CLI plugin (sha256-pinned)
+  get_url:
+    url: "https://github.com/docker/compose/releases/download/v{{ docker_compose_version }}/docker-compose-linux-x86_64"
+    dest: /usr/libexec/docker/cli-plugins/docker-compose
+    checksum: "sha256:{{ docker_compose_sha256 }}"
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Verify the docker compose plugin resolves at bake (smoke test)
+  command: docker compose version
+  changed_when: false
+
 # --- fixuid (UID/GID remapper for container images) ---
 - name: Download fixuid {{ fixuid_version }}
   get_url:

@@ -4,5 +4,10 @@ container_packages:
 
 fixuid_version: "0.6.0"
 
+# docker compose v2 CLI plugin (invoked as `docker compose`). AL2023's Amazon repos
+# don't ship docker-compose-plugin, so it's installed as a pinned upstream binary.
+docker_compose_version: "5.3.1"
+docker_compose_sha256: "f9ebc6ebdb19d769b793c245a736caaeb198c62587f13b25c660c13b4987f959"
+
 dev_user: ec2-user
 dev_home: /home/ec2-user
