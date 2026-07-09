@@ -56,6 +56,17 @@
     state: present
     disable_gpg_check: false
 
+# --- System Xorg server (xorgxrdp backend dependency, AL2023 core repo) ---
+# xorgxrdp's Xorg backend runs the SYSTEM Xorg (/usr/bin/Xorg from xorg-x11-server-Xorg). Install
+# it explicitly so the dependency is first-class, not merely transitive via xorgxrdp. The
+# re-enabled CIS 2.2.1 (which removes xorg-x11-server-common) is scoped OFF for xrdp builds in
+# ansible/roles/hardening/defaults/main.yml so hardening does not strip it back out.
+- name: Install the system Xorg server for the xorgxrdp backend (XRDP-01)
+  ansible.builtin.dnf:
+    name: xorg-x11-server-Xorg
+    state: present
+    disable_gpg_check: false
+
 # --- Install xrdp + xorgxrdp from SPAL (XRDP-01) ---
 # SPAL is an EPEL9 rebuild; xrdp/xorgxrdp are EPEL9 packages, expected present. The SPAL GPG
 # key was imported by spal-release, so disable_gpg_check stays false. Version pin applied when
