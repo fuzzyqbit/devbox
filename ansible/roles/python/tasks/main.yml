@@ -1,11 +1,11 @@
 ---
 - name: Install Python packages
-  dnf:
+  ansible.builtin.dnf:
     name: "{{ python_packages }}"
     state: present
 
 - name: Install pipx
-  pip:
+  ansible.builtin.pip:
     name: pipx
     executable: pip3
     state: present
@@ -13,32 +13,32 @@
 - name: Ensure pipx path
   become: true
   become_user: "{{ dev_user }}"
-  command: python3 -m pipx ensurepath
+  ansible.builtin.command: python3 -m pipx ensurepath
   changed_when: false
 
 - name: Install Python CLI tools via pipx
   become: true
   become_user: "{{ dev_user }}"
-  command: "python3 -m pipx install {{ item }}"
+  ansible.builtin.command: "python3 -m pipx install {{ item }}"
   args:
     creates: "{{ dev_home }}/.local/bin/{{ item }}"
   loop: "{{ pipx_tools }}"
 
 # --- uv + uvx (standalone binary, faster than pipx-based install) ---
 - name: Download uv {{ uv_version }}
-  get_url:
+  ansible.builtin.get_url:
     url: "https://github.com/astral-sh/uv/releases/download/{{ uv_version }}/uv-x86_64-unknown-linux-musl.tar.gz"
     dest: /tmp/uv.tar.gz
     mode: "0644"
 
 - name: Create uv extract directory
-  file:
+  ansible.builtin.file:
     path: /tmp/uv-extract
     state: directory
     mode: "0755"
 
 - name: Extract uv archive
-  unarchive:
+  ansible.builtin.unarchive:
     src: /tmp/uv.tar.gz
     dest: /tmp/uv-extract
     remote_src: true
@@ -46,21 +46,21 @@
       - --strip-components=1
 
 - name: Install uv binary
-  copy:
+  ansible.builtin.copy:
     src: /tmp/uv-extract/uv
     dest: /usr/local/bin/uv
     remote_src: true
     mode: "0755"
 
 - name: Install uvx binary
-  copy:
+  ansible.builtin.copy:
     src: /tmp/uv-extract/uvx
     dest: /usr/local/bin/uvx
     remote_src: true
     mode: "0755"
 
 - name: Clean up uv archive
-  file:
+  ansible.builtin.file:
     path: "{{ item }}"
     state: absent
   loop:
@@ -77,14 +77,14 @@
 - name: Install virtualenvwrapper for dev user
   become: true
   become_user: "{{ dev_user }}"
-  pip:
+  ansible.builtin.pip:
     name: virtualenvwrapper
     executable: pip3
     extra_args: --user
     state: present
 
 - name: Configure virtualenvwrapper in bashrc
-  blockinfile:
+  ansible.builtin.blockinfile:
     path: "{{ dev_home }}/.bashrc"
     block: |
       export WORKON_HOME=$HOME/.virtualenvs

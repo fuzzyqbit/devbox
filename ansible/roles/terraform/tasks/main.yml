@@ -1,41 +1,43 @@
 ---
 - name: Add HashiCorp yum repository
-  get_url:
+  ansible.builtin.get_url:
     url: https://rpm.releases.hashicorp.com/AmazonLinux/hashicorp.repo
     dest: /etc/yum.repos.d/hashicorp.repo
     mode: "0644"
 
 - name: Install Terraform
-  dnf:
+  ansible.builtin.dnf:
     name: terraform
     state: present
 
 - name: Download tflint
-  get_url:
+  ansible.builtin.get_url:
     url: "https://github.com/terraform-linters/tflint/releases/download/v{{ tflint_version }}/tflint_linux_amd64.zip"
     dest: /tmp/tflint.zip
     mode: "0644"
 
 - name: Install tflint
-  unarchive:
+  ansible.builtin.unarchive:
     src: /tmp/tflint.zip
     dest: /usr/local/bin
     remote_src: true
     mode: "0755"
 
 - name: Clean up tflint archive
-  file:
+  ansible.builtin.file:
     path: /tmp/tflint.zip
     state: absent
 
 - name: Download terraform-docs
-  get_url:
-    url: "https://github.com/terraform-docs/terraform-docs/releases/download/v{{ terraform_docs_version }}/terraform-docs-v{{ terraform_docs_version }}-linux-amd64.tar.gz"
+  ansible.builtin.get_url:
+    url: >-
+      https://github.com/terraform-docs/terraform-docs/releases/download/v{{
+      terraform_docs_version }}/terraform-docs-v{{ terraform_docs_version }}-linux-amd64.tar.gz
     dest: /tmp/terraform-docs.tar.gz
     mode: "0644"
 
 - name: Install terraform-docs
-  unarchive:
+  ansible.builtin.unarchive:
     src: /tmp/terraform-docs.tar.gz
     dest: /usr/local/bin
     remote_src: true
@@ -44,40 +46,40 @@
     mode: "0755"
 
 - name: Clean up terraform-docs archive
-  file:
+  ansible.builtin.file:
     path: /tmp/terraform-docs.tar.gz
     state: absent
 
 - name: Download OpenTofu {{ tofu_version }}
-  get_url:
+  ansible.builtin.get_url:
     url: "https://github.com/opentofu/opentofu/releases/download/v{{ tofu_version }}/tofu_{{ tofu_version }}_linux_amd64.zip"
     dest: /tmp/tofu.zip
     mode: "0644"
 
 - name: Install tofu binary
-  unarchive:
+  ansible.builtin.unarchive:
     src: /tmp/tofu.zip
     dest: /usr/local/bin
     remote_src: true
     mode: "0755"
 
 - name: Clean up tofu archive
-  file:
+  ansible.builtin.file:
     path: /tmp/tofu.zip
     state: absent
 
 - name: Enable OpenTofu tab completion
-  lineinfile:
+  ansible.builtin.lineinfile:
     path: "{{ dev_home }}/.bashrc"
-    line: 'complete -C /usr/local/bin/tofu tofu'
-    regexp: 'complete.*tofu'
+    line: "complete -C /usr/local/bin/tofu tofu"
+    regexp: "complete.*tofu"
     owner: "{{ dev_user }}"
     group: "{{ dev_user }}"
 
 - name: Enable Terraform tab completion
-  lineinfile:
+  ansible.builtin.lineinfile:
     path: "{{ dev_home }}/.bashrc"
-    line: 'complete -C /usr/bin/terraform terraform'
-    regexp: 'complete.*terraform'
+    line: "complete -C /usr/bin/terraform terraform"
+    regexp: "complete.*terraform"
     owner: "{{ dev_user }}"
     group: "{{ dev_user }}"

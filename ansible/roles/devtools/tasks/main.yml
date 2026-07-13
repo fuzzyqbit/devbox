@@ -1,31 +1,31 @@
 ---
 - name: Install devtools from dnf
-  dnf:
+  ansible.builtin.dnf:
     name: "{{ devtools_dnf_packages }}"
     state: present
 
 # --- ShellCheck (not in AL2023 repos, install from GitHub) ---
 - name: Download ShellCheck {{ shellcheck_version }}
-  get_url:
+  ansible.builtin.get_url:
     url: "https://github.com/koalaman/shellcheck/releases/download/v{{ shellcheck_version }}/shellcheck-v{{ shellcheck_version }}.linux.x86_64.tar.xz"
     dest: /tmp/shellcheck.tar.xz
     mode: "0644"
 
 - name: Extract ShellCheck
-  unarchive:
+  ansible.builtin.unarchive:
     src: /tmp/shellcheck.tar.xz
     dest: /tmp
     remote_src: true
 
 - name: Install ShellCheck binary
-  copy:
+  ansible.builtin.copy:
     src: "/tmp/shellcheck-v{{ shellcheck_version }}/shellcheck"
     dest: /usr/local/bin/shellcheck
     remote_src: true
     mode: "0755"
 
 - name: Clean up ShellCheck
-  file:
+  ansible.builtin.file:
     path: "{{ item }}"
     state: absent
   loop:
@@ -34,32 +34,32 @@
 
 # --- ripgrep ---
 - name: Download ripgrep
-  get_url:
+  ansible.builtin.get_url:
     url: "https://github.com/BurntSushi/ripgrep/releases/download/{{ ripgrep_version }}/ripgrep-{{ ripgrep_version }}-x86_64-unknown-linux-musl.tar.gz"
     dest: /tmp/ripgrep.tar.gz
     mode: "0644"
 
 - name: Create temp dir for ripgrep
-  file:
+  ansible.builtin.file:
     path: /tmp/ripgrep-extract
     state: directory
     mode: "0755"
 
 - name: Extract ripgrep
-  unarchive:
+  ansible.builtin.unarchive:
     src: /tmp/ripgrep.tar.gz
     dest: /tmp/ripgrep-extract
     remote_src: true
 
 - name: Install ripgrep binary
-  copy:
+  ansible.builtin.copy:
     src: "/tmp/ripgrep-extract/ripgrep-{{ ripgrep_version }}-x86_64-unknown-linux-musl/rg"
     dest: /usr/local/bin/rg
     remote_src: true
     mode: "0755"
 
 - name: Clean up ripgrep
-  file:
+  ansible.builtin.file:
     path: "{{ item }}"
     state: absent
   loop:
@@ -68,32 +68,32 @@
 
 # --- fd ---
 - name: Download fd
-  get_url:
+  ansible.builtin.get_url:
     url: "https://github.com/sharkdp/fd/releases/download/v{{ fd_version }}/fd-v{{ fd_version }}-x86_64-unknown-linux-musl.tar.gz"
     dest: /tmp/fd.tar.gz
     mode: "0644"
 
 - name: Create temp dir for fd
-  file:
+  ansible.builtin.file:
     path: /tmp/fd-extract
     state: directory
     mode: "0755"
 
 - name: Extract fd
-  unarchive:
+  ansible.builtin.unarchive:
     src: /tmp/fd.tar.gz
     dest: /tmp/fd-extract
     remote_src: true
 
 - name: Install fd binary
-  copy:
+  ansible.builtin.copy:
     src: "/tmp/fd-extract/fd-v{{ fd_version }}-x86_64-unknown-linux-musl/fd"
     dest: /usr/local/bin/fd
     remote_src: true
     mode: "0755"
 
 - name: Clean up fd
-  file:
+  ansible.builtin.file:
     path: "{{ item }}"
     state: absent
   loop:
@@ -102,32 +102,32 @@
 
 # --- bat ---
 - name: Download bat
-  get_url:
+  ansible.builtin.get_url:
     url: "https://github.com/sharkdp/bat/releases/download/v{{ bat_version }}/bat-v{{ bat_version }}-x86_64-unknown-linux-musl.tar.gz"
     dest: /tmp/bat.tar.gz
     mode: "0644"
 
 - name: Create temp dir for bat
-  file:
+  ansible.builtin.file:
     path: /tmp/bat-extract
     state: directory
     mode: "0755"
 
 - name: Extract bat
-  unarchive:
+  ansible.builtin.unarchive:
     src: /tmp/bat.tar.gz
     dest: /tmp/bat-extract
     remote_src: true
 
 - name: Install bat binary
-  copy:
+  ansible.builtin.copy:
     src: "/tmp/bat-extract/bat-v{{ bat_version }}-x86_64-unknown-linux-musl/bat"
     dest: /usr/local/bin/bat
     remote_src: true
     mode: "0755"
 
 - name: Clean up bat
-  file:
+  ansible.builtin.file:
     path: "{{ item }}"
     state: absent
   loop:
@@ -136,34 +136,34 @@
 
 # --- fzf ---
 - name: Download fzf
-  get_url:
+  ansible.builtin.get_url:
     url: "https://github.com/junegunn/fzf/releases/download/v{{ fzf_version }}/fzf-{{ fzf_version }}-linux_amd64.tar.gz"
     dest: /tmp/fzf.tar.gz
     mode: "0644"
 
 - name: Install fzf
-  unarchive:
+  ansible.builtin.unarchive:
     src: /tmp/fzf.tar.gz
     dest: /usr/local/bin
     remote_src: true
     mode: "0755"
 
 - name: Clean up fzf archive
-  file:
+  ansible.builtin.file:
     path: /tmp/fzf.tar.gz
     state: absent
 
 - name: Add fzf key bindings to bashrc
-  lineinfile:
+  ansible.builtin.lineinfile:
     path: "{{ dev_home }}/.bashrc"
     line: 'eval "$(fzf --bash)"'
-    regexp: 'fzf --bash'
+    regexp: "fzf --bash"
     owner: "{{ dev_user }}"
     group: "{{ dev_user }}"
 
 # --- yq ---
 - name: Download yq
-  get_url:
+  ansible.builtin.get_url:
     url: "https://github.com/mikefarah/yq/releases/download/v{{ yq_version }}/yq_linux_amd64"
     dest: /usr/local/bin/yq
     mode: "0755"
@@ -173,47 +173,49 @@
   when: direnv_install
   block:
     - name: Download direnv
-      get_url:
+      ansible.builtin.get_url:
         url: https://direnv.net/install.sh
         dest: /tmp/direnv-install.sh
         mode: "0755"
 
     - name: Install direnv binary
-      shell: bin_path=/usr/local/bin bash /tmp/direnv-install.sh
+      ansible.builtin.command: bash /tmp/direnv-install.sh
+      environment:
+        bin_path: /usr/local/bin
       args:
         creates: /usr/local/bin/direnv
 
     - name: Add direnv hook to bashrc
-      lineinfile:
+      ansible.builtin.lineinfile:
         path: "{{ dev_home }}/.bashrc"
         line: 'eval "$(direnv hook bash)"'
-        regexp: 'direnv hook'
+        regexp: "direnv hook"
         owner: "{{ dev_user }}"
         group: "{{ dev_user }}"
 
 # --- Apache Thrift compiler (no pre-built Linux binaries; build compiler only) ---
 - name: Install Thrift build dependencies
-  dnf:
+  ansible.builtin.dnf:
     name:
       - boost-devel
       - flex
       - bison
     state: present
 
-- name: Download Thrift {{ thrift_version }} source
-  get_url:
+- name: Download Thrift source {{ thrift_version }}
+  ansible.builtin.get_url:
     url: "https://archive.apache.org/dist/thrift/{{ thrift_version }}/thrift-{{ thrift_version }}.tar.gz"
     dest: /tmp/thrift.tar.gz
     mode: "0644"
 
 - name: Extract Thrift source
-  unarchive:
+  ansible.builtin.unarchive:
     src: /tmp/thrift.tar.gz
     dest: /tmp
     remote_src: true
 
 - name: Configure Thrift (compiler only, all language libs disabled)
-  command: >
+  ansible.builtin.command: >
     ./configure
     --prefix=/usr/local
     --without-c_glib
@@ -241,13 +243,13 @@
     creates: "/tmp/thrift-{{ thrift_version }}/Makefile"
 
 - name: Build Thrift compiler binary
-  command: make -j{{ ansible_processor_vcpus | default(2) }} -C compiler/cpp
+  ansible.builtin.command: make -j{{ ansible_processor_vcpus | default(2) }} -C compiler/cpp
   args:
     chdir: "/tmp/thrift-{{ thrift_version }}"
     creates: "/tmp/thrift-{{ thrift_version }}/compiler/cpp/thrift"
 
 - name: Find built thrift binary
-  find:
+  ansible.builtin.find:
     paths: "/tmp/thrift-{{ thrift_version }}/compiler/cpp"
     patterns: "thrift"
     recurse: false
@@ -255,14 +257,14 @@
   register: thrift_bin
 
 - name: Install thrift binary
-  copy:
+  ansible.builtin.copy:
     src: "{{ thrift_bin.files[0].path }}"
     dest: /usr/local/bin/thrift
     remote_src: true
     mode: "0755"
 
 - name: Clean up Thrift source
-  file:
+  ansible.builtin.file:
     path: "{{ item }}"
     state: absent
   loop:
@@ -270,15 +272,15 @@
     - "/tmp/thrift-{{ thrift_version }}"
 
 # --- Bazel (via bazelisk launcher) ---
-- name: Download bazelisk {{ bazelisk_version }} as bazel
-  get_url:
+- name: Download bazelisk-as-bazel {{ bazelisk_version }}
+  ansible.builtin.get_url:
     url: "https://github.com/bazelbuild/bazelisk/releases/download/v{{ bazelisk_version }}/bazelisk-linux-amd64"
     dest: /usr/local/bin/bazel
     mode: "0755"
 
 # --- nvm (Node Version Manager) ---
 - name: Download nvm install script
-  get_url:
+  ansible.builtin.get_url:
     url: "https://raw.githubusercontent.com/nvm-sh/nvm/v{{ nvm_version }}/install.sh"
     dest: /tmp/nvm-install.sh
     mode: "0755"
@@ -286,29 +288,29 @@
 - name: Install nvm for {{ dev_user }}
   become: true
   become_user: "{{ dev_user }}"
-  command: bash /tmp/nvm-install.sh
+  ansible.builtin.command: bash /tmp/nvm-install.sh
   args:
     creates: "{{ dev_home }}/.nvm/nvm.sh"
 
 - name: Clean up nvm install script
-  file:
+  ansible.builtin.file:
     path: /tmp/nvm-install.sh
     state: absent
 
 # --- Sublime Text ---
 - name: Import Sublime Text GPG key
-  rpm_key:
+  ansible.builtin.rpm_key:
     key: https://download.sublimetext.com/sublimehq-rpm-pub.gpg
     state: present
 
 - name: Add Sublime Text repository
-  get_url:
+  ansible.builtin.get_url:
     url: https://download.sublimetext.com/rpm/stable/x86_64/sublime-text.repo
     dest: /etc/yum.repos.d/sublime-text.repo
     mode: "0644"
 
 - name: Install Sublime Text
-  dnf:
+  ansible.builtin.dnf:
     name: sublime-text
     state: present
 
@@ -318,16 +320,18 @@
 # no TLS, no password (SSM/IAM is the auth boundary). Built from the AL2023
 # system python3 (3.9); ipykernel pinned to a 3.9-compatible release.
 - name: Create Jupyter virtualenv
-  command:
+  ansible.builtin.command:
     cmd: "python3 -m venv {{ jupyter_venv_path }}"
     creates: "{{ jupyter_venv_path }}/bin/python3"
 
 - name: Upgrade pip in Jupyter venv
-  command:
+  ansible.builtin.command:
     cmd: "{{ jupyter_venv_path }}/bin/pip install --upgrade pip"
+  register: jupyter_pip_upgrade
+  changed_when: "'Successfully installed' in jupyter_pip_upgrade.stdout"
 
 - name: Install JupyterLab and ipykernel into venv
-  command:
+  ansible.builtin.command:
     cmd: >
       {{ jupyter_venv_path }}/bin/pip install
       jupyterlab=={{ jupyterlab_version }}
@@ -335,6 +339,6 @@
     creates: "{{ jupyter_venv_path }}/bin/jupyter"
 
 - name: Register Python kernel into venv prefix
-  command:
+  ansible.builtin.command:
     cmd: "{{ jupyter_venv_path }}/bin/python3 -m ipykernel install --prefix {{ jupyter_venv_path }} --name python3 --display-name 'Python 3'"
     creates: "{{ jupyter_venv_path }}/share/jupyter/kernels/python3/kernel.json"

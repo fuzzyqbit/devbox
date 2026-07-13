@@ -7,8 +7,8 @@ dcv_version: "2025.0"
 # nice-dcv-server / nice-dcv-web-viewer share build 20103; nice-xdcv is build 688.
 # Only dcv_build_server drives the tarball URL; the RPM install globs by name so the
 # xdcv build skew is handled automatically. dcv_build_xdcv is documentation-only.
-dcv_build_server: "20103"   # nice-dcv-server / nice-dcv-web-viewer build (tarball URL)
-dcv_build_xdcv: "688"       # nice-xdcv build — DIFFERENT number; glob installs it
+dcv_build_server: "20103" # nice-dcv-server / nice-dcv-web-viewer build (tarball URL)
+dcv_build_xdcv: "688" # nice-xdcv build — DIFFERENT number; glob installs it
 
 # Web port DCV listens on (direct-connect :8443, TCP web + UDP QUIC share this port).
 dcv_web_port: 8443

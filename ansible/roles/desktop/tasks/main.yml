@@ -2,12 +2,12 @@
 # --- GNOME Desktop ---
 
 - name: Install GNOME desktop group
-  dnf:
+  ansible.builtin.dnf:
     name: "@Desktop"
     state: present
 
 - name: Install additional desktop packages
-  dnf:
+  ansible.builtin.dnf:
     name:
       - gnome-shell
       # gnome-session provides /usr/bin/gnome-session, the binary the DCV session launcher
@@ -23,13 +23,13 @@
 # headless Amazon DCV connection — the operator has no local console to unlock it) ---
 
 - name: Create dconf local profile directory
-  file:
+  ansible.builtin.file:
     path: /etc/dconf/db/local.d/locks
     state: directory
     mode: "0755"
 
 - name: Disable GNOME screen lock via dconf system defaults
-  copy:
+  ansible.builtin.copy:
     dest: /etc/dconf/db/local.d/01-screensaver
     content: |
       [org/gnome/desktop/screensaver]
@@ -40,7 +40,7 @@
     mode: "0644"
 
 - name: Lock screensaver settings so users cannot re-enable lock
-  copy:
+  ansible.builtin.copy:
     dest: /etc/dconf/db/local.d/locks/screensaver
     content: |
       /org/gnome/desktop/screensaver/lock-enabled
@@ -48,29 +48,29 @@
     mode: "0644"
 
 - name: Apply dconf system defaults
-  command: dconf update
+  ansible.builtin.command: dconf update
+  changed_when: true # regenerates the dconf db from the files written above
 
-# --- ffmpeg (static build — not in AL2023 base repos) ---
 - name: Download ffmpeg static build
-  get_url:
+  ansible.builtin.get_url:
     url: https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz
     dest: /tmp/ffmpeg-static.tar.xz
     mode: "0644"
 
 - name: Create ffmpeg extract directory
-  file:
+  ansible.builtin.file:
     path: /tmp/ffmpeg-extract
     state: directory
     mode: "0755"
 
 - name: Extract ffmpeg archive
-  unarchive:
+  ansible.builtin.unarchive:
     src: /tmp/ffmpeg-static.tar.xz
     dest: /tmp/ffmpeg-extract
     remote_src: true
 
 - name: Find ffmpeg binary
-  find:
+  ansible.builtin.find:
     paths: /tmp/ffmpeg-extract
     patterns: "ffmpeg"
     recurse: true
@@ -78,7 +78,7 @@
   register: ffmpeg_bin
 
 - name: Find ffprobe binary
-  find:
+  ansible.builtin.find:
     paths: /tmp/ffmpeg-extract
     patterns: "ffprobe"
     recurse: true
@@ -86,21 +86,21 @@
   register: ffprobe_bin
 
 - name: Install ffmpeg binary
-  copy:
+  ansible.builtin.copy:
     src: "{{ ffmpeg_bin.files[0].path }}"
     dest: /usr/local/bin/ffmpeg
     remote_src: true
     mode: "0755"
 
 - name: Install ffprobe binary
-  copy:
+  ansible.builtin.copy:
     src: "{{ ffprobe_bin.files[0].path }}"
     dest: /usr/local/bin/ffprobe
     remote_src: true
     mode: "0755"
 
 - name: Clean up ffmpeg archive
-  file:
+  ansible.builtin.file:
     path: "{{ item }}"
     state: absent
   loop:
@@ -109,16 +109,16 @@
 
 # --- VLC (flatpak — not in AL2023 base repos) ---
 - name: Install flatpak
-  dnf:
+  ansible.builtin.dnf:
     name: flatpak
     state: present
 
 - name: Add Flathub remote
-  command: flatpak remote-add --if-not-exists --system flathub https://dl.flathub.org/repo/flathub.flatpakrepo
+  ansible.builtin.command: flatpak remote-add --if-not-exists --system flathub https://dl.flathub.org/repo/flathub.flatpakrepo
   changed_when: false
 
 - name: Install VLC via flatpak
-  command: flatpak install --system -y flathub org.videolan.VLC
+  ansible.builtin.command: flatpak install --system -y flathub org.videolan.VLC
   args:
     creates: /var/lib/flatpak/app/org.videolan.VLC
 
@@ -133,23 +133,23 @@
   when: layers.vscode_desktop | default(true)
   block:
     - name: Import Microsoft GPG key (VS Code)
-      rpm_key:
+      ansible.builtin.rpm_key:
         key: https://packages.microsoft.com/keys/microsoft.asc
         state: present
 
     - name: Download Visual Studio Code RPM (pinned)
-      get_url:
+      ansible.builtin.get_url:
         url: "https://update.code.visualstudio.com/{{ vscode_desktop_version }}/linux-rpm-x64/stable"
         dest: /tmp/vscode.rpm
         mode: "0644"
 
     - name: Install Visual Studio Code
-      dnf:
+      ansible.builtin.dnf:
         name: /tmp/vscode.rpm
         state: present
         disable_gpg_check: false
 
     - name: Clean up VS Code RPM
-      file:
+      ansible.builtin.file:
         path: /tmp/vscode.rpm
         state: absent
