@@ -141,3 +141,22 @@
       # mise version manager — system-wide bash activation (Phase 8 MISE-02)
       # NOTE: SSM non-login shells require `bash -l` to source /etc/profile.d (see RESEARCH Pitfall 6).
       eval "$(mise activate bash)"
+
+# --- ansible (IaC tool) — run roles ad-hoc on the baked box (ansible-playbook -c local) ---
+# ansible-core (engine, ansible.builtin) from the AL2023 repos, plus the community.general
+# collection so roles that call community.* modules work out of the box. The collection is
+# version-pinned (defaults/main.yml, matching ansible/requirements.yml) and installed to the
+# system-wide /usr/share/ansible/collections path (on ansible-core's default COLLECTIONS_PATHS
+# for every user), not a per-user ~/.ansible.
+- name: Install ansible-core
+  ansible.builtin.dnf:
+    name: ansible-core
+    state: present
+
+- name: Install the community.general collection system-wide
+  ansible.builtin.command:
+    cmd: >-
+      ansible-galaxy collection install
+      community.general:{{ devops_ansible_community_general_version }}
+      -p /usr/share/ansible/collections
+    creates: /usr/share/ansible/collections/ansible_collections/community/general
