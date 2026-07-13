@@ -8,7 +8,7 @@
 
   pre_tasks:
     - name: Wait for cloud-init to finish
-      command: cloud-init status --wait
+      ansible.builtin.command: cloud-init status --wait
       changed_when: false
 
   roles:
@@ -68,7 +68,7 @@
       # Gated on desktop too: DCV needs GNOME (desktop role) + the ec2-user PAM password
       # (secrets role, gated on vscode OR desktop), so both must exist before dcv configures auth.
 
-    - role: hardening  # MUST remain last — invariant (JUP-08 / CLAUDE.md §8)
+    - role: hardening # MUST remain last — invariant (JUP-08 / CLAUDE.md §8)
       when: layers.hardening | default(false)
 
   post_tasks:
@@ -79,7 +79,7 @@
     # X server is observable. Gated on the SAME condition as the dcv role so a no-dcv bake does
     # not fail on an X server it never installed.
     - name: Stat /usr/bin/Xdcv after hardening (W1 regression guard)
-      stat:
+      ansible.builtin.stat:
         path: /usr/bin/Xdcv
       register: xserver_post_hardening
       when: (layers.dcv | default(false)) and (layers.desktop | default(false))
@@ -99,11 +99,11 @@
       when: (layers.dcv | default(false)) and (layers.desktop | default(false))
 
     - name: Clean dnf cache
-      command: dnf clean all
+      ansible.builtin.command: dnf clean all
       changed_when: false
 
     - name: Remove temporary files
-      file:
+      ansible.builtin.file:
         path: "{{ item }}"
         state: absent
       loop:
@@ -112,7 +112,7 @@
         - /var/tmp/*
 
     - name: Write build manifest
-      copy:
+      ansible.builtin.copy:
         content: |
           build_date: {{ ansible_date_time.iso8601 }}
           layers: {{ layers | to_nice_yaml }}
@@ -122,4 +122,5 @@
 # FIXME: see firewalld-docker-fix.yml header — temporary workaround,
 # not the long-term firewall design. Remove once firewalld policy is
 # managed properly (or once firewalld is removed entirely).
-- import_playbook: firewalld-docker-fix.yml
+- name: Apply the firewalld/docker workaround (see firewalld-docker-fix.yml header)
+  import_playbook: firewalld-docker-fix.yml

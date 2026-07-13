@@ -24,10 +24,25 @@ directory:
 hard-fail-on: HIGH
 soft-fail-on: MEDIUM
 
-# Empty by policy. Add entries ONLY with a comment explaining the carve-out.
-# Example shape (do not uncomment):
-#   - CKV_AWS_24  # carve-out for SSM-agent egress 0.0.0.0/0 (required for SSM-only access posture; Phase 1 SEC-04)
-skip-check: []
+# Add entries ONLY with a comment explaining the carve-out.
+skip-check:
+  # Detailed (1-min) CloudWatch monitoring is paid per-metric; this is a single-operator
+  # devbox that is stopped most of the time and observability is an explicit v3-backlog
+  # item (STATE.md "Deferred"). Basic 5-min monitoring suffices; revisit with that backlog.
+  - CKV_AWS_126
+  # Both the root volume and the persistent /home volume ARE encrypted (encrypted = true,
+  # AWS-managed aws/ebs key). A customer-managed KMS CMK adds $1/mo + per-request cost and
+  # key-lifecycle burden with no threat-model benefit for a single-operator box (no
+  # cross-account sharing, no key-rotation policy requirement). Aligns with the repo's
+  # cost posture (DLM backup layer dropped for unwanted spend).
+  - CKV_AWS_189
+  # All-ports egress to 0.0.0.0/0 is deliberate: the box has NO public ingress
+  # (SSM-only + CIDR-allowlisted web ports) and needs broad egress for SSM
+  # endpoints, dnf/SPAL repos, galaxy, and the CloudFront DCV tarball. Matches
+  # the SSM-only posture carve-out anticipated by this file's original example.
+  # (Flagged by checkov >= 3.3 locally; the SHA-pinned CI action does not flag
+  # it yet — skip recorded ahead of an action bump.)
+  - CKV_AWS_382
 
 # Run quietly in CI — full findings are written to the runner log via
 # checkov-action's default output handler.
