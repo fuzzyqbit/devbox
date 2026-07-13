@@ -111,7 +111,7 @@
     # the one place a post-hardening removal is observable. Gated on the SAME condition as the
     # xrdp role so a no-xrdp bake does not fail on an X server it never installed.
     - name: Stat /usr/bin/Xorg after hardening (W1b — xrdp backend guard)
-      stat:
+      ansible.builtin.stat:
         path: /usr/bin/Xorg
       register: xorg_post_hardening
       when: (layers.xrdp | default(false)) and (layers.desktop | default(false))

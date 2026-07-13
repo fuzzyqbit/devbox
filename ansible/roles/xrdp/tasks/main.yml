@@ -179,6 +179,11 @@
     path: /etc/xrdp/xrdp.ini
     section: Xvnc
     state: absent
+    # section removal rewrites the file — keep the RPM's root-owned 0644, matching
+    # the two ini_file hardening tasks above
+    owner: root
+    group: root
+    mode: "0644"
 
 # --- Service enable (XRDP-01) — enable both, no start needed at bake ---
 
@@ -326,7 +331,8 @@
       contain security_layer=rdp. Re-check the ini_file hardening task.
     quiet: false
 
-- name: Check xrdp + xrdp-sesman service enablement (XRDP-04)
+# The systemd module cannot do a read-only is-enabled query — command is deliberate.
+- name: Check xrdp + xrdp-sesman service enablement (XRDP-04) # noqa: command-instead-of-module
   ansible.builtin.command:
     cmd: systemctl is-enabled xrdp xrdp-sesman
   register: xrdp_bake_enabled
