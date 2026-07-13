@@ -165,6 +165,7 @@ resource "aws_instance" "devbox" {
   vpc_security_group_ids      = [aws_security_group.devbox.id]
   iam_instance_profile        = aws_iam_instance_profile.devbox.name
   associate_public_ip_address = var.associate_public_ip
+  ebs_optimized               = true # CKV_AWS_135; free + default-capable on current gen instance types
 
   metadata_options {
     http_tokens                 = "required" # IMDSv2-only; rejects IMDSv1
@@ -177,6 +178,10 @@ resource "aws_instance" "devbox" {
     volume_size           = var.root_volume_size
     volume_type           = "gp3"
     delete_on_termination = true
+    # CKV_AWS_8: encrypt the root volume at launch (AWS-managed key, no CMK cost).
+    # NOTE: flipping this on an existing instance forces replacement — routine here
+    # (AMI swaps already replace the instance; /home lives on the persistent volume).
+    encrypted = true
   }
 
   tags = merge(local.common_tags, {

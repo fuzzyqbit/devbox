@@ -105,7 +105,7 @@
     src: dcv.conf.j2
     dest: /etc/dcv/dcv.conf
     mode: "0644"
-  notify: reload systemd
+  notify: Reload systemd
 
 # --- GNOME-on-Xorg virtual-session init script (DCV-03 / CRITICAL-2 gap-closure) ---
 # A `dcv create-session --type virtual` with NO --init hands the operator a blank/Wayland
@@ -142,7 +142,7 @@
     src: dcv-virtual-session.service.j2
     dest: /etc/systemd/system/dcv-virtual-session.service
     mode: "0644"
-  notify: reload systemd
+  notify: Reload systemd
 
 - name: Enable dcvserver service
   ansible.builtin.systemd:
@@ -424,7 +424,8 @@
       remove /etc/dcv/dcv.pem and re-run the bake to regenerate it.
     quiet: false
 
-- name: Check dcvserver + dcv-virtual-session service enablement (DCV-04)
+# The systemd module cannot do a read-only is-enabled query — command is deliberate.
+- name: Check dcvserver + dcv-virtual-session service enablement (DCV-04) # noqa: command-instead-of-module
   ansible.builtin.command:
     cmd: systemctl is-enabled dcvserver dcv-virtual-session
   register: dcv_bake_enabled

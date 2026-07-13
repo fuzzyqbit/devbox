@@ -22,7 +22,7 @@
     owner: root
     group: root
     mode: "0644"
-  notify: reload systemd
+  notify: Reload systemd
 
 - name: Enable the persistent /home mount unit (runs at instance boot, not at bake)
   ansible.builtin.systemd:
@@ -57,4 +57,4 @@
     - code-server
     - dcvserver
     - dcv-virtual-session
-  notify: reload systemd
+  notify: Reload systemd

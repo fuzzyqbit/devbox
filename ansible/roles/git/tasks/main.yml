@@ -1,6 +1,6 @@
 ---
 - name: Install git packages
-  dnf:
+  ansible.builtin.dnf:
     name: "{{ git_packages }}"
     state: present
 
@@ -8,7 +8,7 @@
   when: gh_cli_install
   block:
     - name: Add GitHub CLI yum repository
-      yum_repository:
+      ansible.builtin.yum_repository:
         name: gh-cli
         description: GitHub CLI
         baseurl: https://cli.github.com/packages/rpm
@@ -17,18 +17,18 @@
         enabled: true
 
     - name: Install gh
-      dnf:
+      ansible.builtin.dnf:
         name: gh
         state: present
 
 - name: Download lazygit
-  get_url:
+  ansible.builtin.get_url:
     url: "https://github.com/jesseduffield/lazygit/releases/download/v{{ lazygit_version }}/lazygit_{{ lazygit_version }}_Linux_x86_64.tar.gz"
     dest: /tmp/lazygit.tar.gz
     mode: "0644"
 
 - name: Install lazygit
-  unarchive:
+  ansible.builtin.unarchive:
     src: /tmp/lazygit.tar.gz
     dest: /usr/local/bin
     remote_src: true
@@ -37,37 +37,37 @@
     mode: "0755"
 
 - name: Clean up lazygit archive
-  file:
+  ansible.builtin.file:
     path: /tmp/lazygit.tar.gz
     state: absent
 
 - name: Download git-delta
-  get_url:
+  ansible.builtin.get_url:
     url: "https://github.com/dandavison/delta/releases/download/{{ delta_version }}/delta-{{ delta_version }}-x86_64-unknown-linux-musl.tar.gz"
     dest: /tmp/delta.tar.gz
     mode: "0644"
 
 - name: Create temp dir for delta extraction
-  file:
+  ansible.builtin.file:
     path: /tmp/delta-extract
     state: directory
     mode: "0755"
 
 - name: Extract delta
-  unarchive:
+  ansible.builtin.unarchive:
     src: /tmp/delta.tar.gz
     dest: /tmp/delta-extract
     remote_src: true
 
 - name: Install delta binary
-  copy:
+  ansible.builtin.copy:
     src: "/tmp/delta-extract/delta-{{ delta_version }}-x86_64-unknown-linux-musl/delta"
     dest: /usr/local/bin/delta
     remote_src: true
     mode: "0755"
 
 - name: Clean up delta files
-  file:
+  ansible.builtin.file:
     path: "{{ item }}"
     state: absent
   loop:
@@ -77,11 +77,13 @@
 - name: Configure git to use delta
   become: true
   become_user: "{{ dev_user }}"
-  command: "git config --global {{ item.key }} {{ item.value }}"
+  community.general.git_config:
+    name: "{{ item.key }}"
+    value: "{{ item.value }}"
+    scope: global
   loop:
     - { key: "core.pager", value: "delta" }
     - { key: "interactive.diffFilter", value: "delta --color-only" }
     - { key: "delta.navigate", value: "true" }
     - { key: "delta.side-by-side", value: "true" }
     - { key: "merge.conflictstyle", value: "diff3" }
-  changed_when: false

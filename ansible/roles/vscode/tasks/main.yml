@@ -1,23 +1,23 @@
 ---
 - name: Download code-server RPM
-  get_url:
+  ansible.builtin.get_url:
     url: "https://github.com/coder/code-server/releases/download/v{{ code_server_version }}/code-server-{{ code_server_version }}-amd64.rpm"
     dest: /tmp/code-server.rpm
     mode: "0644"
 
 - name: Install code-server
-  dnf:
+  ansible.builtin.dnf:
     name: /tmp/code-server.rpm
     state: present
     disable_gpg_check: true
 
 - name: Clean up RPM
-  file:
+  ansible.builtin.file:
     path: /tmp/code-server.rpm
     state: absent
 
 - name: Create code-server config directory
-  file:
+  ansible.builtin.file:
     path: "{{ dev_home }}/.config/code-server"
     state: directory
     owner: "{{ dev_user }}"
@@ -25,7 +25,7 @@
     mode: "0755"
 
 - name: Write code-server config
-  template:
+  ansible.builtin.template:
     src: config.yaml.j2
     dest: "{{ dev_home }}/.config/code-server/config.yaml"
     owner: "{{ dev_user }}"
@@ -33,14 +33,14 @@
     mode: "0600"
 
 - name: Install code-server systemd service
-  template:
+  ansible.builtin.template:
     src: code-server.service.j2
     dest: /etc/systemd/system/code-server.service
     mode: "0644"
-  notify: reload systemd
+  notify: Reload systemd
 
 - name: Enable code-server service
-  systemd:
+  ansible.builtin.systemd:
     name: code-server
     enabled: true
     daemon_reload: true
@@ -48,7 +48,9 @@
 - name: Install VS Code extensions
   become: true
   become_user: "{{ dev_user }}"
-  command: "code-server --install-extension {{ item }}"
+  ansible.builtin.command: "code-server --install-extension {{ item }}"
   loop: "{{ code_server_extensions }}"
   changed_when: false
-  ignore_errors: true
+  # Extensions are best-effort at bake (marketplace flakiness must not fail the AMI);
+  # failed_when: false replaces ignore_errors so the task cannot mask other error kinds.
+  failed_when: false

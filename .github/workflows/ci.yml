@@ -28,6 +28,9 @@ name: ci
 
 on:
   push:
+    # main only — feature branches get identical coverage from the pull_request
+    # event; the old bare `push:` double-ran every job on each PR-branch push.
+    branches: [main]
     paths-ignore:
       - '.planning/**'
       - '**/*.md'
@@ -74,9 +77,16 @@ jobs:
       - name: tofu init -lockfile=readonly
         # Phase 3 REP-01 gate: CI must NOT silently rewrite the committed
         # lockfile. Any provider drift causes init to fail loudly.
+        #
+        # -backend=false: terraform/backend.tf is a PARTIAL s3 backend (bucket/
+        #   key are supplied by ./run via -backend-config at operator init). A
+        #   bare `tofu init` in CI prompts for the missing bucket and HANGS the
+        #   runner until the 6h timeout — this was the silent tofu-validate
+        #   stall on every run. validate needs providers, not a live backend.
+        # -input=false: any future prompt fails loudly instead of hanging.
         run: |
           cd terraform
-          tofu init -lockfile=readonly
+          tofu init -backend=false -input=false -lockfile=readonly
           tofu validate
 
   # ---------------------------------------------------------------- 3
