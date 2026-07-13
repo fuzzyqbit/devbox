@@ -1,4 +1,9 @@
 ---
+# SPAL (Supplementary Packages for Amazon Linux) system-release floor. SPAL is only on
+# AL2023 >= this; older AMIs have no spal-release package.
+# https://docs.aws.amazon.com/linux/al2023/ug/configure-spal-repository.html
+spal_min_system_release: "2023.9.20251117"
+
 base_packages:
   - wget
   - unzip

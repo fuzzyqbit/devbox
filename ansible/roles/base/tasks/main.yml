@@ -18,6 +18,35 @@
     name: "{{ base_packages }}"
     state: present
 
+# --- SPAL (Supplementary Packages for Amazon Linux) — enable image-wide ---
+# SPAL is the AL2023 EPEL9 rebuild; enabling it in `base` makes its packages (chromium,
+# xrdp/xorgxrdp, …) available to every later role. `dnf install spal-release` drops
+# /etc/yum.repos.d/amazonlinux-spal.repo and imports the Amazon-signed SPAL GPG keys (GPG
+# stays ON — CLAUDE.md §8 airgap posture). Assert the system-release floor first so an old
+# AMI fails loudly instead of `dnf install spal-release` erroring cryptically.
+- name: Gather package facts for the SPAL system-release floor gate
+  ansible.builtin.package_facts:
+    manager: auto
+
+- name: Assert the AL2023 system-release meets the SPAL version floor
+  ansible.builtin.assert:
+    that:
+      - ansible_facts.packages['system-release'][0].version is version(spal_min_system_release, '>=', version_type='loose')
+    fail_msg: >-
+      This AMI's system-release
+      ({{ ansible_facts.packages['system-release'][0].version | default('absent') }}) is BELOW
+      the SPAL floor ({{ spal_min_system_release }}). SPAL is only available on
+      AL2023 >= {{ spal_min_system_release }}; older images have no `spal-release` package.
+      Rebake from a newer AL2023 source AMI (or `sudo dnf upgrade`) and retry.
+      https://docs.aws.amazon.com/linux/al2023/ug/configure-spal-repository.html
+    quiet: true
+
+- name: Enable SPAL via the Amazon-signed spal-release package
+  ansible.builtin.dnf:
+    name: spal-release
+    state: present
+    disable_gpg_check: false
+
 - name: Install AWS CLI v2
   when: awscli_install
   block:

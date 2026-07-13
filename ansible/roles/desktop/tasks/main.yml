@@ -17,6 +17,9 @@
       - dejavu-sans-fonts
       - dejavu-sans-mono-fonts
       - mesa-dri-drivers
+      # chromium — browser for the GNOME desktop. From SPAL (enabled in the base role),
+      # not AL2023 core; the Amazon-signed SPAL GPG key was imported by spal-release.
+      - chromium
     state: present
 
 # --- GNOME screensaver: disable lock screen (a locked GNOME session is unusable over a
