@@ -2,22 +2,22 @@
 # CIS variable overrides for a devimage (developer sandbox) context.
 
 # --- Firewall: disabled — EC2 security groups provide perimeter security ---
-amzn2023cis_rule_3_4_1_1: false   # Ensure nftables is installed
-amzn2023cis_rule_3_4_1_2: false   # Ensure single firewall configuration utility
-amzn2023cis_rule_3_4_2_1: false   # Ensure firewalld default zone is set
-amzn2023cis_rule_3_4_2_2: false   # Ensure nftables table exists
-amzn2023cis_rule_3_4_2_3: false   # Ensure nftables base chains exist
-amzn2023cis_rule_3_4_2_4: false   # Ensure host firewall loopback traffic configured
-amzn2023cis_rule_3_4_2_5: false   # Ensure firewalld drops unnecessary services
-amzn2023cis_rule_3_4_2_6: false   # Ensure nftables established connections configured
-amzn2023cis_rule_3_4_2_7: false   # Ensure nftables default deny firewall policy
+amzn2023cis_rule_3_4_1_1: false # Ensure nftables is installed
+amzn2023cis_rule_3_4_1_2: false # Ensure single firewall configuration utility
+amzn2023cis_rule_3_4_2_1: false # Ensure firewalld default zone is set
+amzn2023cis_rule_3_4_2_2: false # Ensure nftables table exists
+amzn2023cis_rule_3_4_2_3: false # Ensure nftables base chains exist
+amzn2023cis_rule_3_4_2_4: false # Ensure host firewall loopback traffic configured
+amzn2023cis_rule_3_4_2_5: false # Ensure firewalld drops unnecessary services
+amzn2023cis_rule_3_4_2_6: false # Ensure nftables established connections configured
+amzn2023cis_rule_3_4_2_7: false # Ensure nftables default deny firewall policy
 
 # --- Journal remote: not needed for a devbox ---
 amzn2023cis_syslog_service: journald
-amzn2023cis_rule_5_1_2_1_1: false  # Ensure systemd-journal-remote is installed
-amzn2023cis_rule_5_1_2_1_2: false  # Ensure systemd-journal-remote is configured
-amzn2023cis_rule_5_1_2_1_3: false  # Ensure systemd-journal-remote is enabled
-amzn2023cis_rule_5_1_2_1_4: false  # Ensure journald not configured as remote client
+amzn2023cis_rule_5_1_2_1_1: false # Ensure systemd-journal-remote is installed
+amzn2023cis_rule_5_1_2_1_2: false # Ensure systemd-journal-remote is configured
+amzn2023cis_rule_5_1_2_1_3: false # Ensure systemd-journal-remote is enabled
+amzn2023cis_rule_5_1_2_1_4: false # Ensure journald not configured as remote client
 
 # --- Logrotate: rsyslog-logrotate requires rsyslog; we use journald ---
 amzn2023cis_rule_5_3: false

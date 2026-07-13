@@ -1,30 +1,30 @@
 ---
 - name: Download Go {{ go_version }}
-  get_url:
+  ansible.builtin.get_url:
     url: "https://go.dev/dl/go{{ go_version }}.linux-amd64.tar.gz"
     dest: /tmp/go.tar.gz
     mode: "0644"
 
 - name: Remove existing Go installation
-  file:
+  ansible.builtin.file:
     path: "{{ go_install_dir }}/go"
     state: absent
 
 - name: Extract Go to {{ go_install_dir }}
-  unarchive:
+  ansible.builtin.unarchive:
     src: /tmp/go.tar.gz
     dest: "{{ go_install_dir }}"
     remote_src: true
 
 - name: Add Go to system PATH
-  copy:
+  ansible.builtin.copy:
     content: |
       export PATH={{ go_bin }}:$PATH
     dest: /etc/profile.d/golang.sh
     mode: "0644"
 
 - name: Set up GOPATH for dev user
-  blockinfile:
+  ansible.builtin.blockinfile:
     path: "{{ dev_home }}/.bashrc"
     marker: "# {mark} GOLANG"
     block: |
@@ -34,7 +34,7 @@
     group: "{{ dev_user }}"
 
 - name: Create GOPATH directories
-  file:
+  ansible.builtin.file:
     path: "{{ dev_home }}/go/{{ item }}"
     state: directory
     owner: "{{ dev_user }}"
@@ -46,7 +46,7 @@
     - pkg
 
 - name: Clean up Go tarball
-  file:
+  ansible.builtin.file:
     path: /tmp/go.tar.gz
     state: absent
 
@@ -57,7 +57,7 @@
 - name: Install pinned Go developer tools
   become: true
   become_user: "{{ dev_user }}"
-  command:
+  ansible.builtin.command:
     cmd: "{{ go_bin }}/go install {{ item.path }}"
     creates: "{{ dev_home }}/go/bin/{{ item.bin }}"
   loop: "{{ go_tools }}"

@@ -1,12 +1,12 @@
 ---
-- name: Update all packages
-  dnf:
+- name: Update all packages # noqa: package-latest (bake-time full-image update is the intent)
+  ansible.builtin.dnf:
     name: "*"
     state: latest
     update_cache: true
 
 - name: Swap curl-minimal for full curl
-  command: dnf swap -y curl-minimal curl
+  ansible.builtin.command: dnf swap -y curl-minimal curl
   args:
     removes: /usr/bin/curl
   register: curl_swap
@@ -14,32 +14,61 @@
   failed_when: curl_swap.rc != 0 and 'already installed' not in curl_swap.stderr
 
 - name: Install base packages
-  dnf:
+  ansible.builtin.dnf:
     name: "{{ base_packages }}"
     state: present
+
+# --- SPAL (Supplementary Packages for Amazon Linux) — enable image-wide ---
+# SPAL is the AL2023 EPEL9 rebuild; enabling it in `base` makes its packages (chromium,
+# xrdp/xorgxrdp, …) available to every later role. `dnf install spal-release` drops
+# /etc/yum.repos.d/amazonlinux-spal.repo and imports the Amazon-signed SPAL GPG keys (GPG
+# stays ON — CLAUDE.md §8 airgap posture). Assert the system-release floor first so an old
+# AMI fails loudly instead of `dnf install spal-release` erroring cryptically.
+- name: Gather package facts for the SPAL system-release floor gate
+  ansible.builtin.package_facts:
+    manager: auto
+
+- name: Assert the AL2023 system-release meets the SPAL version floor
+  ansible.builtin.assert:
+    that:
+      - ansible_facts.packages['system-release'][0].version is version(spal_min_system_release, '>=', version_type='loose')
+    fail_msg: >-
+      This AMI's system-release
+      ({{ ansible_facts.packages['system-release'][0].version | default('absent') }}) is BELOW
+      the SPAL floor ({{ spal_min_system_release }}). SPAL is only available on
+      AL2023 >= {{ spal_min_system_release }}; older images have no `spal-release` package.
+      Rebake from a newer AL2023 source AMI (or `sudo dnf upgrade`) and retry.
+      https://docs.aws.amazon.com/linux/al2023/ug/configure-spal-repository.html
+    quiet: true
+
+- name: Enable SPAL via the Amazon-signed spal-release package
+  ansible.builtin.dnf:
+    name: spal-release
+    state: present
+    disable_gpg_check: false
 
 - name: Install AWS CLI v2
   when: awscli_install
   block:
     - name: Download AWS CLI v2 installer
-      get_url:
+      ansible.builtin.get_url:
         url: https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip
         dest: /tmp/awscliv2.zip
         mode: "0644"
 
     - name: Unzip AWS CLI installer
-      unarchive:
+      ansible.builtin.unarchive:
         src: /tmp/awscliv2.zip
         dest: /tmp
         remote_src: true
 
     - name: Run AWS CLI installer
-      command: /tmp/aws/install --update
+      ansible.builtin.command: /tmp/aws/install --update
       args:
         creates: /usr/local/bin/aws
 
     - name: Clean up AWS CLI installer
-      file:
+      ansible.builtin.file:
         path: "{{ item }}"
         state: absent
       loop:
@@ -50,26 +79,26 @@
   when: starship_install
   block:
     - name: Download Starship installer
-      get_url:
+      ansible.builtin.get_url:
         url: https://starship.rs/install.sh
         dest: /tmp/starship-install.sh
         mode: "0755"
 
     - name: Install Starship
-      command: /tmp/starship-install.sh --yes
+      ansible.builtin.command: /tmp/starship-install.sh --yes
       args:
         creates: /usr/local/bin/starship
 
     - name: Add Starship init to bashrc
-      lineinfile:
+      ansible.builtin.lineinfile:
         path: "{{ dev_home }}/.bashrc"
         line: 'eval "$(starship init bash)"'
-        regexp: 'starship init'
+        regexp: "starship init"
         owner: "{{ dev_user }}"
         group: "{{ dev_user }}"
 
 - name: Apply sysctl tuning
-  sysctl:
+  ansible.posix.sysctl:
     name: "{{ item.key }}"
     value: "{{ item.value }}"
     sysctl_set: true
@@ -77,7 +106,7 @@
   loop: "{{ sysctl_tuning | dict2items }}"
 
 - name: Set open file limits for dev user
-  copy:
+  ansible.builtin.copy:
     content: |
       {{ dev_user }} soft nofile 65536
       {{ dev_user }} hard nofile 65536
@@ -85,7 +114,7 @@
     mode: "0644"
 
 - name: Ensure dev user profile directory exists
-  file:
+  ansible.builtin.file:
     path: "{{ dev_home }}/.local/bin"
     state: directory
     owner: "{{ dev_user }}"
@@ -93,9 +122,9 @@
     mode: "0755"
 
 - name: Add local bin to PATH in bashrc
-  lineinfile:
+  ansible.builtin.lineinfile:
     path: "{{ dev_home }}/.bashrc"
     line: 'export PATH="$HOME/.local/bin:$PATH"'
-    regexp: '\.local/bin'
+    regexp: "\\.local/bin"
     owner: "{{ dev_user }}"
     group: "{{ dev_user }}"

@@ -4,7 +4,7 @@
 # update-ca-trust is run to rebuild the system bundle.
 
 - name: Copy custom CA certificates into trust anchors
-  copy:
+  ansible.builtin.copy:
     src: "{{ item }}"
     dest: /etc/pki/ca-trust/source/anchors/
     mode: "0644"
@@ -13,16 +13,20 @@
     - "ca-certs/*.pem"
   register: ca_certs_copied
 
-- name: Rebuild system CA trust bundle
-  command: update-ca-trust extract
-  when: ca_certs_copied.changed
+# noqa'd no-handler: a play-end handler flush would rebuild the bundle AFTER later
+# roles already downloaded through TLS — the whole point of this role is that
+# subsequent roles trust the custom CAs, so the rebuild must run inline, right here.
+- name: Rebuild system CA trust bundle # noqa: no-handler
+  ansible.builtin.command: update-ca-trust extract
+  changed_when: true
+  when: ca_certs_copied is changed
 
 # Set env vars so tools that bypass OpenSSL defaults also use the bundle.
 # Java (Amazon Corretto on AL2023) links cacerts -> /etc/pki/java/cacerts
 # which update-ca-trust manages, so no keytool step is needed.
 - name: Write /etc/profile.d/ca-trust.sh
   when: ca_cert_env_vars
-  copy:
+  ansible.builtin.copy:
     dest: /etc/profile.d/ca-trust.sh
     mode: "0644"
     content: |

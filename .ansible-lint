@@ -16,8 +16,19 @@ exclude_paths:
   - .planning/                      # planning markdown, not Ansible YAML
   - .github/                        # GitHub Actions workflows are YAML but not Ansible
 
-# Use UTF-8 + parse as plain YAML where appropriate.
-parseable: true
+# NOTE: `parseable` was removed from the ansible-lint config schema in v26 —
+# with it present, ansible-lint 26.x exits 3 ("Invalid configuration file")
+# before linting anything, which is what silently broke the CI job on every
+# branch. Do not re-add it.
+
+skip_list:
+  # 99 pre-v26 findings. Two deliberate patterns: (a) dev_user/dev_home are a
+  # cross-role contract (play vars in playbook.yml; per-role defaults are
+  # standalone-use fallbacks) — role-prefixing them would break the sharing by
+  # design; (b) role-local tool-version pins (mise_version, yq_version, …)
+  # predate the rule. Renaming ~73 vars is churn without a safety win. New
+  # roles SHOULD still prefix their private vars.
+  - var-naming[no-role-prefix]
 
 # Mock variables that come from facts/vault and are not statically resolvable
 # during lint. (Empty by default — populate if/when production profile flags
