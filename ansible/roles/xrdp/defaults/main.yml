@@ -11,10 +11,8 @@
 xrdp_version: ""
 xrdp_xorgxrdp_version: ""
 
-# SPAL requires this AL2023 system-release floor. Older AMIs have no `spal-release` package,
-# so `dnf install spal-release` fails cryptically — the leading assert names this floor.
-# https://docs.aws.amazon.com/linux/al2023/ug/configure-spal-repository.html
-xrdp_spal_min_system_release: "2023.9.20251117"
+# NOTE: SPAL itself (system-release floor gate + spal-release install) is enabled image-wide
+# by the `base` role — exactly once. This role only asserts the repo file exists.
 
 dev_user: ec2-user
 dev_home: /home/ec2-user

@@ -1,7 +1,8 @@
 ---
 # xrdp role — SPAL-sourced xrdp + xorgxrdp remote-desktop path (:3389), ADDITIVE alongside DCV.
-# Mirrors the dcv role: secrets-reuse assert -> SPAL enable -> version-pinned install -> PAM +
-# startwm + TLS-hardened xrdp.ini -> service enable -> SELinux relabel -> static bake asserts.
+# Mirrors the dcv role: secrets-reuse assert -> SPAL precondition assert -> version-pinned
+# install -> PAM + startwm + TLS-hardened xrdp.ini -> service enable -> SELinux relabel ->
+# static bake asserts. SPAL itself is enabled image-wide by the `base` role (exactly once).
 # Wires before `hardening` (invariant C1); the runtime/adversarial half is the Task 3 human-verify.
 
 - name: Assert the dev_user PAM password was set by the secrets role (XRDP-02)
@@ -19,42 +20,30 @@
     quiet: true
   no_log: true
 
-# --- SPAL version floor (XRDP-01) — assert FIRST with a readable fail_msg ---
-# SPAL requires system-release >= xrdp_spal_min_system_release. Older AMIs have no spal-release
-# package, so `dnf install spal-release` fails cryptically. Gate on the actual installed
-# system-release VERSION (from package_facts), which carries the dotted-numeric date form
-# AL2023 uses (e.g. 2023.9.20251117).
+# --- SPAL precondition (XRDP-01) — SPAL is enabled image-wide by the `base` role ---
+# The base role owns the SPAL setup (system-release floor gate + Amazon-signed `spal-release`
+# install, which drops /etc/yum.repos.d/amazonlinux-spal.repo and imports the SPAL GPG keys)
+# so SPAL is set up exactly ONCE per image. This role only ASSERTS that precondition, with a
+# readable failure instead of the cryptic "No match for argument: xrdp" the dnf install below
+# would emit if the repo were missing.
 
-- name: Gather installed package facts for the SPAL system-release floor gate (XRDP-01)
-  ansible.builtin.package_facts:
-    manager: auto
+- name: Stat the SPAL repo file installed by the base role (XRDP-01)
+  ansible.builtin.stat:
+    path: /etc/yum.repos.d/amazonlinux-spal.repo
+  register: xrdp_spal_repo
 
-- name: Assert the AL2023 system-release meets the SPAL version floor (XRDP-01)
+- name: Assert SPAL is enabled (by the base role) before installing xrdp from it (XRDP-01)
   ansible.builtin.assert:
     that:
-      - ansible_facts.packages['system-release'][0].version is version(xrdp_spal_min_system_release, '>=', version_type='loose')
+      - xrdp_spal_repo.stat.exists
     fail_msg: >-
-      This AMI's system-release
-      ({{ ansible_facts.packages['system-release'][0].version | default('absent') }}) is BELOW
-      the SPAL floor ({{ xrdp_spal_min_system_release }}). SPAL (Supplementary Packages for
-      Amazon Linux) is only available on AL2023 >= {{ xrdp_spal_min_system_release }}; older
-      images have no `spal-release` package and `dnf install spal-release` fails cryptically.
-      Rebake from a newer AL2023 source AMI (or `sudo dnf upgrade` the base) and retry.
+      /etc/yum.repos.d/amazonlinux-spal.repo is missing — SPAL is not enabled, so the
+      xrdp/xorgxrdp install below cannot resolve. SPAL is enabled image-wide by the `base`
+      role (spal-release: floor gate + GPG keys + repo file); it is deliberately NOT enabled
+      here so SPAL setup exists exactly once. Check that the base role ran (layers.base) and
+      still carries its SPAL enable block.
       https://docs.aws.amazon.com/linux/al2023/ug/configure-spal-repository.html
     quiet: true
-
-# --- Enable SPAL (XRDP-01) via the Amazon-signed spal-release package ---
-# `dnf install spal-release` drops /etc/yum.repos.d/amazonlinux-spal.repo AND imports the SPAL
-# GPG keys — the canonical SPAL-enable mechanism. This delivers the "SPAL repo file under
-# /etc/yum.repos.d/" the locked decision requires, using the Amazon-signed release package
-# (avoids a drift-prone hand-hardcoded baseurl/GPG key). GPG check stays ON (no --nogpgcheck;
-# CLAUDE.md §8 airgap posture) for spal-release AND every dnf install below.
-
-- name: Enable SPAL via the Amazon-signed spal-release package (XRDP-01)
-  ansible.builtin.dnf:
-    name: spal-release
-    state: present
-    disable_gpg_check: false
 
 # --- System Xorg server (xorgxrdp backend dependency, AL2023 core repo) ---
 # xorgxrdp's Xorg backend runs the SYSTEM Xorg (/usr/bin/Xorg from xorg-x11-server-Xorg). Install
@@ -69,7 +58,7 @@
 
 # --- Install xrdp + xorgxrdp from SPAL (XRDP-01) ---
 # SPAL is an EPEL9 rebuild; xrdp/xorgxrdp are EPEL9 packages, expected present. The SPAL GPG
-# key was imported by spal-release, so disable_gpg_check stays false. Version pin applied when
+# key was imported by spal-release (base role), so disable_gpg_check stays false. Version pin applied when
 # xrdp_version / xorgxrdp_version are set (deferred-pin); bare names install the latest in the
 # versioned SPAL repo until pinned at first bake. Confirm availability at exec with
 # `dnf list --repo=amazonlinux-spal xrdp xorgxrdp`.
