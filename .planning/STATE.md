@@ -132,6 +132,7 @@ See PROJECT.md Key Decisions table.
 | 260602-add-golang-dev-tools | add 11 pinned Go developer tools to the golang role | 2026-06-02 | 88541f0 | [260602-add-golang-dev-tools](./quick/260602-add-golang-dev-tools/) |
 | 260609-dif | enforce noVNC HTTPS-only via `novnc_proxy --ssl-only` | 2026-06-09 | fb59449 | [260609-dif-…](./quick/260609-dif-enforce-https-only-on-novnc-via-novnc-pr/) |
 | 260611-jq2 | (prior DCV role — reverted at d3bd9a0; source for the v4.0 `dcv` role port) | — | 51c5f1f/67faeb3/8538ef3 | git history |
+| 260707-o7s | add xrdp (RDP :3389) from SPAL — additive to DCV, PAM logins; **Tasks 1–2 committed, Task 3 live-verify pending** | 2026-07-07 | 1ab1835/33690e9 | [260707-o7s-xrdp-spal](./quick/260707-o7s-xrdp-spal/) |
 
 ## Session Continuity
 

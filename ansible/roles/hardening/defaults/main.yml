@@ -24,3 +24,12 @@ amzn2023cis_rule_5_3: false
 
 # --- AIDE: filesystem integrity checking is overkill for a dev box ---
 amzn2023cis_config_aide: false
+
+# --- X Window System (CIS 2.2.1): scoped OFF only when the xrdp layer is baked ---
+# CIS 2.2.1 removes xorg-x11-server-common (cascading to xorg-x11-server-Xorg). DCV ships its own
+# /usr/bin/Xdcv, so 2.2.1 stays ENFORCED for DCV-only builds. xrdp's xorgxrdp backend needs the
+# SYSTEM Xorg, which 2.2.1 would strip AFTER the xrdp role installs it — so keep the X server ONLY
+# when the xrdp layer is enabled. Accepted, scoped hardening deviation (CLAUDE.md §8): baking the
+# xrdp layer re-admits the X Window System (larger attack surface). No-xrdp bakes keep 2.2.1
+# enforced and the X server removed. The W1b post-hardening guard in playbook.yml proves it held.
+amzn2023cis_rule_2_2_1: "{{ not (layers.xrdp | default(false) | bool) }}"

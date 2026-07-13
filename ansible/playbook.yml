@@ -68,6 +68,13 @@
       # Gated on desktop too: DCV needs GNOME (desktop role) + the ec2-user PAM password
       # (secrets role, gated on vscode OR desktop), so both must exist before dcv configures auth.
 
+    - role: xrdp
+      when: (layers.xrdp | default(false)) and (layers.desktop | default(false))
+      # xrdp (RDP :3389) from SPAL — a second, WebGL-free remote-desktop path, ADDITIVE to dcv
+      # (quick-task 260707-o7s). MUST stay before hardening (hardening-last invariant). Gated on
+      # desktop too: xrdp needs GNOME (desktop role) + the ec2-user PAM password (secrets role,
+      # gated on vscode OR desktop), so both must exist before xrdp configures PAM auth.
+
     - role: hardening # MUST remain last — invariant (JUP-08 / CLAUDE.md §8)
       when: layers.hardening | default(false)
 
@@ -97,6 +104,30 @@
           `repoquery --requires nice-xdcv` at the Phase-15 UAT.
         quiet: false
       when: (layers.dcv | default(false)) and (layers.desktop | default(false))
+
+    # --- W1b: xrdp Xorg-backend survival guard — runs AFTER all roles, incl. hardening ---
+    # xorgxrdp's backend runs the SYSTEM Xorg (/usr/bin/Xorg from xorg-x11-server-Xorg). CIS 2.2.1
+    # is scoped OFF for xrdp builds (hardening/defaults) so hardening must NOT strip it; this is
+    # the one place a post-hardening removal is observable. Gated on the SAME condition as the
+    # xrdp role so a no-xrdp bake does not fail on an X server it never installed.
+    - name: Stat /usr/bin/Xorg after hardening (W1b — xrdp backend guard)
+      ansible.builtin.stat:
+        path: /usr/bin/Xorg
+      register: xorg_post_hardening
+      when: (layers.xrdp | default(false)) and (layers.desktop | default(false))
+
+    - name: Assert the system Xorg survived hardening for the xrdp backend (W1b)
+      ansible.builtin.assert:
+        that:
+          - xorg_post_hardening.stat.exists
+        fail_msg: >-
+          /usr/bin/Xorg is GONE post-hardening on an xrdp build. xorgxrdp's backend needs the
+          system Xorg, so CIS 2.2.1 (which removes xorg-x11-server-common) MUST be scoped off when
+          the xrdp layer is enabled. Confirm ansible/roles/hardening/defaults/main.yml sets
+          amzn2023cis_rule_2_2_1 to false for xrdp builds. Without the system Xorg, xorgxrdp
+          cannot start and every RDP session fails.
+        quiet: false
+      when: (layers.xrdp | default(false)) and (layers.desktop | default(false))
 
     - name: Clean dnf cache
       ansible.builtin.command: dnf clean all

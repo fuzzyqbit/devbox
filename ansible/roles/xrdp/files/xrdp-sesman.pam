@@ -1,0 +1,12 @@
+#%PAM-1.0
+# /etc/pam.d/xrdp-sesman — the PAM service xrdp-sesman authenticates RDP logins against.
+# Delegates auth/account/session/password to password-auth so the CIS-hardened faillock
+# + pwquality stack applies to RDP logins. Body is identical to /etc/pam.d/dcv (dcv.pam);
+# only this header differs. The xrdp role installs this regardless of what the SPAL xrdp
+# RPM ships, so the AL2023 PAM path is verified/repaired (XRDP-02).
+auth        include     password-auth
+account     include     password-auth
+session     required    pam_loginuid.so
+session     optional    pam_lastlog.so quiet
+session     include     password-auth
+password    include     password-auth

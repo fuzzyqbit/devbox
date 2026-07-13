@@ -1,0 +1,18 @@
+---
+# xrdp role defaults — SPAL-sourced xrdp + xorgxrdp version pins (deferred-pin, CLAUDE.md §9).
+#
+# xrdp_version / xrdp_xorgxrdp_version: leave EMPTY to install the latest package in the versioned
+# SPAL repo (amazonlinux-spal). Once resolved at the first bake, fill each with the exact
+# package version string so `dnf install xrdp-<ver>` pins it deterministically — the closest
+# analog to the repo's SHA-pin invariant (CLAUDE.md §8) available for a package repo.
+# To resolve after the first bake, run ON THE INSTANCE:
+#     dnf list --repo=amazonlinux-spal xrdp xorgxrdp
+# then set both vars to the exact version-release strings (e.g. "0.10.1-1.amzn2023").
+xrdp_version: ""
+xrdp_xorgxrdp_version: ""
+
+# NOTE: SPAL itself (system-release floor gate + spal-release install) is enabled image-wide
+# by the `base` role — exactly once. This role only asserts the repo file exists.
+
+dev_user: ec2-user
+dev_home: /home/ec2-user
