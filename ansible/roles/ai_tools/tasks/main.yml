@@ -63,6 +63,40 @@
   loop_control:
     label: "{{ item.item }}"
 
+# All three CLIs are npm launchers that exec a native platform binary delivered
+# via optionalDependencies. npm treats optional-dep failures as NON-FATAL: the
+# install exits 0 and the bin symlink exists even if the platform binary never
+# landed — and --version can answer from the JS shim without spawning it. Stat
+# the linux-x64 platform package dir explicitly so a silent optional-dep failure
+# fails the bake loudly (final-review finding, 2026-07-14). The nested
+# <pkg>/node_modules/<platform-pkg> layout is [ASSUMED, confirmed-at-first-bake]
+# from npm's global-install dependency nesting.
+- name: Stat each AI CLI linux-x64 platform package (bake-assert)
+  ansible.builtin.stat:
+    path: "{{ ai_tools_npm_prefix }}/lib/node_modules/{{ item.pkg }}/node_modules/{{ item.platform_pkg }}"
+  register: ai_tools_bake_platform
+  loop:
+    - { pkg: "@anthropic-ai/claude-code", platform_pkg: "@anthropic-ai/claude-code-linux-x64" }
+    - { pkg: "@openai/codex", platform_pkg: "@openai/codex-linux-x64" }
+    - { pkg: "opencode-ai", platform_pkg: "opencode-linux-x64" }
+  loop_control:
+    label: "{{ item.platform_pkg }}"
+
+- name: Assert every AI CLI platform binary package landed (bake-assert)
+  ansible.builtin.assert:
+    that:
+      - item.stat.exists
+    fail_msg: >-
+      {{ item.item.platform_pkg }} is missing under
+      {{ ai_tools_npm_prefix }}/lib/node_modules/{{ item.item.pkg }}/node_modules —
+      npm treats optionalDependencies failures as non-fatal, so the install can go
+      green without the native binary and the CLI dies at first runtime use.
+      Rebake with a healthy registry connection.
+    quiet: true
+  loop: "{{ ai_tools_bake_platform.results }}"
+  loop_control:
+    label: "{{ item.item.platform_pkg }}"
+
 - name: Run each AI CLI --version (bake-assert)
   ansible.builtin.command:
     cmd: "{{ ai_tools_npm_prefix }}/bin/{{ item }} --version"

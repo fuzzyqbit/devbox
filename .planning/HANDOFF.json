@@ -16,7 +16,7 @@
   ],
   "remaining_tasks": [
     {"id": 5, "name": "User reviews spec, then invoke superpowers:writing-plans", "status": "not_started"},
-    {"id": 6, "name": "Implement ansible/roles/ai-tools per spec (role, playbook wiring, layer_config)", "status": "not_started"},
+    {"id": 6, "name": "Implement ansible/roles/ai_tools per spec (role, playbook wiring, layer_config)", "status": "not_started"},
     {"id": 7, "name": "ansible-lint + syntax-check + PR + 9-check CI + merge (same flow as PR #4/#5)", "status": "not_started"}
   ],
   "blockers": [],
