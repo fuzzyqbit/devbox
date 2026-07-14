@@ -1,0 +1,99 @@
+---
+# SBOM generation — imported LAST from playbook.yml (after the main play and the
+# firewalld workaround) so the inventory reflects the FINAL image state: everything
+# the roles installed and everything hardening removed. A syft scan earlier in the
+# bake would list packages CIS 2.2.1 strips afterwards.
+#
+# What it produces:
+#   * /etc/devimage-sbom.cdx.json  — CycloneDX 1.x JSON SBOM baked into the image,
+#     next to /etc/devimage-manifest.yml (layer manifest).
+#   * sbom/devimage-sbom.cdx.json  — the same file fetched back to the workstation
+#     (repo root, gitignored) as a per-bake artifact for scanners/archival.
+#
+# Why syft: single static Go binary (checksum-pinned below, same posture as mise),
+# catalogs the rpm db AND non-rpm installs (Go binaries via buildinfo, pip venvs,
+# npm, cargo, /usr/local/bin single-file tools), which is exactly this image's
+# problem — most tools arrive outside dnf. The binary stays on the image after the
+# scan (it is itself catalogued), so operators can re-run `syft` on the live box.
+#
+# Update procedure: bump sbom_syft_version + sbom_syft_sha256 from the upstream
+# syft_<ver>_checksums.txt, rebake.
+- name: Generate the image SBOM (syft, CycloneDX)
+  hosts: all
+  become: true
+  vars:
+    # [VERIFIED: github.com/anchore/syft/releases — 2026-07-14]
+    # SHA-256 from upstream syft_1.46.0_checksums.txt for syft_1.46.0_linux_amd64.tar.gz.
+    sbom_syft_version: "1.46.0"
+    sbom_syft_sha256: "d654f678b709eb53c393d38519d5ed7d2e57205529404018614cfefa0fb2b5ca"
+    sbom_output_path: /etc/devimage-sbom.cdx.json
+    # Bake-assert floor: the full image carries 1000+ rpm packages alone; a count
+    # below this means syft scanned the wrong root or died mid-scan.
+    sbom_min_components: 200
+    # Fetch destination on the workstation (playbook_dir = ansible/). Gitignored.
+    sbom_local_dir: "{{ playbook_dir }}/../sbom"
+
+  tasks:
+    - name: Download the checksum-pinned syft {{ sbom_syft_version }}
+      ansible.builtin.get_url:
+        url: "https://github.com/anchore/syft/releases/download/v{{ sbom_syft_version }}/syft_{{ sbom_syft_version }}_linux_amd64.tar.gz"
+        dest: /tmp/syft.tar.gz
+        mode: "0644"
+        checksum: "sha256:{{ sbom_syft_sha256 }}"
+
+    - name: Install the syft binary
+      ansible.builtin.unarchive:
+        src: /tmp/syft.tar.gz
+        dest: /usr/local/bin
+        remote_src: true
+        extra_opts:
+          - syft
+        mode: "0755"
+
+    - name: Clean up the syft archive
+      ansible.builtin.file:
+        path: /tmp/syft.tar.gz
+        state: absent
+
+    # Pseudo-filesystems and volatile/user paths are excluded: they are not image
+    # content, and /proc//sys traversal both slows the scan and can hang readers.
+    # SYFT_CHECK_FOR_APP_UPDATE=false keeps the run network-silent (§2 airgap posture).
+    - name: Scan the root filesystem into a CycloneDX SBOM
+      ansible.builtin.command:
+        cmd: >-
+          /usr/local/bin/syft scan dir:/
+          --exclude ./proc/** --exclude ./sys/** --exclude ./dev/**
+          --exclude ./run/** --exclude ./tmp/** --exclude ./var/tmp/**
+          --exclude ./home/**
+          -o cyclonedx-json={{ sbom_output_path }}
+        creates: "{{ sbom_output_path }}"
+      environment:
+        SYFT_CHECK_FOR_APP_UPDATE: "false"
+
+    - name: Ensure the SBOM file is world-readable
+      ansible.builtin.file:
+        path: "{{ sbom_output_path }}"
+        mode: "0644"
+
+    - name: Count SBOM components
+      ansible.builtin.command:
+        cmd: "jq '.components | length' {{ sbom_output_path }}"
+      register: sbom_component_count
+      changed_when: false
+
+    - name: Assert the SBOM is non-trivial (bake-assert)
+      ansible.builtin.assert:
+        that:
+          - (sbom_component_count.stdout | int) >= sbom_min_components
+        fail_msg: >-
+          SBOM at {{ sbom_output_path }} has only {{ sbom_component_count.stdout }}
+          components (floor: {{ sbom_min_components }}). syft likely scanned the wrong
+          root or aborted mid-scan — the artifact is not a faithful image inventory.
+          Inspect the syft scan task output and rebake.
+        quiet: false
+
+    - name: Fetch the SBOM back to the workstation (per-bake artifact)
+      ansible.builtin.fetch:
+        src: "{{ sbom_output_path }}"
+        dest: "{{ sbom_local_dir }}/devimage-sbom.cdx.json"
+        flat: true

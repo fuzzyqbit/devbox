@@ -13,6 +13,10 @@ terraform/terraform.tfstate.d/
 # Ansible
 *.retry
 
+# Per-bake SBOM artifact fetched back by ansible/sbom.yml (image copy lives at
+# /etc/devimage-sbom.cdx.json). Local-only; archive elsewhere if needed.
+sbom/
+
 # OS
 .DS_Store
 

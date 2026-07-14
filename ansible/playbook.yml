@@ -155,3 +155,9 @@
 # managed properly (or once firewalld is removed entirely).
 - name: Apply the firewalld/docker workaround (see firewalld-docker-fix.yml header)
   import_playbook: firewalld-docker-fix.yml
+
+# SBOM: MUST stay the last import — it inventories the final image state
+# (see sbom.yml header). Writes /etc/devimage-sbom.cdx.json on the image and
+# fetches a copy to sbom/ on the workstation as a per-bake artifact.
+- name: Generate the image SBOM (see sbom.yml header)
+  import_playbook: sbom.yml
