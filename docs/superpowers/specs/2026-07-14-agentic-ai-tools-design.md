@@ -23,7 +23,7 @@ on PATH out of the box: Claude Code, OpenAI Codex CLI, opencode.
 ## Role layout
 
 ```
-ansible/roles/ai-tools/
+ansible/roles/ai_tools/
 ├── defaults/main.yml
 └── tasks/main.yml
 ```

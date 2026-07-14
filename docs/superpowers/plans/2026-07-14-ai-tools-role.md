@@ -4,7 +4,7 @@
 
 **Goal:** Bake three agentic AI coding CLIs (Claude Code, OpenAI Codex CLI, opencode) into the devbox AMI as version-pinned npm globals, per the approved spec `docs/superpowers/specs/2026-07-14-agentic-ai-tools-design.md`.
 
-**Architecture:** New self-contained Ansible role `ansible/roles/ai-tools/` (defaults + tasks) that dnf-installs nodejs20, npm-installs the three pinned packages to `/usr/local`, and bake-asserts each binary (stat + `--version`). Wired into `ansible/playbook.yml` after `devtools` / before `secrets`, gated on `layers.ai_tools`.
+**Architecture:** New self-contained Ansible role `ansible/roles/ai_tools/` (defaults + tasks) that dnf-installs nodejs20, npm-installs the three pinned packages to `/usr/local`, and bake-asserts each binary (stat + `--version`). Wired into `ansible/playbook.yml` after `devtools` / before `secrets`, gated on `layers.ai_tools`.
 
 **Tech Stack:** Ansible (ansible-core ≥ 2.16, FQCN modules only), AL2023 dnf (`nodejs20`, `nodejs20-npm`), npm global installs, ansible-lint (production profile), GitHub Actions CI (9-check gate), `gh` CLI for PR flow.
 
@@ -28,13 +28,13 @@
 ### Task 1: Role files — `defaults/main.yml` + `tasks/main.yml`
 
 **Files:**
-- Create: `ansible/roles/ai-tools/defaults/main.yml`
-- Create: `ansible/roles/ai-tools/tasks/main.yml`
+- Create: `ansible/roles/ai_tools/defaults/main.yml`
+- Create: `ansible/roles/ai_tools/tasks/main.yml`
 - Test: ansible-lint over the role directory (IaC — lint/syntax IS the test cycle; the in-file asserts are the bake-time tests)
 
 **Interfaces:**
 - Consumes: nothing from other tasks. AL2023 repo packages `nodejs20`, `nodejs20-npm` (same names the `devtools` role installs — `ansible/roles/devtools/defaults/main.yml:3-4`).
-- Produces: role directory name `ai-tools` (referenced by Task 2's `role: ai-tools` playbook entry); defaults vars `ai_tools_claude_code_version`, `ai_tools_codex_version`, `ai_tools_opencode_version`, `ai_tools_npm_prefix`; installed binaries `/usr/local/bin/{claude,codex,opencode}` on the image.
+- Produces: role directory name `ai_tools` (referenced by Task 2's `role: ai_tools` playbook entry); defaults vars `ai_tools_claude_code_version`, `ai_tools_codex_version`, `ai_tools_opencode_version`, `ai_tools_npm_prefix`; installed binaries `/usr/local/bin/{claude,codex,opencode}` on the image.
 
 - [ ] **Step 1: Re-verify the three npm pins (freshness check)**
 
@@ -48,7 +48,7 @@ npm view opencode-ai version
 
 Expected: `2.1.209`, `0.144.4`, `1.17.20`. If the registry shows newer versions, use the NEWER version strings in Step 2 (latest-at-implementation is the pin policy; note the bump in the Task 1 commit message). If a package name 404s, STOP — do not guess an alternate name; report back.
 
-- [ ] **Step 2: Write `ansible/roles/ai-tools/defaults/main.yml`**
+- [ ] **Step 2: Write `ansible/roles/ai_tools/defaults/main.yml`**
 
 ```yaml
 ---
@@ -69,7 +69,7 @@ Deliberate deviation from the spec's defaults sketch: `dev_user` / `dev_home` ar
 
 If Step 1 returned newer versions, substitute them and update the `[VERIFIED: …]` date to the actual check date.
 
-- [ ] **Step 3: Write `ansible/roles/ai-tools/tasks/main.yml`**
+- [ ] **Step 3: Write `ansible/roles/ai_tools/tasks/main.yml`**
 
 ```yaml
 ---
@@ -150,7 +150,7 @@ If Step 1 returned newer versions, substitute them and update the `[VERIFIED: �
 - [ ] **Step 4: Lint the role**
 
 ```bash
-ansible-lint ansible/roles/ai-tools/
+ansible-lint ansible/roles/ai_tools/
 ```
 
 Expected: `Passed: 0 failure(s), 0 warning(s)` (production profile — repo config applies). If `name[template]` fires, a task name has mid-string Jinja — reword so any Jinja sits at the end (or remove it). If `no-changed-when` fires, a `command:` task lost its `creates:`/`changed_when:` — restore it.
@@ -158,7 +158,7 @@ Expected: `Passed: 0 failure(s), 0 warning(s)` (production profile — repo conf
 - [ ] **Step 5: Commit**
 
 ```bash
-git add ansible/roles/ai-tools/
+git add ansible/roles/ai_tools/
 ```
 
 Then, as its OWN Bash call:
@@ -179,7 +179,7 @@ Verify: `git log --oneline -1` shows the commit on `feat/ai-tools-role`.
 - Test: `ansible-playbook --syntax-check` on the full import chain + `ansible-lint` on the playbook
 
 **Interfaces:**
-- Consumes: role directory `ai-tools` and its defaults (Task 1).
+- Consumes: role directory `ai_tools` and its defaults (Task 1).
 - Produces: `layers.ai_tools` toggle consumed by the playbook gate; the complete, lintable playbook Task 3 ships.
 
 - [ ] **Step 1: Insert the role entry in `ansible/playbook.yml`**
@@ -202,7 +202,7 @@ Insert between them, so the block reads:
     - role: devtools
       when: layers.devtools | default(false)
 
-    - role: ai-tools
+    - role: ai_tools
       when: layers.ai_tools | default(false)
       # Agentic AI coding CLIs (claude, codex, opencode) as pinned npm globals in
       # /usr/local. Self-contained (installs nodejs20 itself, no devtools dependency).
@@ -234,7 +234,7 @@ Change to:
   ai_tools: true
 ```
 
-(Underscore key `ai_tools` vs dash role dir `ai-tools` follows the existing `persistent_home` / `persistent-home` precedent.)
+(Role dir and layers key are both `ai_tools` — the role-name lint rule forbids dashes; maintainer decision 2026-07-14.)
 
 - [ ] **Step 3: Syntax-check the full import chain**
 
@@ -313,7 +313,7 @@ Write `$CLAUDE_JOB_DIR/tmp/pr-body-ai-tools.md`:
 
 ```markdown
 ## Summary
-- New `ansible/roles/ai-tools/` role: bakes three agentic AI coding CLIs as pinned npm globals in `/usr/local` — `@anthropic-ai/claude-code@2.1.209` (`claude`), `@openai/codex@0.144.4` (`codex`), `opencode-ai@1.17.20` (`opencode`)
+- New `ansible/roles/ai_tools/` role: bakes three agentic AI coding CLIs as pinned npm globals in `/usr/local` — `@anthropic-ai/claude-code@2.1.209` (`claude`), `@openai/codex@0.144.4` (`codex`), `opencode-ai@1.17.20` (`opencode`)
 - Self-contained: role dnf-installs nodejs20 + nodejs20-npm itself (idempotent overlap with devtools)
 - NO auth baked (secrets invariant): runtime login only; credentials persist on the /home EBS volume
 - Bake-asserts per binary (stat + `--version`) — bake-green-but-broken guard, dcv/xrdp pattern
@@ -382,4 +382,4 @@ Use the real merge SHA from `git log origin/main --oneline -1` after merge. No c
 
 **Placeholder scan:** every code step carries full file/block content; commands carry expected output. `<PR#>`/`<merge-sha>`/`<run-id>` are runtime values resolved by earlier steps in the same task, not placeholders. ✔
 
-**Type consistency:** var names identical across defaults, tasks, and prose (`ai_tools_claude_code_version`, `ai_tools_codex_version`, `ai_tools_opencode_version`, `ai_tools_npm_prefix`); register names `ai_tools_bake_bins` used once; role dir `ai-tools` vs layers key `ai_tools` consistent everywhere. ✔
+**Type consistency:** var names identical across defaults, tasks, and prose (`ai_tools_claude_code_version`, `ai_tools_codex_version`, `ai_tools_opencode_version`, `ai_tools_npm_prefix`); register names `ai_tools_bake_bins` used once; role dir and layers key both `ai_tools`. ✔
