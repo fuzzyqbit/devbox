@@ -29,6 +29,9 @@ skip_list:
   # predate the rule. Renaming ~73 vars is churn without a safety win. New
   # roles SHOULD still prefix their private vars.
   - var-naming[no-role-prefix]
+  # Project convention: role names use hyphens (persistent-home, ai-tools, etc.);
+  # renaming to underscores would break references in playbook.yml.
+  - role-name
 
 # Mock variables that come from facts/vault and are not statically resolvable
 # during lint. (Empty by default — populate if/when production profile flags
