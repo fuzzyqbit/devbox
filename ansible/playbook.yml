@@ -51,6 +51,13 @@
     - role: devtools
       when: layers.devtools | default(false)
 
+    - role: ai_tools
+      when: layers.ai_tools | default(false)
+      # Agentic AI coding CLIs (claude, codex, opencode) as pinned npm globals in
+      # /usr/local. Self-contained (installs nodejs20 itself, no devtools dependency).
+      # NO auth baked — operators log in at runtime; creds persist on the /home EBS
+      # volume. MUST stay before hardening (last-role invariant).
+
     - role: secrets
       when: >-
         (layers.vscode | default(false)) or

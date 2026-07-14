@@ -1,0 +1,107 @@
+---
+# Agentic AI coding CLIs (Claude Code, OpenAI Codex CLI, opencode) baked as pinned
+# npm globals (design: docs/superpowers/specs/2026-07-14-agentic-ai-tools-design.md).
+# NO auth is baked (CLAUDE.md §8 secrets invariant): operators authenticate at
+# runtime (claude/codex/opencode login flows); credentials land under
+# /home/ec2-user on the persistent EBS volume and survive AMI swaps.
+# Self-contained: installs nodejs20 itself rather than depending on the devtools
+# layer toggle (which happens to install the same packages — dnf is idempotent).
+
+- name: Install the nodejs runtime for the AI CLIs
+  ansible.builtin.dnf:
+    name:
+      - nodejs20
+      - nodejs20-npm
+    state: present
+
+# NOTE [ASSUMED, confirmed-at-first-bake]: AL2023's nodejs20/nodejs20-npm packages
+# register `node`/`npm` via alternatives. If the first bake fails here with
+# "npm: command not found", switch cmd to `npm-20` (the versioned binary name).
+- name: Install the pinned AI CLI npm packages
+  ansible.builtin.command:
+    cmd: >-
+      npm install -g --prefix {{ ai_tools_npm_prefix }}
+      {{ item.pkg }}@{{ item.pin }}
+    creates: "{{ ai_tools_npm_prefix }}/lib/node_modules/{{ item.pkg }}"
+  loop:
+    - { pkg: "@anthropic-ai/claude-code", pin: "{{ ai_tools_claude_code_version }}" }
+    - { pkg: "@openai/codex", pin: "{{ ai_tools_codex_version }}" }
+    - { pkg: "opencode-ai", pin: "{{ ai_tools_opencode_version }}" }
+  loop_control:
+    label: "{{ item.pkg }}"
+
+- name: Remove the root npm cache (image hygiene)
+  ansible.builtin.file:
+    path: /root/.npm
+    state: absent
+
+# ── Bake-asserts (dcv/xrdp bake-green-but-broken pattern) ──
+# Stat proves npm linked each binary into <prefix>/bin; --version proves the
+# binary actually executes on AL2023 (node ABI, bundled platform deps). A broken
+# install fails the bake loudly here instead of shipping a dead CLI.
+
+- name: Stat the installed AI CLI binaries (bake-assert)
+  ansible.builtin.stat:
+    path: "{{ ai_tools_npm_prefix }}/bin/{{ item }}"
+  register: ai_tools_bake_bins
+  loop:
+    - claude
+    - codex
+    - opencode
+
+- name: Assert every AI CLI binary exists (bake-assert)
+  ansible.builtin.assert:
+    that:
+      - item.stat.exists
+    fail_msg: >-
+      {{ item.item }} is missing from {{ ai_tools_npm_prefix }}/bin after the npm
+      install — npm did not link the binary. Check the npm --prefix bin layout
+      ({{ ai_tools_npm_prefix }}/lib/node_modules vs bin symlinks) and the package's
+      "bin" field.
+    quiet: true
+  loop: "{{ ai_tools_bake_bins.results }}"
+  loop_control:
+    label: "{{ item.item }}"
+
+# All three CLIs are npm launchers that exec a native platform binary delivered
+# via optionalDependencies. npm treats optional-dep failures as NON-FATAL: the
+# install exits 0 and the bin symlink exists even if the platform binary never
+# landed — and --version can answer from the JS shim without spawning it. Stat
+# the linux-x64 platform package dir explicitly so a silent optional-dep failure
+# fails the bake loudly (final-review finding, 2026-07-14). The nested
+# <pkg>/node_modules/<platform-pkg> layout is [ASSUMED, confirmed-at-first-bake]
+# from npm's global-install dependency nesting.
+- name: Stat each AI CLI linux-x64 platform package (bake-assert)
+  ansible.builtin.stat:
+    path: "{{ ai_tools_npm_prefix }}/lib/node_modules/{{ item.pkg }}/node_modules/{{ item.platform_pkg }}"
+  register: ai_tools_bake_platform
+  loop:
+    - { pkg: "@anthropic-ai/claude-code", platform_pkg: "@anthropic-ai/claude-code-linux-x64" }
+    - { pkg: "@openai/codex", platform_pkg: "@openai/codex-linux-x64" }
+    - { pkg: "opencode-ai", platform_pkg: "opencode-linux-x64" }
+  loop_control:
+    label: "{{ item.platform_pkg }}"
+
+- name: Assert every AI CLI platform binary package landed (bake-assert)
+  ansible.builtin.assert:
+    that:
+      - item.stat.exists
+    fail_msg: >-
+      {{ item.item.platform_pkg }} is missing under
+      {{ ai_tools_npm_prefix }}/lib/node_modules/{{ item.item.pkg }}/node_modules —
+      npm treats optionalDependencies failures as non-fatal, so the install can go
+      green without the native binary and the CLI dies at first runtime use.
+      Rebake with a healthy registry connection.
+    quiet: true
+  loop: "{{ ai_tools_bake_platform.results }}"
+  loop_control:
+    label: "{{ item.item.platform_pkg }}"
+
+- name: Run each AI CLI --version (bake-assert)
+  ansible.builtin.command:
+    cmd: "{{ ai_tools_npm_prefix }}/bin/{{ item }} --version"
+  changed_when: false
+  loop:
+    - claude
+    - codex
+    - opencode

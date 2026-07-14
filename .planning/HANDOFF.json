@@ -1,0 +1,35 @@
+{
+  "version": "1.0",
+  "timestamp": "2026-07-14T16:10:38.347Z",
+  "phase": null,
+  "phase_name": "non-phase: feature-branch/PR flow (superpowers brainstorming → plan → implement)",
+  "phase_dir": null,
+  "plan": null,
+  "task": 4,
+  "total_tasks": 5,
+  "status": "paused",
+  "completed_tasks": [
+    {"id": 1, "name": "SBOM bake feature (PR #5) merged to main", "status": "done", "commit": "79176c9"},
+    {"id": 2, "name": "Main CI green after PR #5 (run 29343591544)", "status": "done", "commit": "79176c9"},
+    {"id": 3, "name": "ai-tools role: brainstorm + user-approved design", "status": "done", "commit": null},
+    {"id": 4, "name": "ai-tools design spec written, self-reviewed, committed", "status": "in_progress", "progress": "spec at docs/superpowers/specs/2026-07-14-agentic-ai-tools-design.md on feat/ai-tools-role (2a98f4b); awaiting user spec review"}
+  ],
+  "remaining_tasks": [
+    {"id": 5, "name": "User reviews spec, then invoke superpowers:writing-plans", "status": "not_started"},
+    {"id": 6, "name": "Implement ansible/roles/ai_tools per spec (role, playbook wiring, layer_config)", "status": "not_started"},
+    {"id": 7, "name": "ansible-lint + syntax-check + PR + 9-check CI + merge (same flow as PR #4/#5)", "status": "not_started"}
+  ],
+  "blockers": [],
+  "human_actions_pending": [
+    {"action": "Review docs/superpowers/specs/2026-07-14-agentic-ai-tools-design.md", "context": "superpowers brainstorming user-review gate before implementation plan", "blocking": true}
+  ],
+  "decisions": [
+    {"decision": "ai-tools role bakes @anthropic-ai/claude-code 2.1.209, @openai/codex 0.144.4, opencode-ai 1.17.20", "rationale": "user-selected tool set; versions resolved live from npm registry 2026-07-14", "phase": null},
+    {"decision": "npm global install with --prefix /usr/local, pinned versions", "rationale": "repo pin invariant; keeps rpm-owned /usr clean; mise-managed rejected (MISE-03), vendor scripts rejected (unpinned/self-updating)", "phase": null},
+    {"decision": "No auth baked (no keys, no Bedrock IAM, no SSM plumbing)", "rationale": "secrets invariant; operator authenticates at runtime, creds persist on /home EBS volume", "phase": null},
+    {"decision": "Role gated layers.ai_tools, placed after devtools/before secrets in playbook.yml", "rationale": "well before hardening (last-role invariant); role installs nodejs20 itself so it does not depend on devtools layer toggle", "phase": null}
+  ],
+  "uncommitted_files": [],
+  "next_action": "User reviews the ai-tools spec; on approval invoke superpowers:writing-plans, then implement on feat/ai-tools-role",
+  "context_notes": "Session flow: PR #5 (SBOM: syft 1.46.0 checksum-pinned, sbom.yml imported LAST in playbook.yml, /etc/devimage-sbom.cdx.json + fetched sbom/ artifact, jq >=200 component bake-assert) merged as 79176c9, main CI green. Then brainstormed ai-tools role via superpowers flow; design approved by user in-session; spec committed. Memory ledger project_unmerged_milestone_backlog updated with PR#4/PR#5 + repo warts (no-changeme hook false-positive on secrets generate.yml asserts — latent, hooks not installed in clone; terraform role's terraform_version pin is dead — installs unpinned repo terraform)."
+}
