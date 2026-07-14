@@ -1,0 +1,12 @@
+---
+# Agentic AI coding CLIs — one pinned version per tool (repo pin invariant).
+# [VERIFIED: registry.npmjs.org — 2026-07-14]
+# Bump procedure: `npm view <pkg> version`, update the pin, rebake.
+ai_tools_claude_code_version: "2.1.209" # @anthropic-ai/claude-code
+ai_tools_codex_version: "0.144.4" # @openai/codex
+ai_tools_opencode_version: "1.17.20" # opencode-ai
+
+# npm global prefix: binaries land in <prefix>/bin, packages in <prefix>/lib/node_modules.
+# /usr/local keeps the rpm-owned /usr tree clean (same target as the other hand-installed
+# tools: kubectl, helm, mise, syft).
+ai_tools_npm_prefix: /usr/local
