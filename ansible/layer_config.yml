@@ -21,6 +21,9 @@ layers:
   vscode: true
   git: true
   devtools: true
+  # ai_tools bakes the agentic AI coding CLIs (claude, codex, opencode) as pinned
+  # npm globals — no auth baked, operators log in at runtime.
+  ai_tools: true
   desktop: true
   # vscode_desktop gates the Microsoft VS Code editor block inside the desktop role
   # (distinct from `vscode`, which is the browser code-server). Only applies when desktop is on.
