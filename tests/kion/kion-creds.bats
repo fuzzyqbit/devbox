@@ -171,3 +171,10 @@ write_profile() { # helper: call kc_write_aws_profile in a throwaway shell
   run "$SCRIPT" --id 101 --password-stdin <<<"pw"
   [ "$status" -eq 5 ]
 }
+
+@test "--password-stdin accepts a password with no trailing newline" {
+  printf '%s' "hunter2" >"${TEST_TMP}/pw"
+  run "$SCRIPT" --id 101 --password-stdin <"${TEST_TMP}/pw"
+  [ "$status" -eq 0 ]
+  grep -q 'hunter2' "$MOCK_LOG"
+}

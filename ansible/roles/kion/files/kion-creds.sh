@@ -156,7 +156,10 @@ kc_api() { # kc_api METHOD PATH [JSON_BODY] [CODE_ON_404] — sets KC_RESPONSE
 
 kc_read_password() { # sets KC_PASSWORD; never echoes, never on argv
   if (( ARG_PASSWORD_STDIN )); then
-    IFS= read -r KC_PASSWORD || err "$EX_USAGE" "--password-stdin given but stdin is empty"
+    # read returns nonzero at EOF-without-newline even though it populated the
+    # var — accept a non-empty password either way.
+    IFS= read -r KC_PASSWORD || [[ -n "$KC_PASSWORD" ]] \
+      || err "$EX_USAGE" "--password-stdin given but stdin is empty"
   elif kc_has_tty; then
     printf 'Kion password for %s: ' "$KC_USERNAME" >/dev/tty
     IFS= read -rs KC_PASSWORD </dev/tty
