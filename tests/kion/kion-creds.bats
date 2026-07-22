@@ -16,6 +16,7 @@ setup() {
   export PATH="${BATS_TEST_DIRNAME}/mocks:${PATH}"
   export MOCK_DIR="${BATS_TEST_DIRNAME}/fixtures/happy"
   export MOCK_LOG="${TEST_TMP}/curl.log"
+  export MOCK_ARGV_LOG="${TEST_TMP}/curl-argv.log"
 }
 
 teardown() { rm -rf "$TEST_TMP"; }
@@ -116,6 +117,12 @@ write_profile() { # helper: call kc_write_aws_profile in a throwaway shell
   grep -q 'KION_LAST_PROJECT_ID=101' "${KION_CREDS_USER_DIR}/state"
   grep -q 'KION_LAST_USERNAME=' "${KION_CREDS_USER_DIR}/state"
   grep -q 'hunter2' "$MOCK_LOG"           # password travelled in a request body
+  # `run` + status (not bare `! grep`): a non-final `!` line never fails a bats
+  # test (SC2314), so these must be status-checked to actually guard argv.
+  run grep 'hunter2' "$MOCK_ARGV_LOG"
+  [ "$status" -ne 0 ]                     # password never on curl argv
+  run grep 'test-bearer-token' "$MOCK_ARGV_LOG"
+  [ "$status" -ne 0 ]                     # bearer token never on curl argv
 }
 
 @test "cached project id reused when --id omitted" {

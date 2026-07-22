@@ -132,10 +132,17 @@ kc_api() { # kc_api METHOD PATH [JSON_BODY] [CODE_ON_404] — sets KC_RESPONSE
       -H "accept: application/json" -H "content-type: application/json"
       -w $'\n%{http_code}'
     )
-    [[ -n "${KC_TOKEN:-}" ]] && curl_args+=(-H "authorization: Bearer ${KC_TOKEN}")
     [[ -n "$body" ]] && curl_args+=(--data-binary @-)
     set +e
-    raw=$(printf '%s' "$body" | curl "${curl_args[@]}")
+    if [[ -n "${KC_TOKEN:-}" ]]; then
+      # Token via an fd-backed header file (-H @file, curl >= 7.55): never on
+      # argv (/proc/cmdline is world-readable), never in the filesystem
+      # namespace (bash herestrings use unlinked temp files).
+      raw=$(printf '%s' "$body" | curl "${curl_args[@]}" -H "@/dev/fd/3" \
+        3<<<"authorization: Bearer ${KC_TOKEN}")
+    else
+      raw=$(printf '%s' "$body" | curl "${curl_args[@]}")
+    fi
     rc=$?
     set -e
     (( rc == 0 )) || err "$EX_NETWORK" "cannot reach Kion at ${KION_URL} (curl exit ${rc})"

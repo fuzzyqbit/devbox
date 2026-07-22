@@ -24,6 +24,7 @@ name=$(printf '%s' "$path" | tr -c 'A-Za-z0-9' '_')
 body=""
 [[ "$has_body" == "1" ]] && body=$(cat)
 { printf '%s %s\n' "$method" "$path"; printf '%s\n' "$body"; } >>"${MOCK_LOG:-/dev/null}"
+printf '%s\n' "$*" >>"${MOCK_ARGV_LOG:-/dev/null}"
 
 status_var="MOCK_STATUS_${name}"
 status="${!status_var:-200}"
