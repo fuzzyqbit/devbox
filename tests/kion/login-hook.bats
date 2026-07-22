@@ -87,3 +87,10 @@ source_hook() {
   [ "$status" -eq 0 ]
   [ -z "$output" ]
 }
+
+@test "hook sources cleanly under plain sh (non-interactive no-op)" {
+  run sh -c ". '$HOOK'"
+  [ "$status" -eq 0 ]
+  [ -z "$output" ]
+  [ ! -s "$CALL_LOG" ]
+}

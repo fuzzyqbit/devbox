@@ -65,6 +65,7 @@
   changed_when: false
   failed_when: kion_check.rc not in [0, 9]
 
+# The ".https" grep is deliberate: a credentials endpoint must be TLS — http:// kion_url fails the bake by design.
 - name: Assert the rendered conf carries the org URL (bake-assert)
   ansible.builtin.command:
     cmd: grep -q "^KION_URL=.https" /etc/kion-creds.conf

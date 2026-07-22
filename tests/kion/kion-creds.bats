@@ -75,6 +75,22 @@ seed_fresh_state() { # helper: state + creds file that pass --check
   [ "$status" -eq 0 ]
 }
 
+@test "non-numeric KION_REFRESH_FUDGE_SECONDS exits 2 on --check (no arith crash)" {
+  mkdir -p "$KION_CREDS_USER_DIR"
+  printf 'KION_REFRESH_FUDGE_SECONDS="soon"\n' >"${KION_CREDS_USER_DIR}/config"
+  run "$SCRIPT" --check
+  [ "$status" -eq 2 ]
+  [[ "$output" == *"KION_REFRESH_FUDGE_SECONDS must be a number"* ]]
+}
+
+@test "non-numeric KION_STAK_TTL_SECONDS exits 2 on the fetch path" {
+  mkdir -p "$KION_CREDS_USER_DIR"
+  printf 'KION_STAK_TTL_SECONDS="soon"\n' >"${KION_CREDS_USER_DIR}/config"
+  run "$SCRIPT" --id 101 --password-stdin <<<"pw"
+  [ "$status" -eq 2 ]
+  [[ "$output" == *"KION_STAK_TTL_SECONDS must be a number"* ]]
+}
+
 @test "missing project id (no --id, no cache) exits 2 with hint" {
   run "$SCRIPT" --password-stdin <<<"pw"
   [ "$status" -eq 2 ]
@@ -219,7 +235,7 @@ EOF
 }
 
 @test "invalid pick number exits 2" {
-  # shellcheck disable=SC2031  # each @test runs in its own subshell — the export is intentionally test-local
+  # shellcheck disable=SC2030,SC2031  # each @test runs in its own subshell — the export is intentionally test-local
   export MOCK_DIR="${BATS_TEST_DIRNAME}/fixtures/multi"
   run "$SCRIPT" --id 101 --password-stdin <<EOF
 pw
@@ -227,6 +243,18 @@ pw
 EOF
   [ "$status" -eq 2 ]
   [[ "$output" == *"invalid selection"* ]]
+}
+
+@test "octal-looking pick (08) is an invalid selection, not a bash error" {
+  # shellcheck disable=SC2030,SC2031  # each @test runs in its own subshell — the export is intentionally test-local
+  export MOCK_DIR="${BATS_TEST_DIRNAME}/fixtures/multi"
+  run "$SCRIPT" --id 101 --password-stdin <<EOF
+pw
+08
+EOF
+  [ "$status" -eq 2 ]
+  [[ "$output" == *"invalid selection"* ]]
+  [[ "$output" != *"value too great"* ]]   # proves no bash octal-base error
 }
 
 @test "no tty and no --password-stdin exits 8" {

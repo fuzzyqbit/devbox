@@ -36,6 +36,12 @@ KION_USERNAME="${KION_USERNAME:-}"
 
 ARG_ID="" ARG_CAR="" ARG_USER="" ARG_CHECK=0 ARG_PASSWORD_STDIN=0
 
+# Cleanup for the mktemp files in kc_write_state / kc_write_aws_profile: an
+# err/exit between mktemp and mv must not leave a stray dotfile behind.
+KC_TMPFILE=""
+# shellcheck disable=SC2064  # single-quoted deliberately — expanded at exit
+trap '[[ -n "$KC_TMPFILE" ]] && rm -f "$KC_TMPFILE"' EXIT
+
 err() { # err EXIT_CODE MESSAGE...
   local code="$1"; shift
   printf 'kion-creds: %s\n' "$*" >&2
@@ -98,6 +104,7 @@ kc_write_state() { # kc_write_state PROJECT_ID USERNAME EXPIRY_EPOCH
   chmod 700 "$KION_CREDS_USER_DIR"
   local tmp
   tmp=$(mktemp "${KION_CREDS_USER_DIR}/.state.XXXXXX")
+  KC_TMPFILE="$tmp"
   {
     printf 'KION_LAST_PROJECT_ID=%q\n' "$1"
     printf 'KION_LAST_USERNAME=%q\n' "$2"
@@ -105,6 +112,7 @@ kc_write_state() { # kc_write_state PROJECT_ID USERNAME EXPIRY_EPOCH
   } >"$tmp"
   chmod 600 "$tmp"
   mv "$tmp" "$STATE_FILE"
+  KC_TMPFILE=""
 }
 
 kc_creds_fresh() { # 0 = cached STAK still valid (refresh fudge applied)
@@ -211,7 +219,11 @@ kc_pick() { # kc_pick LABEL CHOICE... — prints the selected choice
   else
     err "$EX_NOTTY" "multiple ${label}s but no tty to pick from (use --car or --password-stdin)"
   fi
-  if ! [[ "$choice" =~ ^[0-9]+$ ]] || (( choice < 1 || choice > $# )); then
+  [[ "$choice" =~ ^[0-9]+$ ]] || err "$EX_USAGE" "invalid selection: ${choice}"
+  # Force base 10: a leading zero ("08") would otherwise be read as octal and
+  # blow up the arithmetic range check with "value too great for base".
+  choice=$((10#$choice))
+  if (( choice < 1 || choice > $# )); then
     err "$EX_USAGE" "invalid selection: ${choice}"
   fi
   local choices=("$@")
@@ -261,6 +273,7 @@ kc_write_aws_profile() { # kc_write_aws_profile PROFILE AKID SECRET SESSION_TOKE
   dir=$(dirname "$AWS_CREDS_FILE")
   mkdir -p "$dir"
   tmp=$(mktemp "${dir}/.kion-creds.XXXXXX")
+  KC_TMPFILE="$tmp"
   if [[ -f "$AWS_CREDS_FILE" ]]; then
     # Drop our own section (up to the next [section]); keep everything else.
     awk -v p="[${profile}]" '
@@ -277,11 +290,16 @@ kc_write_aws_profile() { # kc_write_aws_profile PROFILE AKID SECRET SESSION_TOKE
   } >>"$tmp"
   chmod 600 "$tmp"
   mv "$tmp" "$AWS_CREDS_FILE"
+  KC_TMPFILE=""
 }
 
 main() {
   kc_parse_args "$@"
   kc_load_config
+  [[ "$KION_REFRESH_FUDGE_SECONDS" =~ ^[0-9]+$ ]] \
+    || err "$EX_USAGE" "KION_REFRESH_FUDGE_SECONDS must be a number, got: ${KION_REFRESH_FUDGE_SECONDS}"
+  [[ "$KION_STAK_TTL_SECONDS" =~ ^[0-9]+$ ]] \
+    || err "$EX_USAGE" "KION_STAK_TTL_SECONDS must be a number, got: ${KION_STAK_TTL_SECONDS}"
   if (( ARG_CHECK )); then
     if kc_creds_fresh; then exit "$EX_OK"; else exit "$EX_EXPIRED"; fi
   fi
