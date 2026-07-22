@@ -1,0 +1,13 @@
+---
+# Kion STAK fetcher (design: docs/superpowers/specs/2026-07-22-kion-creds-design.md).
+# kion_url is org-specific and REQUIRED when layers.kion is enabled — supply it
+# via packer extra-vars or group_vars; the role bake-asserts it is non-empty.
+# None of these are secrets: the operator's Kion password is prompted at runtime
+# and never baked (CLAUDE.md §8 secrets invariant).
+kion_url: ""
+kion_idms_id: 1
+kion_aws_profile: default
+kion_refresh_fudge_seconds: 300
+# STAK lifetime used to compute the cached expiry timestamp.
+# [ASSUMED, confirmed-at-first-use]: match the org Kion's actual STAK TTL.
+kion_stak_ttl_seconds: 3600

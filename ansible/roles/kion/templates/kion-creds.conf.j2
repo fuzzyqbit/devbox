@@ -1,0 +1,11 @@
+# Rendered by Ansible — role: kion. Do not edit by hand.
+# Per-user overrides belong in ~/.config/kion-creds/config (same KEY="value"
+# format; KION_USERNAME goes there too, never here).
+# NOTE: the default profile "default" shadows the instance-role (IMDS)
+# credentials for CLI/SDK calls on this box — intended. Set KION_AWS_PROFILE
+# to a named profile to keep the IMDS default chain.
+KION_URL="{{ kion_url }}"
+KION_IDMS_ID="{{ kion_idms_id }}"
+KION_AWS_PROFILE="{{ kion_aws_profile }}"
+KION_REFRESH_FUDGE_SECONDS="{{ kion_refresh_fudge_seconds }}"
+KION_STAK_TTL_SECONDS="{{ kion_stak_ttl_seconds }}"

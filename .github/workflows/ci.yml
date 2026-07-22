@@ -1,6 +1,6 @@
 ---
 # Phase 4 (CI-01..CI-06): every push and PR runs fmt/validate/lint/security
-# gates in parallel. 8 jobs, no needs: deps, all on ubuntu-latest.
+# gates in parallel. 9 jobs, no needs: deps, all on ubuntu-latest.
 #
 # Separate from .github/workflows/security.yml (Phase 1) which stays focused
 # on secret-scanning (RESEARCH line 14). security.yml runs unconditionally
@@ -155,8 +155,10 @@ jobs:
       - name: shellcheck scripts
         # shellcheck is pre-installed on ubuntu-latest (RESEARCH line 252,
         # 684). Covers all scripts in scripts/ (_common, devbox-start,
-        # devbox-stop, devbox-status, devbox-ssm).
-        run: shellcheck scripts/*.sh
+        # devbox-stop, devbox-status, devbox-ssm), the kion role shell
+        # files (kion-creds.sh, kion-creds-login.sh), and the kion test
+        # suite (curl mock + bats files).
+        run: shellcheck scripts/*.sh ansible/roles/kion/files/*.sh tests/kion/mocks/curl tests/kion/*.bats
 
   # ---------------------------------------------------------------- 7
   checkov:
@@ -253,3 +255,14 @@ jobs:
           fi
 
           echo "All 10 Phase-3 + CI hardening invariants pass."
+
+  # ---- 9. bats — kion-creds unit tests -------------------------------------
+  bats:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4.3.1
+      - name: Install bats
+        run: sudo apt-get update && sudo apt-get install -y bats
+      - name: Run kion unit tests
+        run: bats tests/kion

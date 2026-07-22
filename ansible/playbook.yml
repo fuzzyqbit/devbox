@@ -58,6 +58,13 @@
       # NO auth baked — operators log in at runtime; creds persist on the /home EBS
       # volume. MUST stay before hardening (last-role invariant).
 
+    - role: kion
+      when: layers.kion | default(false)
+      # Kion STAK fetcher: /usr/local/bin/kion-creds + /etc/profile.d login hook.
+      # Prompts for the operator's Kion password at login — NO secrets baked.
+      # Requires the kion_url extra-var when enabled (role bake-asserts it).
+      # MUST stay before hardening (last-role invariant).
+
     - role: secrets
       when: >-
         (layers.vscode | default(false)) or

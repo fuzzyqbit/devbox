@@ -1,0 +1,95 @@
+---
+# Kion STAK fetcher — on-demand `kion-creds` CLI + login-shell hook.
+# NO secrets baked (CLAUDE.md §8): the script prompts for the Kion password at
+# runtime; only the org Kion URL and non-secret tuning knobs are rendered.
+# curl: AL2023's preinstalled curl-minimal covers every flag the script uses
+# (http/https, -sS -X -H -w --data-binary --connect-timeout --max-time), so
+# only jq is installed here. The base role also lists jq — dnf is idempotent;
+# installing here keeps the role self-contained (ai_tools precedent).
+
+- name: Assert kion_url is configured (bake-assert)
+  ansible.builtin.assert:
+    that:
+      - kion_url | length > 0
+    fail_msg: >-
+      layers.kion is enabled but kion_url is empty. Set kion_url (the org Kion
+      base URL, e.g. https://kion.example.org) via packer extra-vars or
+      group_vars — see ansible/roles/kion/defaults/main.yml.
+    quiet: true
+
+- name: Install kion-creds runtime dependency (jq)
+  ansible.builtin.dnf:
+    name: jq
+    state: present
+
+- name: Install the kion-creds script
+  ansible.builtin.copy:
+    src: kion-creds.sh
+    dest: /usr/local/bin/kion-creds
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Install the login-shell hook
+  ansible.builtin.copy:
+    src: kion-creds-login.sh
+    dest: /etc/profile.d/kion-creds.sh
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Render /etc/kion-creds.conf
+  ansible.builtin.template:
+    src: kion-creds.conf.j2
+    dest: /etc/kion-creds.conf
+    owner: root
+    group: root
+    mode: "0644"
+
+# ── Bake-asserts (dcv/xrdp bake-green-but-broken pattern) ──
+# --help proves the script parses and runs on the image's bash/jq;
+# --check as the dev user proves the state/config path works unprivileged
+# (rc 9 = "no cached creds yet" is the expected fresh-image answer).
+
+- name: Run kion-creds --help (bake-assert)
+  ansible.builtin.command:
+    cmd: /usr/local/bin/kion-creds --help
+  changed_when: false
+
+- name: Run kion-creds --check as the dev user (bake-assert)
+  ansible.builtin.command:
+    cmd: /usr/local/bin/kion-creds --check
+  become: true
+  become_user: "{{ dev_user }}"
+  register: kion_check
+  changed_when: false
+  failed_when: kion_check.rc not in [0, 9]
+
+- name: Assert the rendered conf carries the org URL (bake-assert)
+  ansible.builtin.command:
+    cmd: grep -q "^KION_URL=.https" /etc/kion-creds.conf
+  changed_when: false
+
+- name: Stat the login hook (bake-assert)
+  ansible.builtin.stat:
+    path: /etc/profile.d/kion-creds.sh
+  register: kion_hook_stat
+
+- name: Assert the login hook landed with the right mode (bake-assert)
+  ansible.builtin.assert:
+    that:
+      - kion_hook_stat.stat.exists
+      - kion_hook_stat.stat.mode == "0644"
+    fail_msg: >-
+      /etc/profile.d/kion-creds.sh is missing or has the wrong mode — the login
+      prompt would silently never fire.
+    quiet: true
+
+# The shell-startup design rests on AL2023's /etc/bashrc sourcing
+# /etc/profile.d/*.sh for interactive non-login shells (code-server/DCV
+# terminals). If a future AL2023 drops that, fail the bake here instead of the
+# hook silently never running in those terminals.
+- name: Assert /etc/bashrc sources profile.d for non-login shells (bake-assert)
+  ansible.builtin.command:
+    cmd: grep -q "profile\.d" /etc/bashrc
+  changed_when: false
