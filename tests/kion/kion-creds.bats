@@ -164,6 +164,7 @@ write_profile() { # helper: call kc_write_aws_profile in a throwaway shell
 }
 
 @test "empty accounts list exits 5" {
+  # shellcheck disable=SC2030  # each @test runs in its own subshell — the export is intentionally test-local
   export MOCK_DIR="${TEST_TMP}/fx"
   mkdir -p "$MOCK_DIR"
   cp "${BATS_TEST_DIRNAME}/fixtures/happy/_api_v3_token.json" "$MOCK_DIR/"
@@ -177,4 +178,52 @@ write_profile() { # helper: call kc_write_aws_profile in a throwaway shell
   run "$SCRIPT" --id 101 --password-stdin <"${TEST_TMP}/pw"
   [ "$status" -eq 0 ]
   grep -q 'hunter2' "$MOCK_LOG"
+}
+
+@test "multi account + multi car: numbered picks from stdin" {
+  # shellcheck disable=SC2030,SC2031  # each @test runs in its own subshell — the export is intentionally test-local
+  export MOCK_DIR="${BATS_TEST_DIRNAME}/fixtures/multi"
+  run "$SCRIPT" --id 101 --password-stdin <<EOF
+pw
+2
+1
+EOF
+  [ "$status" -eq 0 ]
+  grep -q '"account_number":"444455556666"' "$MOCK_LOG"   # picked account 2
+  grep -q '"cloud_access_role_name":"developer"' "$MOCK_LOG"  # picked car 1
+}
+
+@test "--car narrows to one role: only the account pick is prompted" {
+  # shellcheck disable=SC2030,SC2031  # each @test runs in its own subshell — the export is intentionally test-local
+  export MOCK_DIR="${BATS_TEST_DIRNAME}/fixtures/multi"
+  run "$SCRIPT" --id 101 --car admin --password-stdin <<EOF
+pw
+1
+EOF
+  [ "$status" -eq 0 ]
+  grep -q '"cloud_access_role_name":"admin"' "$MOCK_LOG"
+}
+
+@test "--car with no matching role exits 6" {
+  # shellcheck disable=SC2030,SC2031  # each @test runs in its own subshell — the export is intentionally test-local
+  export MOCK_DIR="${BATS_TEST_DIRNAME}/fixtures/multi"
+  run "$SCRIPT" --id 101 --car nope --password-stdin <<<"pw"
+  [ "$status" -eq 6 ]
+}
+
+@test "invalid pick number exits 2" {
+  # shellcheck disable=SC2031  # each @test runs in its own subshell — the export is intentionally test-local
+  export MOCK_DIR="${BATS_TEST_DIRNAME}/fixtures/multi"
+  run "$SCRIPT" --id 101 --password-stdin <<EOF
+pw
+99
+EOF
+  [ "$status" -eq 2 ]
+  [[ "$output" == *"invalid selection"* ]]
+}
+
+@test "no tty and no --password-stdin exits 8" {
+  command -v setsid >/dev/null 2>&1 || skip "needs setsid (linux/CI)"
+  run setsid "$SCRIPT" --id 101 </dev/null
+  [ "$status" -eq 8 ]
 }

@@ -182,10 +182,33 @@ kc_login() { # sets KC_TOKEN, wipes KC_PASSWORD
   KC_PASSWORD=""
 }
 
-kc_pick() { # kc_pick LABEL CHOICE... — prints the selection (Task 4 adds >1)
+kc_pick() { # kc_pick LABEL CHOICE... — prints the selected choice
   local label="$1"; shift
   if (( $# == 1 )); then printf '%s\n' "$1"; return 0; fi
-  err "$EX_API" "multiple ${label}s found — picker lands in the next commit"
+  local menu choice i=1 c
+  menu="Select ${label}:"$'\n'
+  for c in "$@"; do
+    menu+=$(printf '  %d) %s' "$i" "$c")$'\n'
+    i=$((i + 1))
+  done
+  menu+="Choice [1-$#]: "
+  if (( ARG_PASSWORD_STDIN )); then
+    # Menu to stderr; selection read from fd 0 — the line AFTER the password.
+    # Never reopen /dev/stdin here: with a regular-file stdin that reopens at
+    # offset 0 and re-reads the password line as the selection.
+    printf '%s' "$menu" >&2
+    IFS= read -r choice || err "$EX_USAGE" "no selection input for ${label}"
+  elif kc_has_tty; then
+    printf '%s' "$menu" >/dev/tty
+    IFS= read -r choice </dev/tty || err "$EX_USAGE" "no selection input for ${label}"
+  else
+    err "$EX_NOTTY" "multiple ${label}s but no tty to pick from (use --car or --password-stdin)"
+  fi
+  if ! [[ "$choice" =~ ^[0-9]+$ ]] || (( choice < 1 || choice > $# )); then
+    err "$EX_USAGE" "invalid selection: ${choice}"
+  fi
+  local choices=("$@")
+  printf '%s\n' "${choices[choice - 1]}"
 }
 
 kc_resolve() { # sets KC_ACCOUNT_NUMBER + KC_CAR_NAME for $KC_PROJECT_ID
