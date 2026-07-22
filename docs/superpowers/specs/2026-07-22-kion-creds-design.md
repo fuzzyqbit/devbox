@@ -72,7 +72,8 @@ rsync, VS Code remote probes, cron).
 
 - `/etc/kion-creds.conf` — baked by the role from Ansible vars:
   - `KION_URL` (required when `layers.kion` is enabled; bake fails if unset)
-  - `KION_IDMS_ID` (default `1` — the username/password identity-source id)
+  - `KION_IDMS_ID` (default `3` — the username/password identity-source id;
+    verified against the live org Kion 2026-07-22, sent as token field `idms`)
   - `KION_AWS_PROFILE` (default `default`)
   - `KION_REFRESH_FUDGE_SECONDS` (default `300`)
   - `KION_STAK_TTL_SECONDS` (default `3600` — stamps the cached expiry; correct

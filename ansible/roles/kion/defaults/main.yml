@@ -5,7 +5,9 @@
 # None of these are secrets: the operator's Kion password is prompted at runtime
 # and never baked (CLAUDE.md §8 secrets invariant).
 kion_url: ""
-kion_idms_id: 1
+# [VERIFIED: live org Kion — 2026-07-22] org IDMS id is 3; the token request
+# field name is "idms" (not "idms_id") — see kc_login in files/kion-creds.sh.
+kion_idms_id: 3
 kion_aws_profile: default
 kion_refresh_fudge_seconds: 300
 # STAK lifetime used to compute the cached expiry timestamp.

@@ -11,8 +11,11 @@ AWS_CREDS_FILE="${AWS_SHARED_CREDENTIALS_FILE:-${HOME}/.aws/credentials}"
 STATE_FILE="${KION_CREDS_USER_DIR}/state"
 
 # Kion API (v3 family) — single source of truth for endpoint paths.
-# [ASSUMED, confirmed-at-first-use]: verify each path and response shape against
-# the org Kion instance's /swagger and correct HERE if they differ.
+# Token path + request body [VERIFIED: live org Kion — 2026-07-22]: POST
+# /api/v3/token takes {username, idms, password} (field is "idms", NOT
+# "idms_id"; org IDMS id is 3). Token RESPONSE shape and the other three
+# paths remain [ASSUMED, confirmed-at-first-use]: verify against the org
+# Kion's /swagger and correct HERE if they differ.
 API_TOKEN_PATH="/api/v3/token"
 API_ME_CARS_PATH="/api/v3/me/cloud-access-role"
 API_PROJECT_ACCOUNTS_PATH="/api/v3/project/PROJECT_ID/accounts"
@@ -28,7 +31,7 @@ readonly EX_NOPROJECT=5 EX_NOCAR=6 EX_API=7 EX_NOTTY=8 EX_EXPIRED=9
 
 # Config defaults — conf files override.
 KION_URL="${KION_URL:-}"
-KION_IDMS_ID="${KION_IDMS_ID:-1}"
+KION_IDMS_ID="${KION_IDMS_ID:-3}"  # [VERIFIED: live org Kion — 2026-07-22]
 KION_AWS_PROFILE="${KION_AWS_PROFILE:-default}"
 KION_REFRESH_FUDGE_SECONDS="${KION_REFRESH_FUDGE_SECONDS:-300}"
 KION_STAK_TTL_SECONDS="${KION_STAK_TTL_SECONDS:-3600}"
@@ -190,7 +193,7 @@ kc_login() { # sets KC_TOKEN, wipes KC_PASSWORD
   # jq reads the password from stdin (-Rs) so it never appears on any argv.
   body=$(printf '%s' "$KC_PASSWORD" \
     | jq -Rsc --arg u "$KC_USERNAME" --argjson i "$KION_IDMS_ID" \
-        '{idms_id: $i, username: $u, password: .}')
+        '{idms: $i, username: $u, password: .}')
   kc_api POST "$API_TOKEN_PATH" "$body"
   KC_TOKEN=$(jq -er '.data.access.token' <<<"$KC_RESPONSE" 2>/dev/null) \
     || err "$EX_API" "unexpected token response shape: ${KC_RESPONSE}"
