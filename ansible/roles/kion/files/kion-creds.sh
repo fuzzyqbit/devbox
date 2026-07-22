@@ -2,7 +2,6 @@
 # kion-creds — fetch short-term AWS access keys (STAKs) from Kion.
 # Installed to /usr/local/bin/kion-creds by ansible/roles/kion.
 # Design: docs/superpowers/specs/2026-07-22-kion-creds-design.md
-# shellcheck disable=SC2034  # REMOVED IN TASK 3 — constants below are consumed from Task 3 on
 set -euo pipefail
 
 # Env seams (tests point these at a tmpdir)
@@ -94,7 +93,6 @@ kc_read_state() {
   return 0
 }
 
-# shellcheck disable=SC2329  # invoked from Task 3 on
 kc_write_state() { # kc_write_state PROJECT_ID USERNAME EXPIRY_EPOCH
   mkdir -p "$KION_CREDS_USER_DIR"
   chmod 700 "$KION_CREDS_USER_DIR"
@@ -118,9 +116,110 @@ kc_creds_fresh() { # 0 = cached STAK still valid (refresh fudge applied)
   (( now < KION_CREDS_EXPIRY - KION_REFRESH_FUDGE_SECONDS ))
 }
 
-# shellcheck disable=SC2329  # invoked from Task 3 on
 kc_has_tty() {
   ( : </dev/tty ) 2>/dev/null
+}
+
+kc_api() { # kc_api METHOD PATH [JSON_BODY] [CODE_ON_404] — sets KC_RESPONSE
+  local method="$1" path="$2" body="${3:-}" code_on_404="${4:-$EX_API}"
+  local url="${KION_URL%/}${path}"
+  local attempt=0 raw rc http
+  while :; do
+    attempt=$((attempt + 1))
+    local curl_args=(
+      -sS -X "$method" "$url"
+      --connect-timeout "$CURL_CONNECT_TIMEOUT" --max-time "$CURL_MAX_TIME"
+      -H "accept: application/json" -H "content-type: application/json"
+      -w $'\n%{http_code}'
+    )
+    [[ -n "${KC_TOKEN:-}" ]] && curl_args+=(-H "authorization: Bearer ${KC_TOKEN}")
+    [[ -n "$body" ]] && curl_args+=(--data-binary @-)
+    set +e
+    raw=$(printf '%s' "$body" | curl "${curl_args[@]}")
+    rc=$?
+    set -e
+    (( rc == 0 )) || err "$EX_NETWORK" "cannot reach Kion at ${KION_URL} (curl exit ${rc})"
+    http="${raw##*$'\n'}"
+    KC_RESPONSE="${raw%$'\n'*}"
+    case "$http" in
+      2??) return 0 ;;
+      401|403) err "$EX_AUTH" "Kion rejected the request (HTTP ${http}): ${KC_RESPONSE}" ;;
+      404) err "$code_on_404" "not found (HTTP 404) for ${method} ${path}: ${KC_RESPONSE}" ;;
+      5??)
+        if (( attempt <= CURL_5XX_RETRIES )); then sleep 1; continue; fi
+        err "$EX_API" "Kion server error (HTTP ${http}) after ${attempt} attempts: ${KC_RESPONSE}"
+        ;;
+      *) err "$EX_API" "Kion API error (HTTP ${http}) for ${method} ${path}: ${KC_RESPONSE}" ;;
+    esac
+  done
+}
+
+kc_read_password() { # sets KC_PASSWORD; never echoes, never on argv
+  if (( ARG_PASSWORD_STDIN )); then
+    IFS= read -r KC_PASSWORD || err "$EX_USAGE" "--password-stdin given but stdin is empty"
+  elif kc_has_tty; then
+    printf 'Kion password for %s: ' "$KC_USERNAME" >/dev/tty
+    IFS= read -rs KC_PASSWORD </dev/tty
+    printf '\n' >/dev/tty
+  else
+    err "$EX_NOTTY" "no tty for the password prompt (use --password-stdin)"
+  fi
+  [[ -n "$KC_PASSWORD" ]] || err "$EX_AUTH" "empty password"
+}
+
+kc_login() { # sets KC_TOKEN, wipes KC_PASSWORD
+  local body
+  # jq reads the password from stdin (-Rs) so it never appears on any argv.
+  body=$(printf '%s' "$KC_PASSWORD" \
+    | jq -Rsc --arg u "$KC_USERNAME" --argjson i "$KION_IDMS_ID" \
+        '{idms_id: $i, username: $u, password: .}')
+  kc_api POST "$API_TOKEN_PATH" "$body"
+  KC_TOKEN=$(jq -er '.data.access.token' <<<"$KC_RESPONSE" 2>/dev/null) \
+    || err "$EX_API" "unexpected token response shape: ${KC_RESPONSE}"
+  KC_PASSWORD=""
+}
+
+kc_pick() { # kc_pick LABEL CHOICE... — prints the selection (Task 4 adds >1)
+  local label="$1"; shift
+  if (( $# == 1 )); then printf '%s\n' "$1"; return 0; fi
+  err "$EX_API" "multiple ${label}s found — picker lands in the next commit"
+}
+
+kc_resolve() { # sets KC_ACCOUNT_NUMBER + KC_CAR_NAME for $KC_PROJECT_ID
+  kc_api GET "${API_PROJECT_ACCOUNTS_PATH/PROJECT_ID/$KC_PROJECT_ID}" "" "$EX_NOPROJECT"
+  local accounts=()
+  mapfile -t accounts < <(jq -er '.data[] | "\(.account_number)\t\(.name)"' \
+    <<<"$KC_RESPONSE" 2>/dev/null || true)
+  (( ${#accounts[@]} > 0 )) \
+    || err "$EX_NOPROJECT" "no accounts visible on project ${KC_PROJECT_ID} — check the id and your Kion access"
+
+  kc_api GET "$API_ME_CARS_PATH"
+  local cars=()
+  mapfile -t cars < <(jq -er --argjson pid "$KC_PROJECT_ID" \
+    '.data[] | select(.project_id == $pid) | .name' <<<"$KC_RESPONSE" 2>/dev/null || true)
+  if [[ -n "$ARG_CAR" ]]; then
+    local filtered=() c
+    for c in "${cars[@]}"; do [[ "$c" == "$ARG_CAR" ]] && filtered+=("$c"); done
+    cars=("${filtered[@]+"${filtered[@]}"}")
+  fi
+  (( ${#cars[@]} > 0 )) \
+    || err "$EX_NOCAR" "no cloud access role for you on project ${KC_PROJECT_ID}${ARG_CAR:+ matching --car ${ARG_CAR}}"
+
+  local acct_line
+  acct_line=$(kc_pick "account" "${accounts[@]}")
+  KC_ACCOUNT_NUMBER="${acct_line%%$'\t'*}"
+  KC_CAR_NAME=$(kc_pick "cloud access role" "${cars[@]}")
+}
+
+kc_fetch_stak() { # sets KC_AKID / KC_SECRET / KC_SESSION
+  local body
+  body=$(jq -cn --arg a "$KC_ACCOUNT_NUMBER" --arg r "$KC_CAR_NAME" \
+    '{account_number: $a, cloud_access_role_name: $r}')
+  kc_api POST "$API_STAK_PATH" "$body"
+  KC_AKID=$(jq -er '.data.access_key' <<<"$KC_RESPONSE" 2>/dev/null) \
+    || err "$EX_API" "unexpected STAK response shape: ${KC_RESPONSE}"
+  KC_SECRET=$(jq -er '.data.secret_access_key' <<<"$KC_RESPONSE")
+  KC_SESSION=$(jq -er '.data.session_token' <<<"$KC_RESPONSE")
 }
 
 kc_write_aws_profile() { # kc_write_aws_profile PROFILE AKID SECRET SESSION_TOKEN
@@ -161,7 +260,20 @@ main() {
     || err "$EX_USAGE" "no project id — pass --id <project-number> (it is cached afterwards)"
   # Username chain (spec): --user flag → per-user/system config → cached → $USER
   KC_USERNAME="${ARG_USER:-${KION_USERNAME:-${KION_LAST_USERNAME:-$USER}}}"
-  err "$EX_API" "not implemented yet"   # replaced in Task 3
+  kc_read_password
+  kc_login
+  kc_resolve
+  kc_fetch_stak
+  kc_write_aws_profile "$KION_AWS_PROFILE" "$KC_AKID" "$KC_SECRET" "$KC_SESSION"
+  local expiry
+  # [ASSUMED, confirmed-at-first-use]: the STAK response carries no expiry field
+  # we rely on; the cache stamps now + KION_STAK_TTL_SECONDS. If the org's real
+  # TTL is shorter, --check reports fresh on dead creds — fix the conf var at UAT.
+  expiry=$(( $(date +%s) + KION_STAK_TTL_SECONDS ))
+  kc_write_state "$KC_PROJECT_ID" "$KC_USERNAME" "$expiry"
+  printf 'kion-creds: wrote profile [%s] — account %s / %s (expires in ~%dm)\n' \
+    "$KION_AWS_PROFILE" "$KC_ACCOUNT_NUMBER" "$KC_CAR_NAME" \
+    "$(( KION_STAK_TTL_SECONDS / 60 ))"
 }
 
 # Test seam: `KION_CREDS_ALLOW_SOURCE=1 source kion-creds.sh` loads functions

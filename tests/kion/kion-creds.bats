@@ -107,3 +107,67 @@ write_profile() { # helper: call kc_write_aws_profile in a throwaway shell
   # shellcheck disable=SC2314  # negation is the last command in the test, so it fails the test correctly
   ! grep -q 'OLD' "$AWS_SHARED_CREDENTIALS_FILE"
 }
+
+@test "happy path: writes profile, caches state, password via body not argv" {
+  run "$SCRIPT" --id 101 --password-stdin <<<"hunter2"
+  [ "$status" -eq 0 ]
+  grep -q '^\[default\]$' "$AWS_SHARED_CREDENTIALS_FILE"
+  grep -q 'aws_access_key_id = ASIATESTKEY' "$AWS_SHARED_CREDENTIALS_FILE"
+  grep -q 'KION_LAST_PROJECT_ID=101' "${KION_CREDS_USER_DIR}/state"
+  grep -q 'KION_LAST_USERNAME=' "${KION_CREDS_USER_DIR}/state"
+  grep -q 'hunter2' "$MOCK_LOG"           # password travelled in a request body
+}
+
+@test "cached project id reused when --id omitted" {
+  run "$SCRIPT" --id 101 --password-stdin <<<"pw"
+  [ "$status" -eq 0 ]
+  : >"$MOCK_LOG"
+  run "$SCRIPT" --password-stdin <<<"pw"
+  [ "$status" -eq 0 ]
+  grep -q 'project/101/accounts' "$MOCK_LOG"
+}
+
+@test "per-user config username is used for the token request" {
+  mkdir -p "$KION_CREDS_USER_DIR"
+  printf 'KION_USERNAME="alice"\n' >"${KION_CREDS_USER_DIR}/config"
+  run "$SCRIPT" --id 101 --password-stdin <<<"pw"
+  [ "$status" -eq 0 ]
+  grep -q '"username":"alice"' "$MOCK_LOG"
+}
+
+@test "auth failure (401 on token) exits 3" {
+  # shellcheck disable=SC2030  # each @test runs in its own subshell — the export is intentionally test-local
+  export MOCK_STATUS__api_v3_token=401
+  run "$SCRIPT" --id 101 --password-stdin <<<"wrong"
+  [ "$status" -eq 3 ]
+}
+
+@test "network failure exits 4 with a reach message" {
+  export MOCK_NETWORK_FAIL=1
+  run "$SCRIPT" --id 101 --password-stdin <<<"pw"
+  [ "$status" -eq 4 ]
+  [[ "$output" == *"cannot reach"* ]]
+}
+
+@test "unknown project (404 on accounts) exits 5" {
+  export MOCK_STATUS__api_v3_project_999_accounts=404
+  run "$SCRIPT" --id 999 --password-stdin <<<"pw"
+  [ "$status" -eq 5 ]
+}
+
+@test "server 5xx retries then exits 7" {
+  # shellcheck disable=SC2031  # each @test runs in its own subshell — no cross-test leakage intended
+  export MOCK_STATUS__api_v3_token=500
+  run "$SCRIPT" --id 101 --password-stdin <<<"pw"
+  [ "$status" -eq 7 ]
+  [ "$(grep -c '^POST /api/v3/token$' "$MOCK_LOG")" -eq 3 ]  # 1 try + 2 retries
+}
+
+@test "empty accounts list exits 5" {
+  export MOCK_DIR="${TEST_TMP}/fx"
+  mkdir -p "$MOCK_DIR"
+  cp "${BATS_TEST_DIRNAME}/fixtures/happy/_api_v3_token.json" "$MOCK_DIR/"
+  printf '{"data": []}' >"${MOCK_DIR}/_api_v3_project_101_accounts.json"
+  run "$SCRIPT" --id 101 --password-stdin <<<"pw"
+  [ "$status" -eq 5 ]
+}

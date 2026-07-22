@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+# curl mock for kion-creds bats tests — replays fixtures, no network.
+# Contract: see "Interfaces" in Task 3 of the plan.
+set -euo pipefail
+
+if [[ "${MOCK_NETWORK_FAIL:-0}" == "1" ]]; then
+  echo "curl: (6) Could not resolve host" >&2
+  exit 6
+fi
+
+method=GET url="" has_body=0
+args=("$@")
+for ((i = 0; i < ${#args[@]}; i++)); do
+  case "${args[i]}" in
+    -X) method="${args[i + 1]}"; i=$((i + 1)) ;;
+    --data-binary) has_body=1; i=$((i + 1)) ;;
+    -H|-w|--connect-timeout|--max-time) i=$((i + 1)) ;;
+    http*://*) url="${args[i]}" ;;
+  esac
+done
+
+path="/${url#*://*/}"
+name=$(printf '%s' "$path" | tr -c 'A-Za-z0-9' '_')
+body=""
+[[ "$has_body" == "1" ]] && body=$(cat)
+{ printf '%s %s\n' "$method" "$path"; printf '%s\n' "$body"; } >>"${MOCK_LOG:-/dev/null}"
+
+status_var="MOCK_STATUS_${name}"
+status="${!status_var:-200}"
+fixture="${MOCK_DIR}/${name}.json"
+if [[ -f "$fixture" ]]; then cat "$fixture"; else printf '{}'; fi
+printf '\n%s' "$status"
