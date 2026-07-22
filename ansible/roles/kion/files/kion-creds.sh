@@ -123,6 +123,30 @@ kc_has_tty() {
   ( : </dev/tty ) 2>/dev/null
 }
 
+kc_write_aws_profile() { # kc_write_aws_profile PROFILE AKID SECRET SESSION_TOKEN
+  local profile="$1" akid="$2" secret="$3" session="$4"
+  local dir tmp
+  dir=$(dirname "$AWS_CREDS_FILE")
+  mkdir -p "$dir"
+  tmp=$(mktemp "${dir}/.kion-creds.XXXXXX")
+  if [[ -f "$AWS_CREDS_FILE" ]]; then
+    # Drop our own section (up to the next [section]); keep everything else.
+    awk -v p="[${profile}]" '
+      $0 == p { drop = 1; next }
+      /^\[/   { drop = 0 }
+      !drop   { print }
+    ' "$AWS_CREDS_FILE" >"$tmp"
+  fi
+  {
+    printf '[%s]\n' "$profile"
+    printf 'aws_access_key_id = %s\n' "$akid"
+    printf 'aws_secret_access_key = %s\n' "$secret"
+    printf 'aws_session_token = %s\n' "$session"
+  } >>"$tmp"
+  chmod 600 "$tmp"
+  mv "$tmp" "$AWS_CREDS_FILE"
+}
+
 main() {
   kc_parse_args "$@"
   kc_load_config
@@ -140,4 +164,8 @@ main() {
   err "$EX_API" "not implemented yet"   # replaced in Task 3
 }
 
-main "$@"
+# Test seam: `KION_CREDS_ALLOW_SOURCE=1 source kion-creds.sh` loads functions
+# without running main (bats function-level tests).
+if [[ "${KION_CREDS_ALLOW_SOURCE:-0}" != "1" ]]; then
+  main "$@"
+fi

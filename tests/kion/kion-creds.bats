@@ -79,3 +79,31 @@ seed_fresh_state() { # helper: state + creds file that pass --check
   [ "$status" -eq 2 ]
   [[ "$output" == *"--id"* ]]
 }
+
+write_profile() { # helper: call kc_write_aws_profile in a throwaway shell
+  bash -c '
+    KION_CREDS_ALLOW_SOURCE=1 source "'"$SCRIPT"'"
+    kc_write_aws_profile "$@"
+  ' _ "$@"
+}
+
+@test "writer creates the creds file 0600 with the profile" {
+  write_profile default AKIDXX secretXX tokenXX
+  grep -q '^\[default\]$' "$AWS_SHARED_CREDENTIALS_FILE"
+  grep -q '^aws_access_key_id = AKIDXX$' "$AWS_SHARED_CREDENTIALS_FILE"
+  grep -q '^aws_session_token = tokenXX$' "$AWS_SHARED_CREDENTIALS_FILE"
+  perms=$(python3 -c "import os,stat;print(oct(stat.S_IMODE(os.stat('$AWS_SHARED_CREDENTIALS_FILE').st_mode)))")
+  [ "$perms" = "0o600" ]
+}
+
+@test "writer preserves foreign profiles and replaces its own" {
+  mkdir -p "$(dirname "$AWS_SHARED_CREDENTIALS_FILE")"
+  printf '[other]\naws_access_key_id = AKIAOTHER\n\n[default]\naws_access_key_id = OLD\n' \
+    >"$AWS_SHARED_CREDENTIALS_FILE"
+  write_profile default AKIDNEW s t
+  grep -q '^\[other\]$' "$AWS_SHARED_CREDENTIALS_FILE"
+  grep -q 'AKIAOTHER' "$AWS_SHARED_CREDENTIALS_FILE"
+  grep -q 'AKIDNEW' "$AWS_SHARED_CREDENTIALS_FILE"
+  # shellcheck disable=SC2314  # negation is the last command in the test, so it fails the test correctly
+  ! grep -q 'OLD' "$AWS_SHARED_CREDENTIALS_FILE"
+}
