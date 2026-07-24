@@ -156,3 +156,45 @@
       ansible.builtin.file:
         path: /tmp/vscode.rpm
         state: absent
+
+# --- Google Chrome (CHROME-02) — from Google's official signed dnf repo ---
+# Unconditional desktop content: gated ONLY by the role-level layers.desktop gate in
+# playbook.yml (operator decision — no vscode_desktop-style sub-flag). Latest-at-bake:
+# Google's repo hosts only the current stable (historic RPMs are not hosted); remediation
+# for a bad version is a rebake (SPAL precedent, CLAUDE.md §8). The .repo content below is
+# byte-identical to what the Chrome RPM's %post writes (chromium.googlesource.com
+# chrome/installer/linux/common/rpm.include install_yum), so the RPM's unconditional
+# overwrite of this file at install is a content no-op and the daily google-chrome cron
+# finds nothing to "fix". GPG verification stays ON (CLAUDE.md §2/§8).
+
+- name: Import the Google Linux signing key (Chrome)
+  # Multi-key bundle (active EB4C 1BFD 4F04 2F6D DDCC EC91 7721 F63B D38B 4796 + obsolete
+  # 4CCA 1EAF 950C EE4A B839 76DC A040 830F 7FAC 5991 — google.com/linuxrepositories).
+  # No fingerprint pin — ansible-core < 2.18 rpm_key verifies a single fingerprint against
+  # the bundle's first key and can mismatch; a plain import lands all keys on a fresh
+  # image (same idiom as the MS key above).
+  ansible.builtin.rpm_key:
+    key: https://dl.google.com/linux/linux_signing_key.pub
+    state: present
+
+- name: Bake the Google Chrome dnf repo config (gpgcheck on)
+  ansible.builtin.copy:
+    dest: /etc/yum.repos.d/google-chrome.repo
+    content: |
+      [google-chrome]
+      name=google-chrome
+      baseurl=https://dl.google.com/linux/chrome/rpm/stable/x86_64
+      enabled=1
+      gpgcheck=1
+      gpgkey=https://dl.google.com/linux/linux_signing_key.pub
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Install Google Chrome (latest-at-bake from the signed repo)
+  # disable_gpg_check stays false — the Google key imported above verifies the signature.
+  # GPG verification stays ON (CLAUDE.md §2/§8).
+  ansible.builtin.dnf:
+    name: google-chrome-stable
+    state: present
+    disable_gpg_check: false
