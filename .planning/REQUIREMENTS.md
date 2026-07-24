@@ -12,13 +12,13 @@
 
 - [ ] **CHROME-01**: Operator can launch Google Chrome from the GNOME desktop (DCV or xrdp session) on every desktop bake.
 - [ ] **CHROME-02**: Chrome installs from Google's official signed dnf repo — baked `.repo` config + GPG key, `gpgcheck=1`, no `--nogpgcheck` (GPG posture consistent with CLAUDE.md §2/§8 and the SPAL precedent).
-- [ ] **CHROME-03**: The exact baked Chrome version is captured by the existing SBOM pass (`/etc/devimage-sbom.cdx.json` via `ansible/sbom.yml`) and visible in the build manifest; the latest-at-bake policy is documented in the role.
-- [ ] **CHROME-04**: The bake fails loudly if Chrome is missing or cannot execute — headless `--version` bake-assert as `ec2-user`, plus a post-hardening survival guard (W1 pattern in `ansible/playbook.yml` post_tasks) if hardening could strip Chrome's dependencies.
 
 ---
 
 ## Future Requirements (deferred)
 
+- **CHROME-03 (deferred 2026-07-24, re-scope):** SBOM/build-manifest capture of the exact baked Chrome version as a stated requirement. Note: the existing SBOM pass inventories all packages regardless, so the version lands in `/etc/devimage-sbom.cdx.json` anyway — dropped as a requirement, not as behavior.
+- **CHROME-04 (deferred 2026-07-24, re-scope):** Dedicated bake-asserts (headless `--version` as `ec2-user`; W1-style post-hardening survival guard). Deviates from the dcv/xrdp/ai_tools bake-assert doctrine by operator choice; revisit if a bake ever ships a dead Chrome.
 - Chrome policy management (managed preferences under `/etc/opt/chrome/policies/`) — no requirement yet; revisit if the desktop gains multi-operator use.
 - Default-browser wiring (xdg-settings) — cosmetic; revisit at UAT if GNOME defaults annoy.
 
@@ -36,8 +36,6 @@
 |-------------|-------|--------|
 | CHROME-01 | — | Pending roadmap |
 | CHROME-02 | — | Pending roadmap |
-| CHROME-03 | — | Pending roadmap |
-| CHROME-04 | — | Pending roadmap |
 
 ---
-*Defined: 2026-07-24 — milestone v4.1.*
+*Defined: 2026-07-24 — milestone v4.1. Re-scoped 2026-07-24: CHROME-03/04 deferred; traceability pending roadmap re-run.*
