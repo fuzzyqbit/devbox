@@ -117,11 +117,12 @@
     cmd: /usr/bin/gitlab-runner --version
   changed_when: false
 
+# The systemd module cannot do a read-only is-enabled query — command is deliberate.
 # `systemctl is-enabled` prints `disabled` on stdout and exits NON-ZERO (rc 1)
 # when the unit is disabled — assert on stdout, never on the rc (xrdp idiom).
 # A missing unit prints an error with EMPTY stdout, so the `disabled` stdout
 # assert below doubles as the unit-present proof.
-- name: Check gitlab-runner service enablement (bake-assert)
+- name: Check gitlab-runner service enablement (bake-assert) # noqa: command-instead-of-module
   ansible.builtin.command:
     cmd: systemctl is-enabled gitlab-runner
   register: gitlab_runner_bake_enabled
