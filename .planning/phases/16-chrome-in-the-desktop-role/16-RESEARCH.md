@@ -360,13 +360,15 @@ git diff main -- ansible/ | grep -E "nogpgcheck|disable_gpg_check: true" && echo
 | A3 | Chrome's modern sandbox uses unprivileged user namespaces on AL2023's 6.1+ kernel (SUID fallback also present and CIS-survivable) | Pitfall 6 | Low for this phase — runtime sandbox proof is Phase 17's criterion; both sandbox paths verified present/unblocked statically |
 | A4 | `packer build` invokes the operator's local ansible-playbook (core 2.15.13) — module behavior verified against that version locally | Environment Availability | Low — all three modules verified present with needed params on 2.15.13 |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **Should the SPAL `chromium` package eventually be dropped now that Chrome ships?**
+   - RESOLVED: SPAL `chromium` stays untouched this phase (locked scope); revisit at UAT as an operator question. The plan does not touch the chromium entry.
    - What we know: REQUIREMENTS.md marks Chromium as out of scope ("different support story"); the desktop role installs it today; both coexist without conflict.
    - What's unclear: whether the operator wants two Chromium-family browsers long-term (image size ~+330MB for Chrome).
    - Recommendation: leave `chromium` untouched this phase (locked scope); surface as a UAT-time question for the operator. Do NOT plan its removal.
 2. **First-bake confirmation of `%post` no-op behavior.**
+   - RESOLVED: deferred to Phase 17 per the operator's CHROME-04 bake-assert deferral — the %post no-op confirmation happens at the Phase 17 live session / first bake, not as a bake-assert this phase.
    - What we know: `%post` overwrite logic verified from Chromium `main` source; the baked content matches its heredoc byte-for-byte.
    - What's unclear: whether the shipping RPM's scriptlet lags the `main` source in some cosmetic way.
    - Recommendation: at the Phase 17 live session (or first bake), run `diff <(rpm -q --scripts google-chrome-stable | sed -n '/YUM_REPO_FILE/,$p') …` — or simply `cat /etc/yum.repos.d/google-chrome.repo` — to confirm the file is still canonical. No bake-assert (CHROME-04 deferred).

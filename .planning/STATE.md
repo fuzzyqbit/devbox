@@ -2,13 +2,14 @@
 gsd_state_version: 1.0
 milestone: v4.1
 milestone_name: Google Chrome in desktop role
-status: roadmap-created
-last_updated: "2026-07-24T00:00:00.000Z"
-last_activity: 2026-07-24
+status: executing
+stopped_at: Roadmap revised (re-scope applied); Phase 16 not yet planned.
+last_updated: "2026-07-24T13:09:22.691Z"
+last_activity: 2026-07-24 -- Phase 16 planning complete
 progress:
   total_phases: 2
   completed_phases: 0
-  total_plans: 0
+  total_plans: 1
   completed_plans: 0
   percent: 0
 ---
@@ -26,8 +27,8 @@ See: .planning/PROJECT.md (v4.1 Google Chrome in desktop role milestone started 
 
 Phase: 16 of 16-17 (Chrome in the desktop role) — not started
 Plan: — (next: `/gsd:plan-phase 16`)
-Status: Roadmap revised (re-scope) — ready to plan Phase 16
-Last activity: 2026-07-24 — v4.1 roadmap revised: CHROME-03/04 deferred to Future Requirements; CHROME-01/02 mapped, 2/2 coverage
+Status: Ready to execute
+Last activity: 2026-07-24 -- Phase 16 planning complete
 
 Progress: [░░░░░░░░░░] 0% (0/2 phases, 0 plans)
 
@@ -160,6 +161,7 @@ Last session: 2026-07-24 (v4.1 milestone start → roadmap created → re-scoped
   bake-asserts) moved to Future Requirements. Roadmap revised: Phase 16 (bake-time
   implementation — CHROME-02) + Phase 17 (live UAT gate — CHROME-01), continuing
   numbering from v4.0's Phase 15. Coverage 2/2, no orphans.
+
 - v4.0 roadmap archived at `milestones/v4.0-ROADMAP.md`; ROADMAP.md replaced for v4.1.
 - v4.0 DCV-11 live UAT remains carried open (merged to main 2026-06-26 without it);
   Phase-17 UAT is planned to compose with that backlog in one live bake session.
@@ -173,6 +175,7 @@ Next: `/gsd:plan-phase 16` (Chrome in the desktop role).
   `ansible/roles/desktop/`: baked Google `.repo` config + GPG key, `gpgcheck=1`
   install of `google-chrome-stable`, gated only by `layers.desktop` (no sub-flag);
   `hardening` stays last role, `sbom.yml` stays last import.
+
 - **Open live-UAT backlog (human/AWS, one bake session can clear several):**
   `DEVBOX_USER=$(whoami) ./run build && ./run tf-init && ./run tf-apply && ./run start`, then
   from within `var.allowed_web_cidrs`: v4.0 DCV-11 checks (GNOME renders on `:8443`, license

@@ -62,7 +62,10 @@ dnf repo, with GPG verification on and no change to the playbook's invariant ord
      Chrome package lands outside the desktop layer.
   4. Playbook invariants hold: `hardening` remains the last role in `ansible/playbook.yml`
      and `sbom.yml` remains the last import; pre-commit + CI grep-gates stay green.
-**Plans**: TBD
+**Plans**: 1 plan
+
+Plans:
+- [ ] 16-01-PLAN.md — Chrome block (rpm_key → baked canonical `.repo` → dnf `google-chrome-stable`) appended to the desktop role + static verification sweep (lint, grep-gates, GPG posture, invariants)
 
 ### Phase 17: Live UAT gate (milestone-close)
 **Goal**: Chrome is proven working where the operator actually uses it — launched from the
@@ -97,7 +100,7 @@ bake + apply session can clear several gates. The next `tf-apply` replaces the i
 | 10-12 | v3.2 | 8/8 | Complete (superseded by v4.0) | 2026-06-16 |
 | 13-14 | v4.0 | 7/7 | Complete (verified; merged 2026-06-26) | 2026-06-19 |
 | 15. Live UAT Gate (DCV-11) | v4.0 | — | Carried open (human/AWS) | - |
-| 16. Chrome in the desktop role | v4.1 | 0/? | Not started | - |
+| 16. Chrome in the desktop role | v4.1 | 0/1 | Planned | - |
 | 17. Live UAT gate | v4.1 | 0/? | Not started | - |
 
 ## Shipped Milestones
