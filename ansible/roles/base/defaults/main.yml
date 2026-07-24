@@ -4,6 +4,14 @@
 # https://docs.aws.amazon.com/linux/al2023/ug/configure-spal-repository.html
 spal_min_system_release: "2023.9.20251117"
 
+# Packages locked (dnf versionlock) to whatever version is installed at bake START —
+# before the full-image update; ordering story in the tasks/main.yml versionlock header.
+# salt-minion is not installed by any role in this repo: it ships on the org's source
+# AMI (or arrives at runtime). Packages absent from the source AMI are skipped by the
+# per-item presence gate, not failed (public AL2023 minimal AMI bakes stay green).
+dnf_versionlock_packages:
+  - salt-minion
+
 base_packages:
   - wget
   - unzip

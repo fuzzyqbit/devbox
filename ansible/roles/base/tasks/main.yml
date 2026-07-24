@@ -1,4 +1,50 @@
 ---
+# --- dnf versionlock — freeze salt-minion at its bake-start version ---
+# ORDERING: the next task after this block is the bake-time full-image update
+# (name: "*" / state: latest). A lock created after that update would capture the
+# post-update version — wrong — so this block MUST stay first in the role. The
+# versionlock plugin filters the dnf sack, and ansible.builtin.dnf loads plugins by
+# default, so the update task honors the lock (do not disable plugins on any task here).
+# SOURCE AMI: no role in this repo installs salt-minion; it ships on the org's source
+# AMI (or arrives at runtime). The lock is therefore conditional — a bake from the
+# public AL2023 minimal AMI has no salt-minion and no-ops cleanly (per-item skip plus
+# a debug note).
+# PLUGIN NAME: python3-dnf-plugin-versionlock is the dnf4 subpackage name on the
+# AL2023/EL9 family (AL2023 ships dnf 4.x for its lifetime). Provider-agnostic fallback
+# spec if a future AMI reports "no match": dnf-command(versionlock) — noted here only,
+# no fallback path coded (YAGNI). GPG check stays ON (dnf default — CLAUDE.md §8).
+# UNLOCK / REMEDIATION: `dnf versionlock delete salt-minion` then update as usual, or
+# rebake — the next bake re-captures the source AMI's then-current version.
+- name: Install dnf versionlock plugin
+  ansible.builtin.dnf:
+    name: python3-dnf-plugin-versionlock
+    state: present
+
+# Pre-update facts feed the per-item presence gate below. The LATER package_facts
+# gather in this file (SPAL system-release floor) deliberately re-collects POST-update
+# facts — do not deduplicate the two gathers.
+- name: Gather package facts for the versionlock gate
+  ansible.builtin.package_facts:
+    manager: auto
+
+- name: Lock packages to their currently installed versions
+  ansible.builtin.command:
+    cmd: dnf versionlock add {{ item }}
+  loop: "{{ dnf_versionlock_packages }}"
+  when: item in ansible_facts.packages
+  register: versionlock_add
+  changed_when: "'Adding versionlock on:' in versionlock_add.stdout"
+  failed_when: versionlock_add.rc != 0 and 'already locked' not in (versionlock_add.stdout + versionlock_add.stderr)
+
+- name: Note packages absent from this source AMI (versionlock skipped)
+  ansible.builtin.debug:
+    msg: >-
+      {{ item }} is not installed on this source AMI — versionlock skipped. This is
+      expected on the public AL2023 minimal AMI; salt-minion comes from the org's
+      source AMI.
+  loop: "{{ dnf_versionlock_packages }}"
+  when: item not in ansible_facts.packages
+
 - name: Update all packages # noqa: package-latest (bake-time full-image update is the intent)
   ansible.builtin.dnf:
     name: "*"
