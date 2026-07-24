@@ -57,3 +57,8 @@ output "devbox_user" {
   description = "Username that owns this devbox"
   value       = var.devbox_user
 }
+
+output "runner_iam_enabled" {
+  description = "Whether the shared GitLab-runner IAM variant is attached (org permissions boundary on the instance role + explicit S3/EC2/caged-IAM policy)"
+  value       = var.enable_runner_iam
+}

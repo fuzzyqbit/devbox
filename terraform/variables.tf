@@ -87,3 +87,37 @@ variable "allow_open_ingress" {
   default     = false
   description = "Escape hatch — when true, bypasses the non-empty validation on allowed_web_cidrs. Intended only for ephemeral exploration where the operator deliberately wants no public web ingress (empty list ⇒ no inbound :8080 / :8443 at all; SSM port forwarding becomes the only path — see RESEARCH.md Pattern 5 / Example 3). NEVER set this to true AND populate allowed_web_cidrs with 0.0.0.0/0 — that combination re-introduces the very finding Phase 2 closes."
 }
+
+variable "enable_runner_iam" {
+  type        = bool
+  default     = false
+  description = "Attach the shared GitLab-runner IAM variant: permissions boundary on the instance role + explicit service permissions (S3, EC2, boundary-caged IAM). Requires runner_permissions_boundary_arn."
+}
+
+variable "runner_permissions_boundary_arn" {
+  type        = string
+  default     = ""
+  description = "ARN of the ORG-SUPPLIED permissions boundary policy. Never created here — governance owns it. Required when enable_runner_iam is true; also stamped on every role the runner itself creates (escalation cage)."
+
+  validation {
+    condition     = !var.enable_runner_iam || can(regex("^arn:aws:iam::[0-9]{12}:policy/", var.runner_permissions_boundary_arn))
+    error_message = "enable_runner_iam requires runner_permissions_boundary_arn (arn:aws:iam::<account>:policy/...)."
+  }
+}
+
+variable "runner_created_role_path" {
+  type        = string
+  default     = "/gitlab-runner/"
+  description = "IAM path prefix under which the runner may create/pass roles (escalation cage part 2). Trailing slash required."
+
+  validation {
+    condition     = can(regex("^/.+/$", var.runner_created_role_path))
+    error_message = "runner_created_role_path must start and end with '/' and must not be bare '/' (e.g. /gitlab-runner/) — the path IS the escalation cage, so the IAM root path would un-cage the runner."
+  }
+}
+
+variable "runner_additional_service_actions" {
+  type        = list(string)
+  default     = []
+  description = "Extra IAM actions for the runner beyond S3/EC2/IAM (e.g. [\"ecr:*\", \"logs:*\", \"cloudformation:*\"]). Explicit-list posture: add here per real need, never wildcard services preemptively."
+}

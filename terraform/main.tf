@@ -40,6 +40,11 @@ resource "aws_iam_role" "devbox" {
   name_prefix = "${local.name_prefix}-"
   description = "EC2 role granting ${var.devbox_user}'s devbox read access to its own SSM secrets"
 
+  # Runner variant: the org boundary caps THIS role's effective permissions too —
+  # enabling the runner variant means the instance itself is governed by the org
+  # boundary; effective permissions = boundary ∩ the policies attached below.
+  permissions_boundary = var.enable_runner_iam ? var.runner_permissions_boundary_arn : null
+
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
     Statement = [{
@@ -98,6 +103,104 @@ resource "aws_iam_instance_profile" "devbox" {
 resource "aws_iam_role_policy_attachment" "devbox_ssm_core" {
   role       = aws_iam_role.devbox.name
   policy_arn = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
+}
+
+# --- Shared-runner IAM variant (enable_runner_iam) ---
+# Explicit service permissions for a shared GitLab runner: S3 + EC2 outright,
+# IAM caged by a two-part escalation cage so a CI job can never escalate past
+# the org boundary:
+#   1. Role create/policy writes require the org permissions boundary on the
+#      affected role (iam:PermissionsBoundary condition) — a job cannot mint an
+#      unbounded admin role. PutRolePermissionsBoundary / DeleteRolePermissionsBoundary
+#      are deliberately absent, so the runner can never strip the cage it is in.
+#   2. PassRole — and every op where the boundary condition key does not exist —
+#      is confined to var.runner_created_role_path: the path is the cage.
+# Effective instance permissions = org boundary ∩ (this policy + ssm-read above).
+
+resource "aws_iam_role_policy" "runner_services" {
+  count = var.enable_runner_iam ? 1 : 0
+  name  = "${local.name_prefix}-runner-services"
+  role  = aws_iam_role.devbox.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = concat(
+      [
+        {
+          Sid      = "RunnerS3"
+          Effect   = "Allow"
+          Action   = ["s3:*"]
+          Resource = "*"
+        },
+        {
+          Sid      = "RunnerEC2"
+          Effect   = "Allow"
+          Action   = ["ec2:*"]
+          Resource = "*"
+        },
+        {
+          Sid      = "RunnerIAMRead"
+          Effect   = "Allow"
+          Action   = ["iam:Get*", "iam:List*"]
+          Resource = "*"
+        },
+        {
+          # Escalation cage part 1: the runner may create/modify roles ONLY under
+          # its own path AND ONLY when the affected role carries the org boundary —
+          # a job cannot mint an unbounded admin role. Only these five actions
+          # support the iam:PermissionsBoundary condition key (per the AWS
+          # delegated-admin pattern); the rest of the role lifecycle is below.
+          Sid    = "RunnerIAMWriteBounded"
+          Effect = "Allow"
+          Action = [
+            "iam:CreateRole",
+            "iam:AttachRolePolicy", "iam:DetachRolePolicy",
+            "iam:PutRolePolicy", "iam:DeleteRolePolicy",
+          ]
+          Resource = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role${var.runner_created_role_path}*"
+          Condition = {
+            StringEquals = { "iam:PermissionsBoundary" = var.runner_permissions_boundary_arn }
+          }
+        },
+        {
+          # DeleteRole / UpdateRole / TagRole / UntagRole do NOT support the
+          # iam:PermissionsBoundary condition key (the request never carries it,
+          # so a conditioned Allow would never match) — path-scoping is the cage
+          # here. None of these can widen a caged role's permissions.
+          Sid    = "RunnerIAMRolePathScoped"
+          Effect = "Allow"
+          Action = [
+            "iam:DeleteRole", "iam:UpdateRole",
+            "iam:TagRole", "iam:UntagRole",
+          ]
+          Resource = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role${var.runner_created_role_path}*"
+        },
+        {
+          # Instance-profile ops don't support the PermissionsBoundary condition key —
+          # path-scoping is the cage for this resource type. Note AddRoleToInstanceProfile
+          # additionally requires iam:PassRole on the role being added (statement below).
+          Sid      = "RunnerInstanceProfilePath"
+          Effect   = "Allow"
+          Action   = ["iam:CreateInstanceProfile", "iam:DeleteInstanceProfile", "iam:AddRoleToInstanceProfile", "iam:RemoveRoleFromInstanceProfile"]
+          Resource = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:instance-profile${var.runner_created_role_path}*"
+        },
+        {
+          # Escalation cage part 2: PassRole confined to the runner's own path — the
+          # boundary condition key does not apply to PassRole, the path is the cage.
+          Sid      = "RunnerPassRolePathScoped"
+          Effect   = "Allow"
+          Action   = ["iam:PassRole"]
+          Resource = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role${var.runner_created_role_path}*"
+        },
+      ],
+      length(var.runner_additional_service_actions) > 0 ? [{
+        Sid      = "RunnerAdditionalServices"
+        Effect   = "Allow"
+        Action   = var.runner_additional_service_actions
+        Resource = "*"
+      }] : []
+    )
+  })
 }
 
 # --- Security Group ---

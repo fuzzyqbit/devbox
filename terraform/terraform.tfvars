@@ -11,3 +11,10 @@ subnet_id        = "subnet-07513680b824b3dbe"
 instance_type    = "t3.medium"
 instance_name    = "devbox"
 root_volume_size = 50
+
+# Shared-runner IAM variant — opt-in, off by default. Attaches the ORG-SUPPLIED
+# permissions boundary to the instance role and grants explicit S3/EC2/caged-IAM
+# permissions. The boundary policy is never created here — governance owns it.
+# Example (fake account id):
+# enable_runner_iam               = true
+# runner_permissions_boundary_arn = "arn:aws:iam::123456789012:policy/org-boundary"
