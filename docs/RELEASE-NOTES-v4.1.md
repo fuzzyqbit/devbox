@@ -44,6 +44,37 @@ bake-time full-image update, so `dnf update *` can never bump it past the lock.
   job extended to cover the kion role shell files, test mocks, and bats files.
   (Supports the unmerged `feat/kion-creds` branch — see below.)
 
+## Previously shipped, previously unreleased (v3.0 → v4.1)
+
+No release was tagged between v3.0 (2026-06-02) and v4.1; the following landed on
+`main` in that window and appears in release notes for the first time here.
+
+- **v4.0 Amazon DCV remote desktop** (merged 2026-06-26): new `dcv` role — non-GPU
+  DCV server on AL2023, PAM auth, TLS + QUIC, virtual GNOME session via `Xdcv` —
+  reached by **direct connect** on `:8443` (TCP+UDP) gated on `var.allowed_web_cidrs`;
+  airgap license path via the regional `dcv-license.<region>` S3 bucket (VPC endpoint +
+  scoped IAM assumed present). Replaced the v3.2 from-source xrdp stack and removed
+  VNC/noVNC entirely.
+- **xrdp re-added from SPAL** (quick-task `260707-o7s`, merged 2026-07-13): RDP on
+  `:3389` as a **second, WebGL-free desktop path, additive to DCV** — a fallback for
+  jumpbox browsers without WebGL, not a DCV replacement. `xrdp`/`xorgxrdp` install from
+  SPAL (Supplementary Packages for Amazon Linux; Amazon-signed repo, GPG on, but
+  packages are as-is EPEL9 rebuilds with **no AWS CVE tracking** — documented operator
+  tradeoff, CLAUDE.md §8; remediation is rebake). Requires the system Xorg, so CIS rule
+  2.2.1 is scoped OFF for xrdp builds only (post-hardening assert guards the X server);
+  DCV-only builds keep 2.2.1 enforced. Login: `ec2-user` + desktop password from
+  `./run secrets-show`.
+- **Persistent `/home` EBS volume** (merged 2026-06-26): separate volume survives AMI
+  swaps/instance replacement (`prevent_destroy`), DLM snapshots; decommission requires
+  an explicit `tofu state rm` first (CLAUDE.md §7).
+- **ai_tools role** (PR #6, merged 2026-07-14): pinned agentic AI CLIs (claude-code,
+  codex, opencode) as npm globals in `/usr/local`; no auth baked — operators log in at
+  runtime, creds persist on the `/home` volume.
+- **SBOM pass** (PR #5): every bake ends with checksum-pinned syft writing a CycloneDX
+  inventory to `/etc/devimage-sbom.cdx.json` + a per-bake copy fetched to `sbom/`.
+- **ansible-core baked** (PR #4) and **CI baseline fixes** (PR #3: lint config, checkov,
+  tofu-validate unhang, push-trigger scoped to main).
+
 ## In flight (not in this release)
 
 - **`feat/kion-creds`** (branch, review-clean, unmerged): `kion-creds` CLI + login-shell
