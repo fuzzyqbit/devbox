@@ -14,6 +14,8 @@ noVNC HTTPS-only enforcement shipped as quick task `260609-dif` (2026-06-09) —
 
 **Goal:** Every desktop bake ships Google Chrome, installed from Google's signed dnf repo at bake time.
 
+**Progress:** Phase 16 complete (2026-07-24) — Chrome block baked into the desktop role, verification passed 4/4 (CHROME-02 delivered at bake-config level). Phase 17 (live UAT, CHROME-01) remains — needs operator AWS session; composes with the open v4.0/xrdp/ai-tools/kion UAT backlog.
+
 **Target features:**
 - `google-chrome-stable` installed inside the existing `desktop` role — no new layer flag; applies whenever `layers.desktop` is on
 - Google's official dnf repo config + GPG key baked; GPG verification stays ON (airgap-posture consistent)
@@ -169,4 +171,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-07-24 — v4.1 Google Chrome in desktop role milestone started.*
+*Last updated: 2026-07-24 — Phase 16 complete (Chrome baked); Phase 17 live UAT pending.*
