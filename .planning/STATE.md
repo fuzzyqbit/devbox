@@ -1,17 +1,16 @@
 ---
 gsd_state_version: 1.0
-milestone: v4.0
-milestone_name: — Amazon DCV Remote Desktop
-status: awaiting-human-uat
-stopped_at: Phase 14 verified (adversarial CLEAR); only Phase 15 live UAT remains (human/AWS)
-last_updated: "2026-06-22T12:17:17.792Z"
-last_activity: 2026-06-22
+milestone: v4.1
+milestone_name: Google Chrome in desktop role
+status: planning
+last_updated: "2026-07-24T12:12:33.273Z"
+last_activity: 2026-07-24
 progress:
-  total_phases: 3
-  completed_phases: 2
-  total_plans: 7
-  completed_plans: 7
-  percent: 67
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # Project State
@@ -25,13 +24,10 @@ See: .planning/PROJECT.md (v4.0 Amazon DCV Remote Desktop milestone started 2026
 
 ## Current Position
 
-Phase: 14 (direct-connect SG + xrdp removal + CIS revert + operator) — VERIFIED (adversarial CLEAR)
-Plan: 5 of 5 complete
-Status: All bake-time/code work done + verified. Only Phase 15 live UAT (human/AWS) remains to close v4.0.
-Last activity: 2026-06-22
-Branch: feat/dcv (pushed; NOT merged to main)
-
-Progress: [█████████·] code 100% — milestone gated on the human Phase-15 UAT
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-07-24 — Milestone v4.1 started
 
 ### v4.0 Phase Map
 

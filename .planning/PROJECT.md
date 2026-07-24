@@ -10,22 +10,29 @@ noVNC HTTPS-only enforcement shipped as quick task `260609-dif` (2026-06-09) —
 
 **Deferred to a later cycle:** observability (CloudWatch metrics + login events), lifecycle automation (idle auto-stop, scheduled stop), image lifecycle (old AMI deregistration + inventory), Packer SSM `:NN` version pin (requires AWS creds).
 
-## Current Milestone: v4.0 Amazon DCV Remote Desktop
+## Current Milestone: v4.1 Google Chrome in desktop role
 
-**Branch:** `feat/dcv`
-
-**Goal:** Replace the remote-desktop stack with **Amazon DCV**. New `dcv` Ansible role installs/configures `dcvserver` on AL2023; **remove vncserver, noVNC, and xrdp/xorgxrdp entirely** — DCV is all that's needed.
-
-**Context:** DCV was scrapped once (`d3bd9a0`, "license unobtainable in airgap") and replaced by from-source xrdp (v3.2, code-complete, RDP-14 live UAT pending). DCV was then re-validated working on a live instance this session — the blocker was the regional S3 license bucket (`ORIGIN_OBJECT_MISSING`), reachable once an S3 VPC endpoint + IAM `s3:GetObject` are in place. v4.0 adopts DCV with that license path as first-class scope and retires xrdp.
+**Goal:** Every desktop bake ships Google Chrome, installed from Google's signed dnf repo at bake time.
 
 **Target features:**
-- New `dcv` role: install + configure `dcvserver` on AL2023 (airgap download — github/vendor, **no S3-for-install**, no private mirror); GNOME desktop; a created console/virtual session (DCV does not auto-create one)
-- **Airgap license path (make-or-break):** S3 gateway VPC endpoint + IAM `s3:GetObject` on `dcv-license.<region>` so the baked AMI licenses at runtime
-- Terraform SG `:8443` TCP (+UDP if QUIC kept) gated on `var.allowed_web_cidrs`; **drop xrdp `:3389`**; SSM-first / no-public-`:22` unchanged; `hardening`-stays-last preserved
-- Operator surface: `./run` port-forward `:8443` + secrets + docs (client over SSM)
-- **Full removal** of xrdp/xorgxrdp + any VNC/noVNC remnants — no dead remote-desktop config in the image
+- `google-chrome-stable` installed inside the existing `desktop` role — no new layer flag; applies whenever `layers.desktop` is on
+- Google's official dnf repo config + GPG key baked; GPG verification stays ON (airgap-posture consistent)
+- Latest-at-bake version policy (Google's repo serves only the current stable — historic RPMs are not hosted); exact baked version captured by the existing SBOM pass + build manifest
+- Bake-assert: chrome binary present + executes headlessly (bake-green-but-dead guard); post-hardening survival check if hardening touches its deps
 
-**Decision:** DCV chosen over the from-source xrdp stack (re-validated working live). Airgap install stays download-based (consistent with the from-source/get_url approach); the licensing dependency on S3 is solved via a VPC gateway endpoint + scoped IAM rather than abandoned. Reverses v3.2.
+**Key decisions:** No sub-gate flag (unlike `vscode_desktop`) — Chrome is unconditional desktop content. Latest-at-bake accepted over a strict pin (pin would break every bake on Chrome's ~4-6-week release cadence); remediation for a bad version is rebake, matching the SPAL/xrdp precedent.
+
+## Shipped since last archive (bookkeeping pending)
+
+GSD archival (`complete-milestone`) has not run since v3.0; the following shipped to `main` outside or after v4.0's records — STATE.md/MILESTONES.md were stale until v4.1 started:
+
+- **v4.0 Amazon DCV** — code-complete, merged 2026-06-26 (dcv role, `:8443`, airgap license path via S3 VPC endpoint). Live UAT still open.
+- **xrdp re-added** (quick-task `260707-o7s`, merged 2026-07-13) — SPAL xrdp/xorgxrdp on `:3389` as a second, WebGL-free desktop path ADDITIVE to DCV. Deliberately reverses v4.0's "full removal" bullet; CIS 2.2.1 scoped off for xrdp builds. See CLAUDE.md §8.
+- **persistent-home** (merged 2026-06-26) — separate `/home` EBS volume + DLM snapshots + `prevent_destroy` (obsoletes SEED-001's core idea).
+- **ai_tools role** (merged 2026-07-14, PR #6) — pinned agentic AI CLIs (claude, codex, opencode).
+- **kion-creds** (branch `feat/kion-creds`, pushed 2026-07-22, UNMERGED) — Kion STAK fetcher role (`layers.kion`), final review "Ready to merge", live token-endpoint verification in progress.
+
+All live UAT items (DCV, xrdp, ai-tools first-bake, kion-creds endpoints) remain open; next `tf-apply` replaces the instance.
 
 ## Superseded: v3.2 XRDP Remote Desktop
 
@@ -162,4 +169,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-06-15 — v3.2 XRDP Remote Desktop milestone started.*
+*Last updated: 2026-07-24 — v4.1 Google Chrome in desktop role milestone started.*
