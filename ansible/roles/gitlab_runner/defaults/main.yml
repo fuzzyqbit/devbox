@@ -1,0 +1,13 @@
+---
+# gitlab_runner role defaults — pinned GitLab runner version (repo pin invariant).
+# [VERIFIED: gitlab.com releases API — 2026-07-24 (v19.2.0 released 2026-07-16)]
+# Bump procedure: check the current release on gitlab.com, edit the pin, rebake
+# (./run build && ./run tf-apply). packages.gitlab.com hosts historic versions,
+# so a pin stays resolvable across future bakes (unlike the Chrome repo).
+#
+# DEFERRED REFINEMENT (CLAUDE.md §9 — xrdp deferred-pin idiom): the rpm RELEASE
+# suffix (e.g. "-1") is NOT pinned yet. At the first bake, run ON THE INSTANCE:
+#     dnf list --showduplicates --repo=runner_gitlab-runner gitlab-runner
+# then extend this pin to the exact version-release string. Leaving the var
+# EMPTY installs the latest in the repo (conditional templating downstream).
+gitlab_runner_version: "19.2.0"

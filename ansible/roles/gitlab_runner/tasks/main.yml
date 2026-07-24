@@ -1,0 +1,169 @@
+---
+# GitLab CI runner (gitlab-runner) from GitLab's OFFICIAL packagecloud rpm repo
+# (packages.gitlab.com/runner/gitlab-runner), installed-NOT-registered.
+#
+# NO secrets baked (CLAUDE.md §8 secrets invariant): the runner registration
+# token is a secret and MUST NOT enter the AMI. The operator registers at
+# RUNTIME:
+#     sudo gitlab-runner register --url <gitlab-url> --token <runner-token>
+# (config lands in /etc/gitlab-runner/config.toml at runtime), then enables the
+# service:
+#     sudo systemctl enable --now gitlab-runner
+#
+# CAVEAT — registration does NOT survive an AMI swap: /etc/gitlab-runner lives
+# on the ROOT volume, not the persistent /home EBS volume (unlike ai_tools
+# credentials). Re-register after every rebake + tf-apply.
+#
+# EXECUTOR DEPS (deliberately NOT a hard dependency — comment only): the shell
+# executor works with what is already baked (bash + git from the git layer);
+# the docker executor becomes available when layers.containers is on.
+#
+# GPG posture: gpgcheck=1 AND repo_gpgcheck=1 baked into the .repo; no bypass
+# flags anywhere in this role (CLAUDE.md §2/§8).
+
+# Content fetched VERBATIM from the packagecloud config_file.repo endpoint on
+# 2026-07-24:
+#   curl -fsSL "https://packages.gitlab.com/install/repositories/runner/gitlab-runner/config_file.repo?os=amazon&dist=2023&source=script"
+# Binary repo section only — the [runner_gitlab-runner-source] SRPMS section is
+# dropped (smaller surface). Chrome-block precedent (desktop role) for baking a
+# vendor .repo with GPG verification ON. $basearch is a dnf variable, not
+# Jinja — the inline content passes it through untouched.
+- name: Bake the GitLab runner dnf repo config (gpgcheck + repo_gpgcheck on)
+  ansible.builtin.copy:
+    dest: /etc/yum.repos.d/gitlab-runner.repo
+    content: |
+      [runner_gitlab-runner]
+      name=runner_gitlab-runner
+      baseurl=https://packages.gitlab.com/runner/gitlab-runner/amazon/2023/$basearch
+      repo_gpgcheck=1
+      gpgcheck=1
+      enabled=1
+      gpgkey=https://packages.gitlab.com/gpgkey/gpg.key
+             https://packages.gitlab.com/gpgkey/runner/49F16C5CC3A0F81F.pub.gpg
+             https://packages.gitlab.com/gpgkey/runner/4C80FB51394521E9.pub.gpg
+      sslverify=1
+      sslcacert=/etc/pki/tls/certs/ca-bundle.crt
+      metadata_expire=300
+    owner: root
+    group: root
+    mode: "0644"
+
+# Plain import, no fingerprint pin — the gpgkey list mixes the packagecloud
+# metadata-signing key and the runner package signing keys, and ansible-core
+# < 2.18 rpm_key verifies a single fingerprint only (Chrome rpm_key idiom,
+# desktop role). Every URL below appears verbatim on the .repo gpgkey= lines.
+- name: Import the GitLab runner package signing keys
+  ansible.builtin.rpm_key:
+    key: "{{ item }}"
+    state: present
+  loop:
+    - https://packages.gitlab.com/gpgkey/gpg.key
+    - https://packages.gitlab.com/gpgkey/runner/49F16C5CC3A0F81F.pub.gpg
+    - https://packages.gitlab.com/gpgkey/runner/4C80FB51394521E9.pub.gpg
+
+# [ASSUMED, confirmed-at-first-bake]: repo_gpgcheck=1 needs dnf/librepo to
+# accept the packagecloud metadata-signing key into its own keyring. The rpm_key
+# imports above cover package signatures only. CLI `dnf -y makecache`
+# auto-accepts keys listed on gpgkey=; the ansible dnf-module API path may not.
+# Drop this task if the first bake proves the module handles it.
+- name: Refresh the GitLab runner repo metadata (accept the repo signing key)
+  ansible.builtin.command:
+    cmd: dnf -y makecache --disablerepo=* --enablerepo=runner_gitlab-runner
+  changed_when: false
+
+# disable_gpg_check stays false — the keys imported above verify the package
+# signature and repo_gpgcheck=1 covers the metadata. GPG verification stays ON
+# (CLAUDE.md §2/§8). Version pin applied when gitlab_runner_version is set
+# (deferred release-suffix refinement — see defaults/main.yml); an emptied var
+# falls back to repo-latest (xrdp deferred-pin templating idiom).
+- name: Install gitlab-runner (pinned) from the signed repo
+  ansible.builtin.dnf:
+    name: "gitlab-runner{{ ('-' ~ gitlab_runner_version) if (gitlab_runner_version | length > 0) else '' }}"
+    state: present
+    disable_gpg_check: false
+
+# The rpm %post enables + starts the service [ASSUMED, confirmed-at-first-bake].
+# An unregistered runner must not run at boot — the operator enables it AFTER
+# registering (see the header).
+- name: Disable and stop the gitlab-runner service (installed-not-registered)
+  ansible.builtin.systemd:
+    name: gitlab-runner
+    enabled: false
+    state: stopped
+    daemon_reload: true
+
+# ── Bake-asserts (dcv/xrdp bake-green-but-broken pattern) ──
+
+- name: Stat the gitlab-runner binary (bake-assert)
+  ansible.builtin.stat:
+    path: /usr/bin/gitlab-runner
+  register: gitlab_runner_bake_bin
+
+- name: Assert the gitlab-runner binary exists (bake-assert)
+  ansible.builtin.assert:
+    that:
+      - gitlab_runner_bake_bin.stat.exists
+    fail_msg: >-
+      /usr/bin/gitlab-runner is missing after the dnf install. The path is
+      [ASSUMED, confirmed-at-first-bake] — confirm the real binary path with
+      `rpm -ql gitlab-runner | grep bin/` on the instance and update the stat
+      and --version tasks if it differs.
+    quiet: true
+
+# Proves the binary actually executes on AL2023, not just exists (ai_tools
+# bake-assert doctrine).
+- name: Run gitlab-runner --version (bake-assert)
+  ansible.builtin.command:
+    cmd: /usr/bin/gitlab-runner --version
+  changed_when: false
+
+# `systemctl is-enabled` prints `disabled` on stdout and exits NON-ZERO (rc 1)
+# when the unit is disabled — assert on stdout, never on the rc (xrdp idiom).
+# A missing unit prints an error with EMPTY stdout, so the `disabled` stdout
+# assert below doubles as the unit-present proof.
+- name: Check gitlab-runner service enablement (bake-assert)
+  ansible.builtin.command:
+    cmd: systemctl is-enabled gitlab-runner
+  register: gitlab_runner_bake_enabled
+  changed_when: false
+  failed_when: false
+
+- name: Assert the gitlab-runner service is present but disabled (bake-assert)
+  ansible.builtin.assert:
+    that:
+      - "'disabled' in gitlab_runner_bake_enabled.stdout"
+    fail_msg: >-
+      `systemctl is-enabled gitlab-runner` did not answer `disabled`
+      (stdout: {{ gitlab_runner_bake_enabled.stdout | default('') }},
+      stderr: {{ gitlab_runner_bake_enabled.stderr | default('') }}).
+      Empty stdout / error output means the unit is MISSING (install or rpm
+      %post regression); `enabled` means the disable task regressed and an
+      unregistered runner would start at boot.
+    quiet: true
+
+# ── §8 no-secrets assert — a runner registration MUST NOT reach the image ──
+
+- name: Stat /etc/gitlab-runner/config.toml (bake-assert)
+  ansible.builtin.stat:
+    path: /etc/gitlab-runner/config.toml
+  register: gitlab_runner_bake_config
+
+- name: Slurp config.toml for the no-secrets assert (bake-assert)
+  ansible.builtin.slurp:
+    src: /etc/gitlab-runner/config.toml
+  register: gitlab_runner_bake_config_content
+  when: gitlab_runner_bake_config.stat.exists
+
+- name: Assert no runner registration is baked (bake-assert)
+  ansible.builtin.assert:
+    that:
+      - "'token' not in (gitlab_runner_bake_config_content.content | b64decode)"
+      - "'[[runners]]' not in (gitlab_runner_bake_config_content.content | b64decode)"
+    fail_msg: >-
+      /etc/gitlab-runner/config.toml carries a `token` or a `[[runners]]`
+      section at bake end — a runner registration reached the image. A
+      registration token is a SECRET (CLAUDE.md §8) and MUST NOT enter the
+      AMI; registration is a runtime step (see the role header). Remove
+      whatever baked it and rebake.
+    quiet: true
+  when: gitlab_runner_bake_config.stat.exists
