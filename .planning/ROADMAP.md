@@ -39,7 +39,7 @@ mirroring the v4.0 DCV-11 pattern. Live-anything requires AWS creds the operator
 
 ## Phases
 
-- [ ] **Phase 16: Chrome in the desktop role** - `google-chrome-stable` from Google's official signed dnf repo (baked `.repo` + GPG key, `gpgcheck=1`) baked into every desktop bake, no new layer flag
+- [x] **Phase 16: Chrome in the desktop role** - `google-chrome-stable` from Google's official signed dnf repo (baked `.repo` + GPG key, `gpgcheck=1`) baked into every desktop bake, no new layer flag (completed 2026-07-24)
 - [ ] **Phase 17: Live UAT gate (milestone-close)** - Chrome proven launchable from the GNOME desktop (DCV or xrdp session) on a live hardened instance
 
 ## Phase Details
@@ -65,7 +65,7 @@ dnf repo, with GPG verification on and no change to the playbook's invariant ord
 **Plans**: 1 plan
 
 Plans:
-- [ ] 16-01-PLAN.md — Chrome block (rpm_key → baked canonical `.repo` → dnf `google-chrome-stable`) appended to the desktop role + static verification sweep (lint, grep-gates, GPG posture, invariants)
+- [x] 16-01-PLAN.md — Chrome block (rpm_key → baked canonical `.repo` → dnf `google-chrome-stable`) appended to the desktop role + static verification sweep (lint, grep-gates, GPG posture, invariants)
 
 ### Phase 17: Live UAT gate (milestone-close)
 **Goal**: Chrome is proven working where the operator actually uses it — launched from the
@@ -100,7 +100,7 @@ bake + apply session can clear several gates. The next `tf-apply` replaces the i
 | 10-12 | v3.2 | 8/8 | Complete (superseded by v4.0) | 2026-06-16 |
 | 13-14 | v4.0 | 7/7 | Complete (verified; merged 2026-06-26) | 2026-06-19 |
 | 15. Live UAT Gate (DCV-11) | v4.0 | — | Carried open (human/AWS) | - |
-| 16. Chrome in the desktop role | v4.1 | 0/1 | Planned | - |
+| 16. Chrome in the desktop role | v4.1 | 1/1 | Complete   | 2026-07-24 |
 | 17. Live UAT gate | v4.1 | 0/? | Not started | - |
 
 ## Shipped Milestones

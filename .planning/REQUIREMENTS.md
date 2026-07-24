@@ -11,7 +11,7 @@
 ### Chrome (CHROME)
 
 - [ ] **CHROME-01**: Operator can launch Google Chrome from the GNOME desktop (DCV or xrdp session) on every desktop bake.
-- [ ] **CHROME-02**: Chrome installs from Google's official signed dnf repo — baked `.repo` config + GPG key, `gpgcheck=1`, no `--nogpgcheck` (GPG posture consistent with CLAUDE.md §2/§8 and the SPAL precedent).
+- [x] **CHROME-02**: Chrome installs from Google's official signed dnf repo — baked `.repo` config + GPG key, `gpgcheck=1`, no `--nogpgcheck` (GPG posture consistent with CLAUDE.md §2/§8 and the SPAL precedent).
 
 ---
 
@@ -35,7 +35,7 @@
 | Requirement | Phase | Status |
 |-------------|-------|--------|
 | CHROME-01 | Phase 17 | Pending |
-| CHROME-02 | Phase 16 | Pending |
+| CHROME-02 | Phase 16 | Complete |
 
 **Coverage:** 2/2 v1 (v4.1) requirements mapped — no orphans. CHROME-03/04 deferred (Future Requirements), intentionally unmapped.
 

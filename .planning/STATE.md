@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v4.1
 milestone_name: Google Chrome in desktop role
-status: executing
-stopped_at: Roadmap revised (re-scope applied); Phase 16 not yet planned.
-last_updated: "2026-07-24T13:09:22.691Z"
-last_activity: 2026-07-24 -- Phase 16 planning complete
+status: verifying
+stopped_at: Completed 16-01-PLAN.md; Phase 16 awaiting verification.
+last_updated: "2026-07-24T13:18:09.293Z"
+last_activity: 2026-07-24
 progress:
   total_phases: 2
-  completed_phases: 0
+  completed_phases: 1
   total_plans: 1
-  completed_plans: 0
-  percent: 0
+  completed_plans: 1
+  percent: 100
 ---
 
 # Project State
@@ -21,22 +21,22 @@ progress:
 See: .planning/PROJECT.md (v4.1 Google Chrome in desktop role milestone started 2026-07-24)
 
 **Core value:** A single operator can spin up, hibernate, and tear down a reproducible, hardened cloud workstation with one command — without leaking credentials or exposing a vulnerable host to the public internet.
-**Current focus:** Phase 16 — Chrome in the desktop role (bake-time implementation). The v4.0 Phase-15 live UAT (human/AWS) remains carried open in parallel.
+**Current focus:** Phase 16 — chrome-in-the-desktop-role
 
 ## Current Position
 
-Phase: 16 of 16-17 (Chrome in the desktop role) — not started
-Plan: — (next: `/gsd:plan-phase 16`)
-Status: Ready to execute
-Last activity: 2026-07-24 -- Phase 16 planning complete
+Phase: 16 (chrome-in-the-desktop-role) — EXECUTING
+Plan: 1 of 1
+Status: Phase complete — ready for verification
+Last activity: 2026-07-24
 
-Progress: [░░░░░░░░░░] 0% (0/2 phases, 0 plans)
+Progress: [██████████] 100%
 
 ### v4.1 Phase Map
 
 | Phase | Goal | Requirements | Status |
 |-------|------|--------------|--------|
-| 16 | Chrome from Google's official signed dnf repo in `desktop` role (baked `.repo` + GPG key, `gpgcheck=1`, no new layer flag) | CHROME-02 | Not started |
+| 16 | Chrome from Google's official signed dnf repo in `desktop` role (baked `.repo` + GPG key, `gpgcheck=1`, no new layer flag) | CHROME-02 | Executed (16-01 — `f778b56`; static gates green; awaiting verifier) |
 | 17 | Live UAT gate — Chrome launches from GNOME desktop (DCV/xrdp) on live hardened instance | CHROME-01 | Not started (human/AWS; blocks milestone close) |
 
 ### v4.0 Phase Map (carried — live UAT open)
@@ -84,7 +84,11 @@ Calendar window: 2026-05-13 17:04 → 2026-05-14 10:58 (~18 hours wall clock; ~7
 
 </details>
 
-v4.1: no metrics yet (roadmap just created).
+### v4.1
+
+| Phase | Plan | Duration | Tasks | Files |
+|-------|------|----------|-------|-------|
+| 16 | 01 | 6min | 2 | 1 |
 
 ## Accumulated Context
 
@@ -99,6 +103,10 @@ See PROJECT.md Key Decisions table.
 - **GPG posture unchanged:** baked `.repo` config + Google GPG key, `gpgcheck=1`, no `--nogpgcheck` / `disable_gpg_check` — consistent with CLAUDE.md §2/§8 airgap posture.
 - **Playbook invariants untouched:** `hardening` stays the last role in `ansible/playbook.yml`; `sbom.yml` stays the last import (both grep-gated).
 - **Phase-17 UAT composes with the open live-UAT backlog** (DCV-11, xrdp 260707-o7s task 3, ai_tools first bake, kion-creds endpoints) — one bake + apply session can clear several gates. Next `tf-apply` replaces the instance.
+
+**v4.1 execution decisions (16-01, 2026-07-24):**
+
+- **Repo-wide local hook baselines are pre-existing-red:** `pre-commit run --all-files` (no-changeme, check-yaml, trailing-whitespace) and the repo-wide push-stage ansible-lint hook fail on content blame-proven to predate Phase 16; CI-authoritative scopes (grep-gates, gitleaks, `ansible-lint ansible/playbook.yml` pinned v26.4.0) are green including the Chrome block. Hygiene follow-ups logged in `phases/16-chrome-in-the-desktop-role/deferred-items.md`; git hooks are not installed in this clone (operator: run the three `pre-commit install` commands, CLAUDE.md §2).
 
 <details>
 <summary>v4.0 roadmap decisions + pitfalls (collapsed — carried until DCV-11 records)</summary>
@@ -155,7 +163,7 @@ See PROJECT.md Key Decisions table.
 
 ## Session Continuity
 
-Last session: 2026-07-24 (v4.1 milestone start → roadmap created → re-scoped + roadmap revised)
+Last session: 2026-07-24T13:16:52.832Z
 
 - v4.1 re-scoped: CHROME-03 (SBOM capture as requirement) and CHROME-04 (dedicated
   bake-asserts) moved to Future Requirements. Roadmap revised: Phase 16 (bake-time
@@ -166,8 +174,8 @@ Last session: 2026-07-24 (v4.1 milestone start → roadmap created → re-scoped
 - v4.0 DCV-11 live UAT remains carried open (merged to main 2026-06-26 without it);
   Phase-17 UAT is planned to compose with that backlog in one live bake session.
 
-Stopped at: Roadmap revised (re-scope applied); Phase 16 not yet planned.
-Next: `/gsd:plan-phase 16` (Chrome in the desktop role).
+Stopped at: Completed 16-01-PLAN.md (`f778b56` — Chrome block in the desktop role; static gates green).
+Next: verifier for Phase 16, then Phase 17 (live UAT gate — composes with the open live-UAT backlog).
 
 ## Operator Next Steps
 
