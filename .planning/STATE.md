@@ -161,6 +161,7 @@ See PROJECT.md Key Decisions table.
 | 260611-jq2 | (prior DCV role — reverted at d3bd9a0; source for the v4.0 `dcv` role port) | — | 51c5f1f/67faeb3/8538ef3 | git history |
 | 260707-o7s | add xrdp (RDP :3389) from SPAL — additive to DCV, PAM logins; **Tasks 1–2 committed, Task 3 live-verify pending** | 2026-07-07 | 1ab1835/33690e9 | [260707-o7s-xrdp-spal](./quick/260707-o7s-xrdp-spal/) |
 | 260724-dh7 | add dnf versionlock + lock salt-minion at bake-start version (pre-update, first tasks of roles/base); static gates green, live bake pending (UAT backlog) — complete | 2026-07-24 | 91c9e93 | [260724-dh7-…](./quick/260724-dh7-add-dnf-versionlock-and-lock-salt-minion/) |
+| 260724-kck | gitlab-runner-role — layer-gated GitLab CI runner from the signed packagecloud repo, installed-not-registered (no token baked, service disabled, default OFF); static gates green, live bake pending (UAT backlog) — complete | 2026-07-24 | a1c054e/bf5864b/b7b47fb | [260724-kck-gitlab-runner-role](./quick/260724-kck-gitlab-runner-role/) |
 
 ## Session Continuity
 
