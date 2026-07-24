@@ -100,7 +100,7 @@ bake + apply session can clear several gates. The next `tf-apply` replaces the i
 | 10-12 | v3.2 | 8/8 | Complete (superseded by v4.0) | 2026-06-16 |
 | 13-14 | v4.0 | 7/7 | Complete (verified; merged 2026-06-26) | 2026-06-19 |
 | 15. Live UAT Gate (DCV-11) | v4.0 | — | Carried open (human/AWS) | - |
-| 16. Chrome in the desktop role | v4.1 | 1/1 | Complete   | 2026-07-24 |
+| 16. Chrome in the desktop role | v4.1 | 1/1 | Complete    | 2026-07-24 |
 | 17. Live UAT gate | v4.1 | 0/? | Not started | - |
 
 ## Shipped Milestones

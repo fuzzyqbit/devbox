@@ -2,13 +2,13 @@
 gsd_state_version: 1.0
 milestone: v4.1
 milestone_name: Google Chrome in desktop role
-status: verifying
+status: ready_to_plan
 stopped_at: Completed 16-01-PLAN.md; Phase 16 awaiting verification.
 last_updated: "2026-07-24T13:18:09.293Z"
 last_activity: 2026-07-24
 progress:
   total_phases: 2
-  completed_phases: 1
+  completed_phases: 2
   total_plans: 1
   completed_plans: 1
   percent: 100
@@ -25,9 +25,9 @@ See: .planning/PROJECT.md (v4.1 Google Chrome in desktop role milestone started 
 
 ## Current Position
 
-Phase: 16 (chrome-in-the-desktop-role) — EXECUTING
-Plan: 1 of 1
-Status: Phase complete — ready for verification
+Phase: 17
+Plan: Not started
+Status: Ready to plan
 Last activity: 2026-07-24
 
 Progress: [██████████] 100%
