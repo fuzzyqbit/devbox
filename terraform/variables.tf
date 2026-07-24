@@ -97,7 +97,7 @@ variable "enable_runner_iam" {
 variable "runner_permissions_boundary_arn" {
   type        = string
   default     = ""
-  description = "ARN of the ORG-SUPPLIED permissions boundary policy. Never created here — governance owns it. Required when enable_runner_iam is true; also stamped on every role the runner itself creates (escalation cage)."
+  description = "ARN of the ORG-SUPPLIED permissions boundary policy. Never created here — governance owns it. Required when enable_runner_iam is true; also stamped on every role the runner itself creates (escalation cage). The cage's security rests entirely on this policy — it MUST deny broad IAM writes; see the trust-surface note in main.tf."
 
   validation {
     condition     = !var.enable_runner_iam || can(regex("^arn:aws:iam::[0-9]{12}:policy/", var.runner_permissions_boundary_arn))
@@ -119,5 +119,13 @@ variable "runner_created_role_path" {
 variable "runner_additional_service_actions" {
   type        = list(string)
   default     = []
-  description = "Extra IAM actions for the runner beyond S3/EC2/IAM (e.g. [\"ecr:*\", \"logs:*\", \"cloudformation:*\"]). Explicit-list posture: add here per real need, never wildcard services preemptively."
+  description = "Extra IAM actions for the runner beyond S3/EC2/IAM (e.g. [\"ecr:*\", \"logs:*\", \"cloudformation:*\"]). Explicit-list posture: add here per real need, never wildcard services preemptively. iam:* and sts:* actions are rejected — they would bypass the escalation cage (see the validation below)."
+
+  validation {
+    condition = alltrue([
+      for a in var.runner_additional_service_actions :
+      !can(regex("(?i)^(iam|sts):", a))
+    ])
+    error_message = "runner_additional_service_actions must not contain iam:* or sts:* actions — those bypass the runner escalation cage. Add IAM/STS grants deliberately in main.tf under the boundary condition instead."
+  }
 }

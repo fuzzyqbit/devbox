@@ -113,10 +113,31 @@ resource "aws_iam_role_policy_attachment" "devbox_ssm_core" {
 #      affected role (iam:PermissionsBoundary condition) — a job cannot mint an
 #      unbounded admin role. PutRolePermissionsBoundary / DeleteRolePermissionsBoundary
 #      are deliberately absent, so the runner can never strip the cage it is in.
-#   2. PassRole — and every op where the boundary condition key does not exist —
-#      is confined to var.runner_created_role_path: the path is the cage.
+#   2. PassRole — and the role-lifecycle / instance-profile ops that are caged by
+#      path rather than by the boundary condition — is confined to
+#      var.runner_created_role_path: the path is the cage.
 # Effective instance permissions = org boundary ∩ (this policy + ssm-read above).
 
+# ⚠ SHARED-RUNNER TRUST SURFACE — READ BEFORE SETTING enable_runner_iam = true
+# Untrusted CI jobs run AS this instance role. With this policy their effective
+# permissions are:  org-boundary ∩ { s3:*, ec2:*, path-caged IAM }.
+#
+# Two load-bearing assumptions the operator MUST satisfy:
+#  1. THE BOUNDARY IS THE ONLY CEILING. s3:* and ec2:* are account-wide
+#     (Resource="*"). Any job can read/write/DELETE any S3 bucket — including the
+#     Terraform state bucket (devimage-tfstate-<acct>) — and Terminate/DeleteVolume
+#     any instance or EBS volume in the account. `prevent_destroy` is Terraform-only
+#     and does NOT stop a raw ec2:DeleteVolume, so OTHER operators' persistent /home
+#     volumes are destroyable by a job here. If that blast radius is unacceptable,
+#     the org boundary MUST tag/resource-scope s3+ec2, or narrow these statements.
+#  2. THE ESCALATION CAGE HOLDS ONLY IF THE BOUNDARY FORBIDS BROAD IAM WRITES.
+#     Runner-created roles under runner_created_role_path are forced to carry the
+#     boundary (iam:PermissionsBoundary condition). But a boundary is a CEILING, not
+#     a condition-enforcer: if the org boundary itself permits broad
+#     iam:CreateRole/AttachRolePolicy/PassRole/PutRolePermissionsBoundary, a bounded
+#     role can mint a fresh UNBOUNDED role and escape in one hop. Governance's
+#     boundary policy MUST deny broad IAM mutation (or gate it on the same
+#     iam:PermissionsBoundary condition) for this cage to mean anything.
 resource "aws_iam_role_policy" "runner_services" {
   count = var.enable_runner_iam ? 1 : 0
   name  = "${local.name_prefix}-runner-services"
@@ -147,9 +168,11 @@ resource "aws_iam_role_policy" "runner_services" {
         {
           # Escalation cage part 1: the runner may create/modify roles ONLY under
           # its own path AND ONLY when the affected role carries the org boundary —
-          # a job cannot mint an unbounded admin role. Only these five actions
-          # support the iam:PermissionsBoundary condition key (per the AWS
-          # delegated-admin pattern); the rest of the role lifecycle is below.
+          # a job cannot mint an unbounded admin role. These are the permission-
+          # GRANTING write ops; each supports the iam:PermissionsBoundary condition
+          # key (per the AWS service authorization reference), so each is gated on
+          # the boundary. The rest of the role lifecycle — ops that cannot widen a
+          # role's permissions — is path-scoped below.
           Sid    = "RunnerIAMWriteBounded"
           Effect = "Allow"
           Action = [
@@ -163,10 +186,14 @@ resource "aws_iam_role_policy" "runner_services" {
           }
         },
         {
-          # DeleteRole / UpdateRole / TagRole / UntagRole do NOT support the
-          # iam:PermissionsBoundary condition key (the request never carries it,
-          # so a conditioned Allow would never match) — path-scoping is the cage
-          # here. None of these can widen a caged role's permissions.
+          # DeleteRole / UpdateRole / TagRole / UntagRole are caged by PATH alone,
+          # deliberately condition-free: none of these can widen a caged role's
+          # permissions (delete / description / tag only), so the boundary
+          # condition adds no security here. Note this is a choice, not a
+          # limitation — DeleteRole DOES support the iam:PermissionsBoundary
+          # condition key per the AWS service authorization reference; leaving it
+          # unconditioned lets the runner clean up an in-path role even if its
+          # boundary was mis-set or stripped out-of-band.
           Sid    = "RunnerIAMRolePathScoped"
           Effect = "Allow"
           Action = [
@@ -176,8 +203,9 @@ resource "aws_iam_role_policy" "runner_services" {
           Resource = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role${var.runner_created_role_path}*"
         },
         {
-          # Instance-profile ops don't support the PermissionsBoundary condition key —
-          # path-scoping is the cage for this resource type. Note AddRoleToInstanceProfile
+          # Instance profiles are not principals and have NO permissions boundary,
+          # so the iam:PermissionsBoundary condition is meaningless for this resource
+          # type — path-scoping is their cage. Note AddRoleToInstanceProfile
           # additionally requires iam:PassRole on the role being added (statement below).
           Sid      = "RunnerInstanceProfilePath"
           Effect   = "Allow"
