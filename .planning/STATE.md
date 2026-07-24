@@ -2,11 +2,11 @@
 gsd_state_version: 1.0
 milestone: v4.1
 milestone_name: Google Chrome in desktop role
-status: planning
-last_updated: "2026-07-24T12:12:33.273Z"
+status: roadmap-created
+last_updated: "2026-07-24T00:00:00.000Z"
 last_activity: 2026-07-24
 progress:
-  total_phases: 0
+  total_phases: 2
   completed_phases: 0
   total_plans: 0
   completed_plans: 0
@@ -17,30 +17,39 @@ progress:
 
 ## Project Reference
 
-See: .planning/PROJECT.md (v4.0 Amazon DCV Remote Desktop milestone started 2026-06-15)
+See: .planning/PROJECT.md (v4.1 Google Chrome in desktop role milestone started 2026-07-24)
 
 **Core value:** A single operator can spin up, hibernate, and tear down a reproducible, hardened cloud workstation with one command — without leaking credentials or exposing a vulnerable host to the public internet.
-**Current focus:** Phase 15 — live UAT (human/AWS); all code-level work (Phases 13–14) verified.
+**Current focus:** Phase 16 — Chrome in the desktop role (bake-time implementation). The v4.0 Phase-15 live UAT (human/AWS) remains carried open in parallel.
 
 ## Current Position
 
-Phase: Not started (defining requirements)
-Plan: —
-Status: Defining requirements
-Last activity: 2026-07-24 — Milestone v4.1 started
+Phase: 16 of 16-17 (Chrome in the desktop role) — not started
+Plan: — (next: `/gsd:plan-phase 16`)
+Status: Roadmap revised (re-scope) — ready to plan Phase 16
+Last activity: 2026-07-24 — v4.1 roadmap revised: CHROME-03/04 deferred to Future Requirements; CHROME-01/02 mapped, 2/2 coverage
 
-### v4.0 Phase Map
+Progress: [░░░░░░░░░░] 0% (0/2 phases, 0 plans)
+
+### v4.1 Phase Map
+
+| Phase | Goal | Requirements | Status |
+|-------|------|--------------|--------|
+| 16 | Chrome from Google's official signed dnf repo in `desktop` role (baked `.repo` + GPG key, `gpgcheck=1`, no new layer flag) | CHROME-02 | Not started |
+| 17 | Live UAT gate — Chrome launches from GNOME desktop (DCV/xrdp) on live hardened instance | CHROME-01 | Not started (human/AWS; blocks milestone close) |
+
+### v4.0 Phase Map (carried — live UAT open)
 
 | Phase | Goal | Requirements | Status |
 |-------|------|--------------|--------|
 | 13 | `dcv` role: install + dcv.conf + virtual session + SELinux/FIPS + bake assert | DCV-01…05 | VERIFIED (bake-config; adversarial CLEAR after CRITICAL-2 fix) |
 | 14 | Direct-connect SG (:8443 TCP+UDP) + xrdp/VNC removal + CIS 2.2.1 revert + operator surface | DCV-06…10 | VERIFIED (code; adversarial CLEAR — 2 independent opus reviewers) |
-| 15 | Live UAT gate (license, render, AVC-clean, FIPS, QUIC, CIS revert safe) | DCV-11 | Pending — human/AWS (blocks milestone close) |
+| 15 | Live UAT gate (license, render, AVC-clean, FIPS, QUIC, CIS revert safe) | DCV-11 | Pending — human/AWS (carried open; merged to main 2026-06-26) |
 
 ## Performance Metrics
 
 <details>
-<summary>v1.0 / v2.0 / v3.2 historical metrics (collapsed)</summary>
+<summary>v1.0 / v2.0 / v3.2 / v4.0 historical metrics (collapsed)</summary>
 
 ### v1.0
 
@@ -65,36 +74,43 @@ Calendar window: 2026-05-13 17:04 → 2026-05-14 10:58 (~18 hours wall clock; ~7
 | 12 | 03 | ~9min | 2 | 10 |
 | 12 | 04 | ~6min | 2 | 5 |
 
+### v4.0
+
+| Phase | Plan | Duration | Tasks | Files |
+|-------|------|----------|-------|-------|
+| 13 | 01 | 5min | 2 | 7 |
+| 13 | 02 | 3min | 2 | 3 |
+
 </details>
 
-v4.0: no metrics yet (roadmap just created).
-| Phase 13 P01 | 5min | 2 tasks | 7 files |
-| Phase 13 P02 | 3min | 2 tasks | 3 files |
+v4.1: no metrics yet (roadmap just created).
 
 ## Accumulated Context
 
 See PROJECT.md Key Decisions table.
 
-**v4.0 roadmap decisions (at roadmap time):**
+**v4.1 roadmap decisions (at roadmap time; revised at 2026-07-24 re-scope):**
 
-- **Coarse granularity → 3 phases**, matching the research's dependency-driven build order (bake-time role → runtime SG/removal → live UAT). No padding; the work clusters into exactly these three boundaries.
-- **License infra is OUT of scope** (assumed reachable externally — REQUIREMENTS.md Assumptions). NO Terraform license/VPC-endpoint/IAM phase is created. The residual licensing risk (`ORIGIN_OBJECT_MISSING` past 15-day grace — the exact blocker that scrapped DCV in `d3bd9a0`) is *verified, not silently assumed*, at the live UAT (DCV-11). If it fails, the S3 gateway endpoint + scoped IAM become a documented follow-up (already listed in ROADMAP Pending).
-- **Direct-connect posture (CHANGED from research's SSM assumption):** the SG opens `:8443` **TCP and UDP** gated on `var.allowed_web_cidrs`; **QUIC is ENABLED** (`enable-quic-frontend=true`) because access is direct, not SSM-tunneled. There is NO `./run` port-forward step for DCV. The xrdp `:3389` ingress is dropped. (NB: the research SUMMARY/PITFALLS were written for an SSM-port-forward posture and recommend QUIC-OFF + TCP-only — that recommendation is **superseded** by the v4.0 direct-connect decision in PROJECT.md/REQUIREMENTS.md; honour QUIC-ON + UDP for v4.0.)
-- **Virtual session (Xdcv), non-GPU/software render** — lets DCV-08 REVERT the v3.2 CIS 2.2.1 X-server exception + delete the post-hardening Xorg guard (virtual sessions use `Xdcv`, not system `/usr/libexec/Xorg`). The revert is committed in Phase 14 but its *safety* is a Phase 15 live-UAT gate; documented fallback (keep Xorg, leave override) if the UAT disproves it.
-- **Prior `dcv` role is recoverable from git** (`51c5f1f` / `67faeb3` / `8538ef3`, quick-task `260611-jq2`; reverted at `d3bd9a0` solely for the airgap-license blocker). Phase 13 ports it + adds the gaps the prior attempt missed: FIPS-clean cert (RSA-2048/sha256/SAN), colord `.rules`, PAM `/etc/pam.d/dcv` delegate, SELinux relabel, bake asserts. ~80% of the role already exists.
-- **Removal (DCV-07/08/09) is the irreversible-cleanup work — sequenced AFTER the `dcv` role is in place** (Phase 14, not Phase 13) so the new role fills the playbook slot xrdp vacates. The live UAT (DCV-11) is last.
-- **Credential model unchanged:** `authentication=system` reuses the `ec2-user` PAM password from the `secrets` role (`/devbox/<user>/vnc-password`, path NEVER renamed — relabel-only; hard-coded in 4+ places). No new secret.
-- **Install airgap-compliant:** pinned `get_url` from CloudFront (`d1uj6qtbmh3dt5.cloudfront.net`) + NICE GPG key import + sha256 (deferred-pin per CLAUDE.md §9 — fill `dcv_tarball_sha256` after first bake before merge). Build numbers differ per package (`dcv_build_server` ≠ `dcv_build_xdcv`) — do not reuse one for the other. No `--nogpgcheck`, no S3-for-install.
-- **`hardening` stays the last role** (grep-gate + CLAUDE.md §8 invariant) — the `dcv` role inserts between `desktop` and `hardening`, the same slot xrdp held.
+- **Coarse granularity → 2 phases:** one bake-time implementation phase (16) + one live-UAT gate (17), mirroring v4.0's DCV-11 pattern. CHROME-01 ("launch from the GNOME desktop") is only provable on a live bake the operator runs with AWS creds — a static verifier pass is not runtime proof (bake-green-but-dead lesson). No padding; the work clusters into exactly these two boundaries.
+- **Re-scope (2026-07-24):** CHROME-03 (SBOM/manifest version capture as a stated requirement) and CHROME-04 (dedicated bake-asserts: headless `--version` as `ec2-user` + W1-style post-hardening guard) deferred to Future Requirements by operator choice — a deliberate deviation from the dcv/xrdp/ai_tools bake-assert doctrine; revisit if a bake ever ships a dead Chrome. The existing SBOM pass still inventories Chrome as ordinary behavior (dropped as requirement, not as behavior). v4.1 maps CHROME-01/02 only (2/2 coverage).
+- **Chrome is unconditional desktop content** inside `ansible/roles/desktop/` — no new role, no new layer flag, no `vscode_desktop`-style sub-gate (operator decision). Applies whenever `layers.desktop` is on; non-desktop bakes unchanged.
+- **Latest-at-bake over strict pin:** Google's repo hosts only the current stable (~4-6-week cadence; historic RPMs not hosted) — a pin would break every bake for no reproducibility gain. Remediation for a bad version = rebake (SPAL/xrdp precedent, CLAUDE.md §8).
+- **GPG posture unchanged:** baked `.repo` config + Google GPG key, `gpgcheck=1`, no `--nogpgcheck` / `disable_gpg_check` — consistent with CLAUDE.md §2/§8 airgap posture.
+- **Playbook invariants untouched:** `hardening` stays the last role in `ansible/playbook.yml`; `sbom.yml` stays the last import (both grep-gated).
+- **Phase-17 UAT composes with the open live-UAT backlog** (DCV-11, xrdp 260707-o7s task 3, ai_tools first bake, kion-creds endpoints) — one bake + apply session can clear several gates. Next `tf-apply` replaces the instance.
 
-**Pitfalls to bake in (from .planning/research/PITFALLS.md):**
+<details>
+<summary>v4.0 roadmap decisions + pitfalls (collapsed — carried until DCV-11 records)</summary>
 
-- No auto-session: DCV creates zero sessions; wire a oneshot `dcv create-session --type virtual --owner ec2-user` unit (virtual cannot use `dcv.conf` console auto-create).
-- SELinux AVCs under enforcing: `restorecon -RvF` over DCV paths in the role; AVC-clean confirmed only at live UAT; never `setenforce 0` — vendor a scoped `audit2allow` module if denials appear.
-- FIPS TLS: DCV's auto-cert may lack SAN / use SHA-1; generate a FIPS-clean self-signed cert in the role + bake-assert SAN/RSA≥2048/sha256; handshake confirmed at UAT.
-- colord polkit: ship `45-allow-colord.rules` (`.pkla` ignored on AL2023 polkit 121+) or the GNOME session hangs.
-- dcv-gl "no GPU" log is BENIGN on non-GPU — do not install `nice-dcv-gl`; document the message.
-- Security grep-gate: reject `authentication=none` / TLS-off in tracked DCV config (mirror the no-changeme gate). The `!= "changeme"` PAM-password assert ported from the prior role is a known no-changeme hook false-positive — annotate/handle the gate.
+- Coarse granularity → 3 phases (bake-time role → runtime SG/removal → live UAT).
+- License infra OUT of scope (assumed external); residual risk verified at DCV-11 — if it fails, S3 gateway endpoint + scoped IAM become a documented follow-up.
+- Direct-connect posture: SG opens `:8443` TCP+UDP gated on `var.allowed_web_cidrs`; QUIC ON; no `./run` port-forward for DCV; xrdp `:3389` re-added later by quick-task 260707-o7s (additive).
+- Virtual session (Xdcv), non-GPU/software render; CIS 2.2.1 re-enabled for DCV-only builds, scoped OFF for xrdp builds (CLAUDE.md §8).
+- Credential model unchanged: `authentication=system` reuses the `ec2-user` PAM password (`/devbox/<user>/vnc-password` path never renamed).
+- Install airgap-compliant: pinned `get_url` from CloudFront + NICE GPG key + sha256; no `--nogpgcheck`, no S3-for-install.
+- Pitfalls baked in: oneshot virtual-session unit; SELinux `restorecon -RvF` + never `setenforce 0`; FIPS-clean self-signed cert (RSA-2048/sha256/SAN); colord `45-allow-colord.rules`; dcv-gl "no GPU" log benign; grep-gate rejects `authentication=none`/TLS-off.
+
+</details>
 
 <details>
 <summary>v1.0 / v2.0 / v3.0 / v3.2 locked decisions (collapsed — see PROJECT.md)</summary>
@@ -102,7 +118,7 @@ See PROJECT.md Key Decisions table.
 - SSM Parameter Store SecureString (vs Secrets Manager); hybrid network posture; Packer manifest → auto.tfvars handoff; Checkov; parallel CI + tiered pre-commit; Terragrunt dropped post-v1.0.
 - v2.0: Makefile deleted last; standalone `./run` dispatcher.
 - v3.0: Jupyter loopback-only on-demand; mise binary-only; hardening-invariant for new roles (JUP-08).
-- v3.2: xorgxrdp/Xorg backend with CIS 2.2.1 as the single documented deviation; post-hardening regression asserts; vendored xorg.conf + idempotent semanage fcontext; tsusers gating; `gnome-session` by name. **All of this is removed/reverted in v4.0** — DCV virtual sessions make the Xorg dependency and the CIS deviation unnecessary.
+- v3.2: xorgxrdp/Xorg backend with CIS 2.2.1 deviation; removed/reverted in v4.0, then xrdp re-added from SPAL by 260707-o7s with 2.2.1 scoped off for xrdp builds.
 
 </details>
 
@@ -110,6 +126,9 @@ See PROJECT.md Key Decisions table.
 
 | Category | Item | Status | Originated |
 |----------|------|--------|-----------|
+| live_uat | v4.0 DCV-11 live UAT (license, render, AVC-clean, FIPS, QUIC, CIS-revert safe) | open — human/AWS | v4.0 Phase 15 |
+| live_uat | xrdp 260707-o7s task 3 (live RDP login verify) + SPAL version pin fill-in | open — human/AWS | quick 260707-o7s |
+| live_uat | ai_tools first-bake verify; kion-creds token endpoints (branch `feat/kion-creds`, unmerged) | open — human/AWS | 2026-07 merges |
 | Observability | CloudWatch metrics + login event shipping | v3 backlog | v1.0 init |
 | Lifecycle | Idle auto-stop + scheduled nightly stop | v3 backlog | v1.0 init |
 | Image lifecycle | Old AMI deregistration + inventory | v3 backlog | v1.0 init |
@@ -119,6 +138,9 @@ See PROJECT.md Key Decisions table.
 | tech_debt | WR-05: bootstrap .sh.j2 outside CI shellcheck glob | open follow-up | v3.0 close |
 | dcv_license | S3 gateway VPC endpoint + scoped IAM `s3:GetObject` on `dcv-license.<region>` | out of scope (assumed external); provision in-repo if target env stops providing it | v4.0 roadmap |
 | dcv_v4x | GPU `nice-dcv-gl`, native-client docs, file transfer, multi-monitor, custom CA cert, SSM `:8443` TCP fallback | deferred | v4.0 roadmap |
+| chrome_deferred | CHROME-03 SBOM/manifest version capture as stated requirement (behavior persists via existing SBOM pass) | deferred — re-scope 2026-07-24 | v4.1 re-scope |
+| chrome_deferred | CHROME-04 dedicated bake-asserts (headless `--version` as `ec2-user`; W1-style post-hardening guard) | deferred — revisit if a bake ships a dead Chrome | v4.1 re-scope |
+| chrome_followup | Chrome managed policies (`/etc/opt/chrome/policies/`); default-browser `xdg-settings` wiring | deferred — revisit at UAT | v4.1 requirements |
 
 ### Quick Tasks Completed
 
@@ -132,18 +154,29 @@ See PROJECT.md Key Decisions table.
 
 ## Session Continuity
 
-Last session: 2026-06-22 (resume → Phase 14 adversarial review + verification)
+Last session: 2026-07-24 (v4.1 milestone start → roadmap created → re-scoped + roadmap revised)
 
-- Ran the pending Phase 14 adversarial review: two independent opus reviewers, distinct lenses (removal/dependency + network/operator). Both VERDICT: CLEAR (0 critical, 0 high).
-- Orchestrator hand-re-verified the load-bearing claims: SG :8443 TCP+UDP both gated on var.allowed_web_cidrs + :3389 gone (main.tf:113-132); `git grep vnc` = 0, `git grep xrdp|xorgxrdp|3389` (excl .planning + dcv role) = 0; hardening last (playbook.yml:65) with dcv before it (59); is-enabled bake assert present (dcv/tasks/main.yml:427-443).
-- Carried CRITICAL-1 (secrets-bootstrap ordering xrdp→dcvserver) confirmed CLOSED.
-- One LOW residual (CIS-2.2.1-revert render safety) is documented + deferred to Phase 15 by design — no static guard can prove "GNOME renders without system Xorg"; the W1 guard fail_msg already names the `repoquery --requires nice-xdcv` Phase-15 check. Deliberately NOT code-changed (a speculative guard would risk false-failing a good bake; KISS/YAGNI).
-- Wrote 14-VERIFICATION.md (status: passed). No code changes this session — Phase 14 stands as committed.
+- v4.1 re-scoped: CHROME-03 (SBOM capture as requirement) and CHROME-04 (dedicated
+  bake-asserts) moved to Future Requirements. Roadmap revised: Phase 16 (bake-time
+  implementation — CHROME-02) + Phase 17 (live UAT gate — CHROME-01), continuing
+  numbering from v4.0's Phase 15. Coverage 2/2, no orphans.
+- v4.0 roadmap archived at `milestones/v4.0-ROADMAP.md`; ROADMAP.md replaced for v4.1.
+- v4.0 DCV-11 live UAT remains carried open (merged to main 2026-06-26 without it);
+  Phase-17 UAT is planned to compose with that backlog in one live bake session.
 
-Stopped at: Phase 14 verified. Milestone v4.0 is code-complete; only the human Phase-15 live UAT remains.
-Next: human runs the Phase-15 live UAT (needs live AWS + reachable S3 license path), then merge feat/dcv → main.
+Stopped at: Roadmap revised (re-scope applied); Phase 16 not yet planned.
+Next: `/gsd:plan-phase 16` (Chrome in the desktop role).
 
 ## Operator Next Steps
 
-- **Phase 15 live UAT (human/AWS):** `DEVBOX_USER=$(whoami) ./run build && ./run tf-init && ./run tf-apply && ./run start`, then from within `var.allowed_web_cidrs` browse `https://<host>:8443` (or native DCV client), login `ec2-user` + `./run secrets-show` desktop password. Confirm: GNOME virtual session renders (not blank/Wayland); license resolves (no ORIGIN_OBJECT_MISSING past grace); SELinux AVC-clean under enforcing (`ausearch -m avc -ts boot`); FIPS TLS handshake on :8443; QUIC over UDP 8443; `systemctl is-active dcvserver dcv-virtual-session`; CIS-2.2.1-revert safe (`repoquery --requires nice-xdcv` shows no `xorg-x11-server-common`). Record results in a 15-*-UAT.md.
-- After UAT passes: merge `feat/dcv` → `main`.
+- **Plan Phase 16:** `/gsd:plan-phase 16` — Chrome install task block in
+  `ansible/roles/desktop/`: baked Google `.repo` config + GPG key, `gpgcheck=1`
+  install of `google-chrome-stable`, gated only by `layers.desktop` (no sub-flag);
+  `hardening` stays last role, `sbom.yml` stays last import.
+- **Open live-UAT backlog (human/AWS, one bake session can clear several):**
+  `DEVBOX_USER=$(whoami) ./run build && ./run tf-init && ./run tf-apply && ./run start`, then
+  from within `var.allowed_web_cidrs`: v4.0 DCV-11 checks (GNOME renders on `:8443`, license
+  resolves, AVC-clean, FIPS TLS, QUIC, `repoquery --requires nice-xdcv` clean), xrdp `:3389`
+  login (260707-o7s task 3 + SPAL pin fill-in), ai_tools first-bake verify, and — once
+  Phase 16 lands — Chrome launch from the GNOME desktop (Phase 17). Record results in the
+  respective UAT files. Note: the next `tf-apply` replaces the instance.

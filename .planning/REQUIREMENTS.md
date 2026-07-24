@@ -34,8 +34,10 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| CHROME-01 | — | Pending roadmap |
-| CHROME-02 | — | Pending roadmap |
+| CHROME-01 | Phase 17 | Pending |
+| CHROME-02 | Phase 16 | Pending |
+
+**Coverage:** 2/2 v1 (v4.1) requirements mapped — no orphans. CHROME-03/04 deferred (Future Requirements), intentionally unmapped.
 
 ---
-*Defined: 2026-07-24 — milestone v4.1. Re-scoped 2026-07-24: CHROME-03/04 deferred; traceability pending roadmap re-run.*
+*Defined: 2026-07-24 — milestone v4.1. Re-scoped 2026-07-24: CHROME-03/04 deferred; roadmap revised same day — Phases 16-17 mapped.*
