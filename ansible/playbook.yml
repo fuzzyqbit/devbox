@@ -58,6 +58,14 @@
       # NO auth baked — operators log in at runtime; creds persist on the /home EBS
       # volume. MUST stay before hardening (last-role invariant).
 
+    - role: gitlab_runner
+      when: layers.gitlab_runner | default(false)
+      # GitLab CI runner from GitLab's official packagecloud rpm repo (gpgcheck +
+      # repo_gpgcheck ON), version-pinned. Installed-NOT-registered: no runner token
+      # baked (§8 no-secrets), service ships disabled — the operator registers at
+      # runtime (see the role header). Default OFF (org-specific tool). MUST stay
+      # before hardening (last-role invariant).
+
     - role: secrets
       when: >-
         (layers.vscode | default(false)) or
