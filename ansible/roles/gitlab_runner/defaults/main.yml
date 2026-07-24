@@ -4,6 +4,9 @@
 # Bump procedure: check the current release on gitlab.com, edit the pin, rebake
 # (./run build && ./run tf-apply). packages.gitlab.com hosts historic versions,
 # so a pin stays resolvable across future bakes (unlike the Chrome repo).
+# If a future bake 404s inside the rpm_key import, GitLab rotated the runner
+# signing keys — re-fetch config_file.repo (URL in tasks/main.yml) and
+# re-splice the .repo content + rpm_key URLs.
 #
 # DEFERRED REFINEMENT (CLAUDE.md §9 — xrdp deferred-pin idiom): the rpm RELEASE
 # suffix (e.g. "-1") is NOT pinned yet. At the first bake, run ON THE INSTANCE:

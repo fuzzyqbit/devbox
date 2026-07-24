@@ -14,6 +14,19 @@
 # on the ROOT volume, not the persistent /home EBS volume (unlike ai_tools
 # credentials). Re-register after every rebake + tf-apply.
 #
+# CAVEAT — job workspaces/caches live under /home/gitlab-runner on the
+# DISPOSABLE root volume (the persistent EBS volume mounts /home/ec2-user
+# only): they vanish on AMI swap and can fill the root filesystem.
+#
+# CIS 4.6.2 END-STATE: the rpm post-install creates the gitlab-runner system
+# user with /bin/bash; the hardening role (applied AFTER this role) flips
+# system-account shells to nologin (CIS rule 4.6.2), so the SHIPPED image has
+# the gitlab-runner account shell as nologin. Runner jobs are unaffected —
+# the runner spawns `su -s /bin/bash` as root — but `sudo su - gitlab-runner`
+# dies post-hardening; operator debugging uses
+#     sudo -u gitlab-runner -s /bin/bash
+# instead of `su -`.
+#
 # EXECUTOR DEPS (deliberately NOT a hard dependency — comment only): the shell
 # executor works with what is already baked (bash + git from the git layer);
 # the docker executor becomes available when layers.containers is on.
@@ -82,6 +95,19 @@
     state: present
     disable_gpg_check: false
 
+- name: Lock gitlab-runner at the pinned version (post-bake drift guard)
+  # Same drift class the base-role versionlock guards for salt-minion: the baked
+  # .repo ships enabled=1, so a runtime `dnf upgrade` would silently move the
+  # CI-job-executing binary off the pin. The versionlock plugin is baked by the
+  # base role (runs before this one). Skipped when the pin var is empty
+  # (deferred-pin mode installs latest — nothing meaningful to lock).
+  ansible.builtin.command:
+    cmd: dnf versionlock add gitlab-runner
+  when: gitlab_runner_version | length > 0
+  register: gitlab_runner_versionlock
+  changed_when: "'Adding versionlock on:' in gitlab_runner_versionlock.stdout"
+  failed_when: gitlab_runner_versionlock.rc != 0 and 'already locked' not in (gitlab_runner_versionlock.stdout + gitlab_runner_versionlock.stderr)
+
 # The rpm %post enables + starts the service [ASSUMED, confirmed-at-first-bake].
 # An unregistered runner must not run at boot — the operator enables it AFTER
 # registering (see the header).
@@ -115,7 +141,23 @@
 - name: Run gitlab-runner --version (bake-assert)
   ansible.builtin.command:
     cmd: /usr/bin/gitlab-runner --version
+  register: gitlab_runner_bake_version
   changed_when: false
+
+# Pin-match: the installed binary must report the pinned version, not merely
+# execute. Skipped in deferred-pin mode (empty var installs repo-latest).
+- name: Assert the installed runner matches the pinned version (bake-assert)
+  ansible.builtin.assert:
+    that:
+      - gitlab_runner_version in gitlab_runner_bake_version.stdout
+    fail_msg: >-
+      `gitlab-runner --version` does not report the pinned version
+      {{ gitlab_runner_version }} — actual output:
+      {{ gitlab_runner_bake_version.stdout | default('') }}. The dnf pin and
+      the installed binary have diverged; check the version pin in
+      defaults/main.yml against the repo contents.
+    quiet: true
+  when: gitlab_runner_version | length > 0
 
 # The systemd module cannot do a read-only is-enabled query — command is deliberate.
 # `systemctl is-enabled` prints `disabled` on stdout and exits NON-ZERO (rc 1)
@@ -143,28 +185,42 @@
     quiet: true
 
 # ── §8 no-secrets assert — a runner registration MUST NOT reach the image ──
+# Three paths: the system-mode config plus the two USER-MODE registration
+# paths (root's and the gitlab-runner account's ~/.gitlab-runner) — a
+# `gitlab-runner register` run without sudo lands there, not in /etc. All
+# three stat-gated: absent files skip cleanly (clean bakes pass).
 
-- name: Stat /etc/gitlab-runner/config.toml (bake-assert)
+- name: Stat runner config.toml candidates (bake-assert)
   ansible.builtin.stat:
-    path: /etc/gitlab-runner/config.toml
+    path: "{{ item }}"
   register: gitlab_runner_bake_config
+  loop:
+    - /etc/gitlab-runner/config.toml
+    - /root/.gitlab-runner/config.toml
+    - /home/gitlab-runner/.gitlab-runner/config.toml
 
-- name: Slurp config.toml for the no-secrets assert (bake-assert)
+- name: Slurp runner config.toml for the no-secrets assert (bake-assert)
   ansible.builtin.slurp:
-    src: /etc/gitlab-runner/config.toml
+    src: "{{ item.item }}"
   register: gitlab_runner_bake_config_content
-  when: gitlab_runner_bake_config.stat.exists
+  when: item.stat.exists
+  loop: "{{ gitlab_runner_bake_config.results }}"
+  loop_control:
+    label: "{{ item.item }}"
 
 - name: Assert no runner registration is baked (bake-assert)
   ansible.builtin.assert:
     that:
-      - "'token' not in (gitlab_runner_bake_config_content.content | b64decode)"
-      - "'[[runners]]' not in (gitlab_runner_bake_config_content.content | b64decode)"
+      - "'token' not in (item.content | b64decode)"
+      - "'[[runners]]' not in (item.content | b64decode)"
     fail_msg: >-
-      /etc/gitlab-runner/config.toml carries a `token` or a `[[runners]]`
+      {{ item.item.item }} carries a `token` or a `[[runners]]`
       section at bake end — a runner registration reached the image. A
       registration token is a SECRET (CLAUDE.md §8) and MUST NOT enter the
       AMI; registration is a runtime step (see the role header). Remove
       whatever baked it and rebake.
     quiet: true
-  when: gitlab_runner_bake_config.stat.exists
+  when: item is not skipped
+  loop: "{{ gitlab_runner_bake_config_content.results }}"
+  loop_control:
+    label: "{{ item.item.item | default('(skipped)') }}"
